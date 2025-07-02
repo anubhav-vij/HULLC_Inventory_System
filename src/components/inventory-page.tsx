@@ -5,11 +5,10 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Badge } from '@/components/ui/badge';
-import { ChevronsUpDown, MoreHorizontal, Package, Pencil, PlusCircle, Trash2, Warehouse } from 'lucide-react';
+import { ChevronsUpDown, MoreHorizontal, Package, Pencil, PlusCircle, Warehouse } from 'lucide-react';
 import { ProductForm } from './product-form';
 import { type Product, type Lot, type ProductFormData } from '@/lib/types';
 import { StockPilotLogo } from './icons';
@@ -50,8 +49,6 @@ export default function InventoryPage() {
     const [productToEdit, setProductToEdit] = useState<Product | null>(null);
     const [isSaving, setIsSaving] = useState(false);
     
-    const [productToDelete, setProductToDelete] = useState<Product | null>(null);
-    const [isAlertOpen, setIsAlertOpen] = useState(false);
     const { toast } = useToast();
 
     useEffect(() => {
@@ -102,20 +99,6 @@ export default function InventoryPage() {
         setProductToEdit(product);
         setIsFormOpen(true);
     };
-
-    const handleDelete = (product: Product) => {
-        setProductToDelete(product);
-        setIsAlertOpen(true);
-    }
-    
-    const confirmDelete = () => {
-        if(productToDelete) {
-            setProducts(products.filter(p => p.id !== productToDelete.id));
-            toast({ title: 'Product Deleted', description: `"${productToDelete.name}" has been removed.`});
-        }
-        setIsAlertOpen(false);
-        setProductToDelete(null);
-    }
 
     const handleSaveProduct = (data: ProductFormData) => {
         setIsSaving(true);
@@ -171,17 +154,19 @@ export default function InventoryPage() {
                                         <TableHead className="w-[100px] text-right">Actions</TableHead>
                                     </TableRow>
                                 </TableHeader>
-                                <TableBody>
-                                    {isLoading ? (
-                                         <TableRow>
+                                {isLoading ? (
+                                     <TableBody>
+                                        <TableRow>
                                             <TableCell colSpan={6} className="h-24 text-center">
                                                 Loading inventory...
                                             </TableCell>
                                         </TableRow>
-                                    ) : products.length > 0 ? (
-                                        products.map(product => (
-                                            <Collapsible asChild key={product.id} >
-                                                <React.Fragment>
+                                    </TableBody>
+                                ) : products.length > 0 ? (
+                                    products.map(product => (
+                                        <TableBody key={product.id} className="[&_tr:last-child]:border-0">
+                                            <Collapsible asChild>
+                                                <>
                                                     <TableRow className="text-sm">
                                                         <TableCell>
                                                             <CollapsibleTrigger asChild>
@@ -222,9 +207,6 @@ export default function InventoryPage() {
                                                                     <DropdownMenuItem onClick={() => handleEdit(product)}>
                                                                         <Pencil className="mr-2 h-4 w-4" /> Edit
                                                                     </DropdownMenuItem>
-                                                                    <DropdownMenuItem onClick={() => handleDelete(product)} className="text-destructive focus:text-destructive">
-                                                                        <Trash2 className="mr-2 h-4 w-4" /> Delete
-                                                                    </DropdownMenuItem>
                                                                 </DropdownMenuContent>
                                                             </DropdownMenu>
                                                         </TableCell>
@@ -258,17 +240,19 @@ export default function InventoryPage() {
                                                             </TableCell>
                                                         </TableRow>
                                                     </CollapsibleContent>
-                                                </React.Fragment>
+                                                </>
                                             </Collapsible>
-                                        ))
-                                    ) : (
+                                        </TableBody>
+                                    ))
+                                ) : (
+                                     <TableBody>
                                         <TableRow>
                                             <TableCell colSpan={6} className="h-24 text-center">
                                                 No products found. Get started by adding a new product.
                                             </TableCell>
                                         </TableRow>
-                                    )}
-                                </TableBody>
+                                    </TableBody>
+                                )}
                             </Table>
                         </div>
                     </CardContent>
@@ -288,20 +272,6 @@ export default function InventoryPage() {
                     />
                 </DialogContent>
             </Dialog>
-
-            <AlertDialog open={isAlertOpen} onOpenChange={setIsAlertOpen}>
-                <AlertDialogContent>
-                    <AlertDialogHeader>
-                        <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                            This will permanently delete the product "{productToDelete?.name}" and all of its associated lots. This action cannot be undone.
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                        <AlertDialogCancel>Cancel</AlertDialogCancel>
-                        <AlertDialogAction onClick={confirmDelete}>Delete</AlertDialogAction>
-                    </AlertDialogFooter>
-                </AlertDialogContent>
-            </AlertDialog>
         </div>
     );
+}
