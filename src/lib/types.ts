@@ -9,12 +9,23 @@ export const LotSchema = z.object({
   expirationDate: z.date().nullable().default(null),
 });
 
+// Stricter lot schema for new lots, requires quantity > 0
+export const NewLotSchema = LotSchema.extend({
+    quantity: z.coerce.number().min(1, "Quantity must be greater than 0."),
+});
+
+// Schema for the form when editing an existing product
 export const ProductFormSchema = z.object({
   name: z.string().min(1, "Product name is required."),
   vendor: z.string().min(1, "Vendor is required."),
   vendorPartNumber: z.string().min(1, "Vendor part number is required."),
   location: z.string().min(1, "Location is required."),
   lots: z.array(LotSchema).min(1, "At least one lot is required."),
+});
+
+// Stricter form schema for creating a new product
+export const ProductFormCreateSchema = ProductFormSchema.extend({
+    lots: z.array(NewLotSchema).min(1, "At least one lot is required."),
 });
 
 export const ProductSchema = ProductFormSchema.extend({

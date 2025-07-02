@@ -11,7 +11,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { CalendarIcon, Loader2, PlusCircle, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
-import { type Product, ProductFormSchema, type ProductFormData } from "@/lib/types";
+import { type Product, ProductFormSchema, type ProductFormData, ProductFormCreateSchema } from "@/lib/types";
 import { Separator } from "./ui/separator";
 
 type ProductFormProps = {
@@ -23,7 +23,7 @@ type ProductFormProps = {
 
 export function ProductForm({ product, onSave, onCancel, isSaving }: ProductFormProps) {
   const form = useForm<ProductFormData>({
-    resolver: zodResolver(ProductFormSchema),
+    resolver: zodResolver(product ? ProductFormSchema : ProductFormCreateSchema),
     defaultValues: product || {
       name: "",
       vendor: "",
