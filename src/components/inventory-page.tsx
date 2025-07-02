@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Badge } from '@/components/ui/badge';
-import { ChevronsUpDown, MoreHorizontal, Package, Pencil, PlusCircle, Warehouse, ArrowRightLeft } from 'lucide-react';
+import { ChevronsUpDown, MoreHorizontal, Package, Pencil, PlusCircle, Warehouse, ArrowRightLeft, CloudUpload, Loader2 } from 'lucide-react';
 import { ProductForm } from './product-form';
 import { TransactionForm } from './transaction-form';
 import { type Product, type Lot, type ProductFormData, type Transaction, type TransactionFormData } from '@/lib/types';
@@ -17,6 +17,7 @@ import { StockPilotLogo } from './icons';
 import { useToast } from '@/hooks/use-toast';
 import { v4 as uuidv4 } from 'uuid';
 import { format } from 'date-fns';
+import Papa from 'papaparse';
 
 const initialProducts: Product[] = [
     {
@@ -55,6 +56,9 @@ export default function InventoryPage() {
     const [productToEdit, setProductToEdit] = useState<Product | null>(null);
     const [productForTransaction, setProductForTransaction] = useState<Product | null>(null);
     const [isSaving, setIsSaving] = useState(false);
+    const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
+    const [isImporting, setIsImporting] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
     
     const { toast } = useToast();
 
@@ -133,7 +137,7 @@ export default function InventoryPage() {
                 setProducts(products.map(p => p.id === updatedProduct.id ? updatedProduct : p));
                 toast({ title: "Product Updated", description: `"${updatedProduct.name}" has been updated successfully.` });
             } else {
-                const newProduct: Product = { ...data, id: nextProductId };
+                const newProduct: Product = { ...data, id: nextProductId, lots: data.lots.map(lot => ({...lot, id: uuidv4()})) };
                 setProducts([...products, newProduct]);
                 toast({ title: "Product Added", description: `"${newProduct.name}" has been added successfully.` });
             }
@@ -188,11 +192,105 @@ export default function InventoryPage() {
             setProductForTransaction(null);
         }, 500);
     }
+    
+    const handleImportClick = () => {
+        fileInputRef.current?.click();
+    };
+
+    const handleFileImport = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+
+        setIsImporting(true);
+        Papa.parse<any>(file, {
+            header: true,
+            skipEmptyLines: true,
+            complete: (results) => {
+                try {
+                    const requiredHeaders = [
+                        'product_id', 'product_name', 'vendor', 'vendor_part_number', 'location', 
+                        'lot_number', 'quantity', 'receipt_date', 'expiration_date'
+                    ];
+                    const headers = results.meta.fields || [];
+                    if (!requiredHeaders.every(h => headers.includes(h))) {
+                        throw new Error(`CSV must contain the following headers: ${requiredHeaders.join(', ')}`);
+                    }
+
+                    const importedProductsMap = new Map<string, Product>();
+
+                    for (const row of results.data) {
+                        const {
+                            product_id, product_name, vendor, vendor_part_number, location,
+                            lot_number, quantity, receipt_date, expiration_date
+                        } = row;
+
+                        if (!product_id || !product_name || !lot_number) continue;
+
+                        const lot: Lot = {
+                            id: uuidv4(),
+                            lotNumber: lot_number,
+                            quantity: parseInt(quantity, 10) || 0,
+                            receiptDate: new Date(receipt_date),
+                            expirationDate: expiration_date ? new Date(expiration_date) : null
+                        };
+
+                        if (importedProductsMap.has(product_id)) {
+                            importedProductsMap.get(product_id)!.lots.push(lot);
+                        } else {
+                            const newProduct: Product = {
+                                id: product_id,
+                                name: product_name,
+                                vendor: vendor,
+                                vendorPartNumber: vendor_part_number,
+                                location: location,
+                                lots: [lot]
+                            };
+                            importedProductsMap.set(product_id, newProduct);
+                        }
+                    }
+                    
+                    const newProducts = Array.from(importedProductsMap.values());
+                    if (newProducts.length === 0) {
+                        toast({ title: "Import Failed", description: "No valid product data found in the file.", variant: "destructive" });
+                        return;
+                    }
+
+                    const updatedProducts = [...products];
+                    newProducts.forEach(newProduct => {
+                        const existingIndex = updatedProducts.findIndex(p => p.id === newProduct.id);
+                        if (existingIndex > -1) {
+                            updatedProducts[existingIndex] = newProduct;
+                        } else {
+                            updatedProducts.push(newProduct);
+                        }
+                    });
+
+                    setProducts(updatedProducts);
+                    toast({ title: "Import Successful", description: `${newProducts.length} product(s) imported.` });
+
+                } catch (error: any) {
+                    toast({ title: "Import Failed", description: error.message, variant: "destructive" });
+                } finally {
+                    setIsImporting(false);
+                    setIsImportDialogOpen(false);
+                    if (event.target) {
+                        event.target.value = '';
+                    }
+                }
+            },
+            error: (error: any) => {
+                toast({ title: "Import Error", description: error.message, variant: "destructive" });
+                setIsImporting(false);
+            }
+        });
+    };
+
 
     const totalQuantity = (lots: Lot[]) => lots.reduce((sum, lot) => sum + lot.quantity, 0);
 
     return (
         <div className="min-h-screen w-full bg-background flex flex-col items-center p-4 sm:p-6 lg:p-8">
+            <input type="file" ref={fileInputRef} onChange={handleFileImport} style={{ display: 'none' }} accept=".csv" />
             <main className="w-full max-w-7xl mx-auto">
                 <div className="flex items-center gap-3 mb-8">
                     <StockPilotLogo className="h-8 w-8 text-primary" />
@@ -212,9 +310,14 @@ export default function InventoryPage() {
                                         <CardTitle>HULLC Inventory</CardTitle>
                                         <CardDescription>Manage your products and their stock.</CardDescription>
                                     </div>
-                                    <Button onClick={handleAddNew}>
-                                        <PlusCircle className="mr-2 h-4 w-4" /> Add Product
-                                    </Button>
+                                    <div className="flex gap-2">
+                                        <Button variant="outline" onClick={() => setIsImportDialogOpen(true)}>
+                                            <CloudUpload className="mr-2 h-4 w-4" /> Import CSV
+                                        </Button>
+                                        <Button onClick={handleAddNew}>
+                                            <PlusCircle className="mr-2 h-4 w-4" /> Add Product
+                                        </Button>
+                                    </div>
                                 </div>
                             </CardHeader>
                             <CardContent>
@@ -365,6 +468,32 @@ export default function InventoryPage() {
                             isSaving={isSaving}
                         />
                     )}
+                </DialogContent>
+            </Dialog>
+
+            <Dialog open={isImportDialogOpen} onOpenChange={setIsImportDialogOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Import Products from CSV</DialogTitle>
+                        <DialogDescription>
+                            Upload a CSV file to bulk-import products. The file must have the following headers:
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="text-sm bg-muted p-4 rounded-md overflow-x-auto">
+                        <code className="font-mono whitespace-nowrap">
+                            product_id,product_name,vendor,vendor_part_number,location,lot_number,quantity,receipt_date,expiration_date
+                        </code>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                        Each row in the CSV represents a single lot. Products with multiple lots should have multiple rows with the same product information. Dates should be in YYYY-MM-DD format.
+                    </p>
+                    <div className="flex justify-end gap-2 pt-4">
+                        <Button variant="ghost" onClick={() => setIsImportDialogOpen(false)} disabled={isImporting}>Cancel</Button>
+                        <Button onClick={handleImportClick} disabled={isImporting}>
+                            {isImporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CloudUpload className="mr-2 h-4 w-4" />}
+                            {isImporting ? 'Importing...' : 'Select File'}
+                        </Button>
+                    </div>
                 </DialogContent>
             </Dialog>
         </div>
