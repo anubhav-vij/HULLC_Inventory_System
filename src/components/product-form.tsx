@@ -1,6 +1,5 @@
 "use client";
 
-import * as React from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useFieldArray, useForm } from "react-hook-form";
 import { z } from "zod";
@@ -9,12 +8,10 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { CalendarIcon, Loader2, PlusCircle, Trash2, Wand2 } from "lucide-react";
+import { CalendarIcon, Loader2, PlusCircle, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { Product, ProductSchema } from "@/lib/types";
-import { getPredictedExpirationDatesAction } from "@/lib/actions";
-import { useToast } from "@/hooks/use-toast";
 import { Separator } from "./ui/separator";
 
 type ProductFormProps = {
@@ -25,7 +22,6 @@ type ProductFormProps = {
 };
 
 export function ProductForm({ product, onSave, onCancel, isSaving }: ProductFormProps) {
-  const { toast } = useToast();
   const form = useForm<z.infer<typeof ProductSchema>>({
     resolver: zodResolver(ProductSchema),
     defaultValues: product || {
@@ -41,51 +37,6 @@ export function ProductForm({ product, onSave, onCancel, isSaving }: ProductForm
     control: form.control,
     name: "lots",
   });
-  
-  const [isPredicting, setIsPredicting] = React.useState(false);
-
-  async function handlePredictExpiration() {
-    setIsPredicting(true);
-    const formData = form.getValues();
-    const lotsToPredict = formData.lots.map((lot, index) => ({...lot, index})).filter(lot => !lot.expirationDate);
-
-    if (lotsToPredict.length === 0) {
-      toast({ title: "No lots to predict", description: "All lots already have an expiration date." });
-      setIsPredicting(false);
-      return;
-    }
-
-    const input = {
-      productName: formData.name,
-      vendor: formData.vendor,
-      vendorPartNumber: formData.vendorPartNumber,
-      location: formData.location,
-      lotNumbers: lotsToPredict.map(l => l.lotNumber),
-      receiptDates: lotsToPredict.map(l => l.receiptDate.toISOString()),
-      quantities: lotsToPredict.map(l => l.quantity),
-    };
-
-    const result = await getPredictedExpirationDatesAction(input);
-
-    if (result.success && result.data) {
-      result.data.predictedExpirationDates.forEach((dateStr, i) => {
-        const originalIndex = lotsToPredict[i].index;
-        form.setValue(`lots.${originalIndex}.expirationDate`, new Date(dateStr));
-      });
-      toast({
-        title: "Prediction Successful",
-        description: "Expiration dates have been predicted and filled in.",
-      });
-    } else {
-      toast({
-        variant: "destructive",
-        title: "Prediction Failed",
-        description: result.error || "Could not predict expiration dates.",
-      });
-    }
-    setIsPredicting(false);
-  }
-
 
   return (
     <Form {...form}>
@@ -197,11 +148,29 @@ export function ProductForm({ product, onSave, onCancel, isSaving }: ProductForm
                     control={form.control}
                     name={`lots.${index}.expirationDate`}
                     render={({ field }) => (
-                       <FormItem>
+                       <FormItem className="flex flex-col">
                         <FormLabel>Expiration Date</FormLabel>
-                        <FormControl>
-                            <Input value={field.value ? format(field.value, "PPP") : 'Predict to see date'} readOnly disabled className="bg-muted/50"/>
-                        </FormControl>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <FormControl>
+                              <Button
+                                variant={"outline"}
+                                className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")}
+                              >
+                                {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
+                                <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                              </Button>
+                            </FormControl>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0" align="start">
+                            <Calendar
+                              mode="single"
+                              selected={field.value ?? undefined}
+                              onSelect={field.onChange}
+                              initialFocus
+                            />
+                          </PopoverContent>
+                        </Popover>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -212,13 +181,9 @@ export function ProductForm({ product, onSave, onCancel, isSaving }: ProductForm
                 </Button>
               </div>
             ))}
-            <div className="flex justify-between items-center">
+            <div className="flex justify-start">
                  <Button type="button" variant="secondary" onClick={() => append({ lotNumber: '', quantity: 1, receiptDate: new Date(), expirationDate: null })}>
                     <PlusCircle className="mr-2 h-4 w-4" /> Add Another Lot
-                </Button>
-                <Button type="button" onClick={handlePredictExpiration} disabled={isPredicting}>
-                    {isPredicting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />}
-                    Predict Expiration
                 </Button>
             </div>
           </div>
