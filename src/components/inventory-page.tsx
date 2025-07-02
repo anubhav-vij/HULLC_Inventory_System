@@ -11,7 +11,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { Badge } from '@/components/ui/badge';
 import { ChevronsUpDown, MoreHorizontal, Package, Pencil, PlusCircle, Trash2, Warehouse } from 'lucide-react';
 import { ProductForm } from './product-form';
-import { type Product, type Lot } from '@/lib/types';
+import { type Product, type Lot, type ProductFormData } from '@/lib/types';
 import { StockPilotLogo } from './icons';
 import { useToast } from '@/hooks/use-toast';
 import { v4 as uuidv4 } from 'uuid';
@@ -83,17 +83,18 @@ export default function InventoryPage() {
         setProductToDelete(null);
     }
 
-    const handleSaveProduct = (data: Product) => {
+    const handleSaveProduct = (data: ProductFormData) => {
         setIsSaving(true);
         // Simulate async save
         setTimeout(() => {
             if (productToEdit) {
-                setProducts(products.map(p => p.id === data.id ? data : p));
-                toast({ title: "Product Updated", description: `"${data.name}" has been updated successfully.` });
+                const updatedProduct: Product = { ...data, id: productToEdit.id };
+                setProducts(products.map(p => p.id === updatedProduct.id ? updatedProduct : p));
+                toast({ title: "Product Updated", description: `"${updatedProduct.name}" has been updated successfully.` });
             } else {
-                const newProduct = { ...data, id: nextProductId };
+                const newProduct: Product = { ...data, id: nextProductId };
                 setProducts([...products, newProduct]);
-                toast({ title: "Product Added", description: `"${data.name}" has been added successfully.` });
+                toast({ title: "Product Added", description: `"${newProduct.name}" has been added successfully.` });
             }
             setIsSaving(false);
             setIsFormOpen(false);

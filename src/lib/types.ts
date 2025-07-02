@@ -9,8 +9,7 @@ export const LotSchema = z.object({
   expirationDate: z.date().nullable().default(null),
 });
 
-export const ProductSchema = z.object({
-  id: z.string(),
+export const ProductFormSchema = z.object({
   name: z.string().min(1, "Product name is required."),
   vendor: z.string().min(1, "Vendor is required."),
   vendorPartNumber: z.string().min(1, "Vendor part number is required."),
@@ -18,5 +17,11 @@ export const ProductSchema = z.object({
   lots: z.array(LotSchema).min(1, "At least one lot is required."),
 });
 
+export const ProductSchema = ProductFormSchema.extend({
+  id: z.string(),
+});
+
+
 export type Lot = z.infer<typeof LotSchema>;
 export type Product = z.infer<typeof ProductSchema>;
+export type ProductFormData = z.infer<typeof ProductFormSchema>;

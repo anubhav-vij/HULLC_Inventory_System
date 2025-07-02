@@ -1,5 +1,6 @@
 "use client";
 
+import React from 'react';
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useFieldArray, useForm } from "react-hook-form";
 import { z } from "zod";
@@ -11,19 +12,19 @@ import { Calendar } from "@/components/ui/calendar";
 import { CalendarIcon, Loader2, PlusCircle, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
-import { Product, ProductSchema } from "@/lib/types";
+import { type Product, ProductFormSchema, type ProductFormData } from "@/lib/types";
 import { Separator } from "./ui/separator";
 
 type ProductFormProps = {
   product?: Product | null;
-  onSave: (data: z.infer<typeof ProductSchema>) => void;
+  onSave: (data: ProductFormData) => void;
   onCancel: () => void;
   isSaving: boolean;
 };
 
 export function ProductForm({ product, onSave, onCancel, isSaving }: ProductFormProps) {
-  const form = useForm<z.infer<typeof ProductSchema>>({
-    resolver: zodResolver(ProductSchema),
+  const form = useForm<ProductFormData>({
+    resolver: zodResolver(ProductFormSchema),
     defaultValues: product || {
       name: "",
       vendor: "",
@@ -182,7 +183,7 @@ export function ProductForm({ product, onSave, onCancel, isSaving }: ProductForm
               </div>
             ))}
             <div className="flex justify-start">
-                 <Button type="button" variant="secondary" onClick={() => append({ lotNumber: '', quantity: 1, receiptDate: new Date(), expirationDate: null })}>
+                 <Button type="button" variant="secondary" onClick={() => append({ lotNumber: '', quantity: 1, receiptDate: new date(), expirationDate: null })}>
                     <PlusCircle className="mr-2 h-4 w-4" /> Add Another Lot
                 </Button>
             </div>
