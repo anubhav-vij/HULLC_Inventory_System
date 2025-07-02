@@ -139,7 +139,7 @@ export default function InventoryPage() {
                                 <TableBody>
                                     {products.length > 0 ? products.map(product => (
                                         <Collapsible asChild key={product.id}>
-                                            <>
+                                            <React.Fragment>
                                                 <TableRow className="text-sm">
                                                     <TableCell>
                                                         <CollapsibleTrigger asChild>
@@ -216,7 +216,7 @@ export default function InventoryPage() {
                                                         </TableCell>
                                                     </TableRow>
                                                 </CollapsibleContent>
-                                            </>
+                                            </React.Fragment>
                                         </Collapsible>
                                     )) : (
                                         <TableRow>
