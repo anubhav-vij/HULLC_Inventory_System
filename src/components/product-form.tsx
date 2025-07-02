@@ -3,7 +3,6 @@
 import React from 'react';
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useFieldArray, useForm } from "react-hook-form";
-import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
@@ -114,7 +113,7 @@ export function ProductForm({ product, onSave, onCancel, isSaving }: ProductForm
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Quantity</FormLabel>
-                        <FormControl><Input type="number" placeholder="e.g., 100" {...field} /></FormControl>
+                        <FormControl><Input type="number" placeholder="e.g., 100" {...field} onChange={e => field.onChange(parseInt(e.target.value) || 0)} /></FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -183,7 +182,7 @@ export function ProductForm({ product, onSave, onCancel, isSaving }: ProductForm
               </div>
             ))}
             <div className="flex justify-start">
-                 <Button type="button" variant="secondary" onClick={() => append({ lotNumber: '', quantity: 1, receiptDate: new date(), expirationDate: null })}>
+                 <Button type="button" variant="secondary" onClick={() => append({ lotNumber: '', quantity: 1, receiptDate: new Date(), expirationDate: null })}>
                     <PlusCircle className="mr-2 h-4 w-4" /> Add Another Lot
                 </Button>
             </div>

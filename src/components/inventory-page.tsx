@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -41,8 +41,11 @@ const initialProducts: Product[] = [
     }
 ];
 
+const STORAGE_KEY = 'stockpilot-inventory-data';
+
 export default function InventoryPage() {
-    const [products, setProducts] = useState<Product[]>(initialProducts);
+    const [products, setProducts] = useState<Product[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [productToEdit, setProductToEdit] = useState<Product | null>(null);
     const [isSaving, setIsSaving] = useState(false);
@@ -51,7 +54,38 @@ export default function InventoryPage() {
     const [isAlertOpen, setIsAlertOpen] = useState(false);
     const { toast } = useToast();
 
+    useEffect(() => {
+        let storedProducts: Product[];
+        try {
+            const item = window.localStorage.getItem(STORAGE_KEY);
+            if (item) {
+                storedProducts = JSON.parse(item).map((product: any) => ({
+                    ...product,
+                    lots: product.lots.map((lot: any) => ({
+                        ...lot,
+                        receiptDate: new Date(lot.receiptDate),
+                        expirationDate: lot.expirationDate ? new Date(lot.expirationDate) : null,
+                    })),
+                }));
+            } else {
+                storedProducts = initialProducts;
+            }
+        } catch (error) {
+            console.error('Error reading from local storage', error);
+            storedProducts = initialProducts;
+        }
+        setProducts(storedProducts);
+        setIsLoading(false);
+    }, []);
+
+    useEffect(() => {
+        if (!isLoading) {
+            window.localStorage.setItem(STORAGE_KEY, JSON.stringify(products));
+        }
+    }, [products, isLoading]);
+
     const nextProductId = useMemo(() => {
+        if (products.length === 0) return 'P001';
         const maxId = products.reduce((max, p) => {
             const num = parseInt(p.id.substring(1));
             return num > max ? num : max;
@@ -116,7 +150,7 @@ export default function InventoryPage() {
                     <CardHeader>
                         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                             <div>
-                                <CardTitle>Inventory</CardTitle>
+                                <CardTitle>HULLC Inventory</CardTitle>
                                 <CardDescription>Manage your products and their stock.</CardDescription>
                             </div>
                             <Button onClick={handleAddNew}>
@@ -137,98 +171,104 @@ export default function InventoryPage() {
                                         <TableHead className="w-[100px] text-right">Actions</TableHead>
                                     </TableRow>
                                 </TableHeader>
-                                {products.length > 0 ? (
-                                    products.map(product => (
-                                        <Collapsible asChild key={product.id} >
-                                            <TableBody>
-                                                <TableRow className="text-sm">
-                                                    <TableCell>
-                                                        <CollapsibleTrigger asChild>
-                                                            <Button variant="ghost" size="sm" className="w-9 p-0 data-[state=open]:rotate-90">
-                                                                <ChevronsUpDown className="h-4 w-4" />
-                                                                <span className="sr-only">Toggle</span>
-                                                            </Button>
-                                                        </CollapsibleTrigger>
-                                                    </TableCell>
-                                                    <TableCell className="font-medium">
-                                                        <div className="flex items-center gap-3">
-                                                            <Package className="h-5 w-5 text-muted-foreground"/>
-                                                            <div>
-                                                                <div>{product.name}</div>
-                                                                <div className="text-xs text-muted-foreground">{product.id} / {product.vendorPartNumber}</div>
-                                                            </div>
-                                                        </div>
-                                                    </TableCell>
-                                                    <TableCell>{product.vendor}</TableCell>
-                                                    <TableCell>
-                                                        <Badge variant="secondary">{totalQuantity(product.lots)}</Badge>
-                                                    </TableCell>
-                                                    <TableCell>
-                                                        <div className="flex items-center gap-2">
-                                                            <Warehouse className="h-4 w-4 text-muted-foreground"/>
-                                                            {product.location}
-                                                        </div>
-                                                    </TableCell>
-                                                    <TableCell className="text-right">
-                                                        <DropdownMenu>
-                                                            <DropdownMenuTrigger asChild>
-                                                                <Button variant="ghost" className="h-8 w-8 p-0">
-                                                                    <span className="sr-only">Open menu</span>
-                                                                    <MoreHorizontal className="h-4 w-4" />
+                                <TableBody>
+                                    {isLoading ? (
+                                         <TableRow>
+                                            <TableCell colSpan={6} className="h-24 text-center">
+                                                Loading inventory...
+                                            </TableCell>
+                                        </TableRow>
+                                    ) : products.length > 0 ? (
+                                        products.map(product => (
+                                            <Collapsible asChild key={product.id} >
+                                                <React.Fragment>
+                                                    <TableRow className="text-sm">
+                                                        <TableCell>
+                                                            <CollapsibleTrigger asChild>
+                                                                <Button variant="ghost" size="sm" className="w-9 p-0 data-[state=open]:rotate-90">
+                                                                    <ChevronsUpDown className="h-4 w-4" />
+                                                                    <span className="sr-only">Toggle</span>
                                                                 </Button>
-                                                            </DropdownMenuTrigger>
-                                                            <DropdownMenuContent align="end">
-                                                                <DropdownMenuItem onClick={() => handleEdit(product)}>
-                                                                    <Pencil className="mr-2 h-4 w-4" /> Edit
-                                                                </DropdownMenuItem>
-                                                                <DropdownMenuItem onClick={() => handleDelete(product)} className="text-destructive focus:text-destructive">
-                                                                    <Trash2 className="mr-2 h-4 w-4" /> Delete
-                                                                </DropdownMenuItem>
-                                                            </DropdownMenuContent>
-                                                        </DropdownMenu>
-                                                    </TableCell>
-                                                </TableRow>
-                                                <CollapsibleContent asChild>
-                                                    <TableRow className="bg-muted/50 hover:bg-muted/50">
-                                                        <TableCell colSpan={6} className="p-0">
-                                                            <div className="p-4">
-                                                                <h4 className="font-semibold mb-2 ml-2">Lots for {product.name}</h4>
-                                                                <Table>
-                                                                    <TableHeader>
-                                                                        <TableRow>
-                                                                            <TableHead>Lot #</TableHead>
-                                                                            <TableHead>Quantity</TableHead>
-                                                                            <TableHead>Receipt Date</TableHead>
-                                                                            <TableHead>Expiration Date</TableHead>
-                                                                        </TableRow>
-                                                                    </TableHeader>
-                                                                    <TableBody>
-                                                                        {product.lots.map(lot => (
-                                                                            <TableRow key={lot.id}>
-                                                                                <TableCell>{lot.lotNumber}</TableCell>
-                                                                                <TableCell>{lot.quantity}</TableCell>
-                                                                                <TableCell>{format(lot.receiptDate, 'PPP')}</TableCell>
-                                                                                <TableCell>{lot.expirationDate ? format(lot.expirationDate, 'PPP') : 'N/A'}</TableCell>
-                                                                            </TableRow>
-                                                                        ))}
-                                                                    </TableBody>
-                                                                </Table>
+                                                            </CollapsibleTrigger>
+                                                        </TableCell>
+                                                        <TableCell className="font-medium">
+                                                            <div className="flex items-center gap-3">
+                                                                <Package className="h-5 w-5 text-muted-foreground"/>
+                                                                <div>
+                                                                    <div>{product.name}</div>
+                                                                    <div className="text-xs text-muted-foreground">{product.id} / {product.vendorPartNumber}</div>
+                                                                </div>
                                                             </div>
                                                         </TableCell>
+                                                        <TableCell>{product.vendor}</TableCell>
+                                                        <TableCell>
+                                                            <Badge variant="secondary">{totalQuantity(product.lots)}</Badge>
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            <div className="flex items-center gap-2">
+                                                                <Warehouse className="h-4 w-4 text-muted-foreground"/>
+                                                                {product.location}
+                                                            </div>
+                                                        </TableCell>
+                                                        <TableCell className="text-right">
+                                                            <DropdownMenu>
+                                                                <DropdownMenuTrigger asChild>
+                                                                    <Button variant="ghost" className="h-8 w-8 p-0">
+                                                                        <span className="sr-only">Open menu</span>
+                                                                        <MoreHorizontal className="h-4 w-4" />
+                                                                    </Button>
+                                                                </DropdownMenuTrigger>
+                                                                <DropdownMenuContent align="end">
+                                                                    <DropdownMenuItem onClick={() => handleEdit(product)}>
+                                                                        <Pencil className="mr-2 h-4 w-4" /> Edit
+                                                                    </DropdownMenuItem>
+                                                                    <DropdownMenuItem onClick={() => handleDelete(product)} className="text-destructive focus:text-destructive">
+                                                                        <Trash2 className="mr-2 h-4 w-4" /> Delete
+                                                                    </DropdownMenuItem>
+                                                                </DropdownMenuContent>
+                                                            </DropdownMenu>
+                                                        </TableCell>
                                                     </TableRow>
-                                                </CollapsibleContent>
-                                            </TableBody>
-                                        </Collapsible>
-                                    ))
-                                ) : (
-                                    <TableBody>
+                                                    <CollapsibleContent asChild>
+                                                        <TableRow className="bg-muted/50 hover:bg-muted/50">
+                                                            <TableCell colSpan={6} className="p-0">
+                                                                <div className="p-4">
+                                                                    <h4 className="font-semibold mb-2 ml-2">Lots for {product.name}</h4>
+                                                                    <Table>
+                                                                        <TableHeader>
+                                                                            <TableRow>
+                                                                                <TableHead>Lot #</TableHead>
+                                                                                <TableHead>Quantity</TableHead>
+                                                                                <TableHead>Receipt Date</TableHead>
+                                                                                <TableHead>Expiration Date</TableHead>
+                                                                            </TableRow>
+                                                                        </TableHeader>
+                                                                        <TableBody>
+                                                                            {product.lots.map(lot => (
+                                                                                <TableRow key={lot.id}>
+                                                                                    <TableCell>{lot.lotNumber}</TableCell>
+                                                                                    <TableCell>{lot.quantity}</TableCell>
+                                                                                    <TableCell>{format(lot.receiptDate, 'PPP')}</TableCell>
+                                                                                    <TableCell>{lot.expirationDate ? format(lot.expirationDate, 'PPP') : 'N/A'}</TableCell>
+                                                                                </TableRow>
+                                                                            ))}
+                                                                        </TableBody>
+                                                                    </Table>
+                                                                </div>
+                                                            </TableCell>
+                                                        </TableRow>
+                                                    </CollapsibleContent>
+                                                </React.Fragment>
+                                            </Collapsible>
+                                        ))
+                                    ) : (
                                         <TableRow>
                                             <TableCell colSpan={6} className="h-24 text-center">
                                                 No products found. Get started by adding a new product.
                                             </TableCell>
                                         </TableRow>
-                                    </TableBody>
-                                )}
+                                    )}
+                                </TableBody>
                             </Table>
                         </div>
                     </CardContent>
