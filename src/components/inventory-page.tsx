@@ -136,10 +136,10 @@ export default function InventoryPage() {
                                         <TableHead className="w-[100px] text-right">Actions</TableHead>
                                     </TableRow>
                                 </TableHeader>
-                                <TableBody>
-                                    {products.length > 0 ? products.map(product => (
-                                        <Collapsible asChild key={product.id}>
-                                            <React.Fragment>
+                                {products.length > 0 ? (
+                                    products.map(product => (
+                                        <Collapsible asChild key={product.id} >
+                                            <TableBody>
                                                 <TableRow className="text-sm">
                                                     <TableCell>
                                                         <CollapsibleTrigger asChild>
@@ -216,16 +216,18 @@ export default function InventoryPage() {
                                                         </TableCell>
                                                     </TableRow>
                                                 </CollapsibleContent>
-                                            </React.Fragment>
+                                            </TableBody>
                                         </Collapsible>
-                                    )) : (
+                                    ))
+                                ) : (
+                                    <TableBody>
                                         <TableRow>
                                             <TableCell colSpan={6} className="h-24 text-center">
                                                 No products found. Get started by adding a new product.
                                             </TableCell>
                                         </TableRow>
-                                    )}
-                                </TableBody>
+                                    </TableBody>
+                                )}
                             </Table>
                         </div>
                     </CardContent>
@@ -262,4 +264,3 @@ export default function InventoryPage() {
             </AlertDialog>
         </div>
     );
-}
