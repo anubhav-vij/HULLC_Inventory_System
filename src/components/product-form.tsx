@@ -92,6 +92,11 @@ export function ProductForm({ product, onSave, onCancel, isSaving }: ProductForm
 
         <div>
           <h3 className="text-lg font-medium mb-2">Lots</h3>
+          {form.formState.errors.lots?.message && (
+            <p className="text-sm font-medium text-destructive mb-2">
+              {form.formState.errors.lots.message as string}
+            </p>
+          )}
           <div className="space-y-4">
             {fields.map((field, index) => (
               <div key={field.id} className="p-4 border rounded-lg bg-background space-y-4">
