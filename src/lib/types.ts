@@ -33,6 +33,61 @@ export const ProductSchema = ProductFormSchema.extend({
 });
 
 
+// Transaction Schemas
+export const TransactionItemSchema = z.object({
+  lotId: z.string(),
+  quantityTaken: z.coerce.number().min(0).default(0),
+});
+
+// We need the original lots to validate against
+export const createTransactionFormSchema = (productLots: Lot[]) => z.object({
+  date: z.date({ required_error: "Transaction date is required." }),
+  notes: z.string().optional(),
+  items: z.array(TransactionItemSchema)
+    .min(1)
+    .refine(
+        (items) => items.some((item) => item.quantityTaken > 0),
+        { message: "You must dispense a quantity greater than zero from at least one lot." }
+    )
+    .refine(
+        (items) => {
+            for(const item of items) {
+                const lot = productLots.find(l => l.id === item.lotId);
+                if (lot && item.quantityTaken > lot.quantity) {
+                    return false; // Found an item where quantity taken exceeds available
+                }
+            }
+            return true; // All good
+        },
+        {
+            message: "Quantity to dispense cannot exceed available quantity for that lot.",
+            path: ["root"], // General form error
+        }
+    ),
+});
+
+
+export const TransactionSchema = z.object({
+    id: z.string().default(() => uuidv4()),
+    productId: z.string(),
+    productName: z.string(),
+    date: z.date(),
+    notes: z.string().optional(),
+    items: z.array(z.object({
+        lotId: z.string(),
+        lotNumber: z.string(),
+        quantity: z.number(),
+    })),
+    totalQuantity: z.number(),
+});
+
+
 export type Lot = z.infer<typeof LotSchema>;
 export type Product = z.infer<typeof ProductSchema>;
 export type ProductFormData = z.infer<typeof ProductFormSchema>;
+export type Transaction = z.infer<typeof TransactionSchema>;
+export type TransactionFormData = {
+    date: Date;
+    notes?: string;
+    items: { lotId: string; quantityTaken: number; }[];
+};
