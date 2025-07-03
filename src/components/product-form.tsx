@@ -187,7 +187,7 @@ export function ProductForm({ product, onSave, onCancel, isSaving }: ProductForm
                     size="sm"
                     onClick={() => remove(index)}
                     className="text-destructive hover:text-destructive"
-                    disabled={!product && fields.length <= 1}
+                    disabled={fields.length <= 1}
                   >
                     <Trash2 className="mr-2 h-4 w-4" /> Remove Lot
                   </Button>
