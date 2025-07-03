@@ -181,9 +181,16 @@ export function ProductForm({ product, onSave, onCancel, isSaving }: ProductForm
                     )}
                   />
                 </div>
-                 <Button type="button" variant="outline" size="sm" onClick={() => remove(index)} className="text-destructive hover:text-destructive">
+                 <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => remove(index)}
+                    className="text-destructive hover:text-destructive"
+                    disabled={!product && fields.length <= 1}
+                  >
                     <Trash2 className="mr-2 h-4 w-4" /> Remove Lot
-                </Button>
+                  </Button>
               </div>
             ))}
             <div className="flex justify-start">
