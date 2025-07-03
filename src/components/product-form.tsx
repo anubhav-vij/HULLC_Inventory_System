@@ -10,7 +10,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { CalendarIcon, Loader2, PlusCircle, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { format } from "date-fns";
+import { format, isValid } from "date-fns";
 import { type Product, ProductFormSchema, type ProductFormData, ProductFormCreateSchema } from "@/lib/types";
 import { Separator } from "./ui/separator";
 
@@ -136,13 +136,13 @@ export function ProductForm({ product, onSave, onCancel, isSaving }: ProductForm
                                 variant={"outline"}
                                 className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")}
                               >
-                                {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
+                                {field.value && isValid(field.value) ? format(field.value, "PPP") : <span>Pick a date</span>}
                                 <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
                               </Button>
                             </FormControl>
                           </PopoverTrigger>
                           <PopoverContent className="w-auto p-0" align="start">
-                            <Calendar mode="single" selected={field.value} onSelect={field.onChange} initialFocus />
+                            <Calendar mode="single" selected={field.value && isValid(field.value) ? field.value : undefined} onSelect={field.onChange} initialFocus />
                           </PopoverContent>
                         </Popover>
                         <FormMessage />
@@ -162,7 +162,7 @@ export function ProductForm({ product, onSave, onCancel, isSaving }: ProductForm
                                 variant={"outline"}
                                 className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")}
                               >
-                                {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
+                                {field.value && isValid(field.value) ? format(field.value, "PPP") : <span>Pick a date</span>}
                                 <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
                               </Button>
                             </FormControl>
@@ -170,7 +170,7 @@ export function ProductForm({ product, onSave, onCancel, isSaving }: ProductForm
                           <PopoverContent className="w-auto p-0" align="start">
                             <Calendar
                               mode="single"
-                              selected={field.value ?? undefined}
+                              selected={field.value && isValid(field.value) ? field.value : undefined}
                               onSelect={field.onChange}
                               initialFocus
                             />
