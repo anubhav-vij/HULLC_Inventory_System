@@ -294,7 +294,7 @@ export default function InventoryPage() {
             <main className="w-full max-w-7xl mx-auto">
                 <div className="flex items-center gap-3 mb-8">
                     <StockPilotLogo className="h-8 w-8 text-primary" />
-                    <h1 className="text-3xl font-bold text-foreground">StockPilot</h1>
+                    <h1 className="text-3xl font-bold text-foreground">Inventory Management System</h1>
                 </div>
 
                 <Tabs defaultValue="inventory">
