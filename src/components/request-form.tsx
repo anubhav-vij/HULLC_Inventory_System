@@ -10,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Loader2 } from "lucide-react";
-import { type Product, ProductRequestSchema, type ProductRequestFormData, DEPARTMENTS, PROJECTS } from "@/lib/types";
+import { type Product, ProductRequestFormSchema, type ProductRequestFormData, DEPARTMENTS, PROJECTS } from "@/lib/types";
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 
 type RequestFormProps = {
@@ -22,7 +22,7 @@ type RequestFormProps = {
 
 export function RequestForm({ product, onSave, onCancel, isSaving }: RequestFormProps) {
   const form = useForm<ProductRequestFormData>({
-    resolver: zodResolver(ProductRequestSchema),
+    resolver: zodResolver(ProductRequestFormSchema),
     defaultValues: {
       requesterName: "",
       requesterEmail: "",

@@ -9,11 +9,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
-import { ChevronsUpDown, MoreHorizontal, Package, Pencil, PlusCircle, Warehouse, ArrowRightLeft, CloudUpload, Loader2, AlertTriangle, Download, Trash2, FileQuestion } from 'lucide-react';
+import { ChevronsUpDown, MoreHorizontal, Package, Pencil, PlusCircle, Warehouse, ArrowRightLeft, CloudUpload, Loader2, AlertTriangle, Download, Trash2, FileQuestion, CheckCircle2, XCircle, Hourglass } from 'lucide-react';
 import { ProductForm } from './product-form';
 import { TransactionForm } from './transaction-form';
 import { RequestForm } from './request-form';
-import { type Product, type Lot, type ProductFormData, type Transaction, type TransactionFormData, type User, type UserRole, type ProductRequestFormData } from '@/lib/types';
+import { type Product, type Lot, type ProductFormData, type Transaction, type TransactionFormData, type User, type UserRole, type ProductRequest, type ProductRequestFormData, type ProductRequestStatus } from '@/lib/types';
 import { StockPilotLogo } from './icons';
 import { useToast } from '@/hooks/use-toast';
 import { v4 as uuidv4 } from 'uuid';
@@ -48,12 +48,14 @@ const initialProducts: Product[] = [
 
 const PRODUCTS_STORAGE_KEY = 'stockpilot-products-data';
 const TRANSACTIONS_STORAGE_KEY = 'stockpilot-transactions-data';
+const REQUESTS_STORAGE_KEY = 'stockpilot-requests-data';
 const USER_STORAGE_KEY = 'stockpilot-user-data';
 
 
 export default function InventoryPage() {
     const [products, setProducts] = useState<Product[]>([]);
     const [transactions, setTransactions] = useState<Transaction[]>([]);
+    const [productRequests, setProductRequests] = useState<ProductRequest[]>([]);
     const [user, setUser] = useState<User | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [isFormOpen, setIsFormOpen] = useState(false);
@@ -62,6 +64,7 @@ export default function InventoryPage() {
     const [productToEdit, setProductToEdit] = useState<Product | null>(null);
     const [productForTransaction, setProductForTransaction] = useState<Product | null>(null);
     const [productForRequest, setProductForRequest] = useState<Product | null>(null);
+    const [requestToFulfill, setRequestToFulfill] = useState<ProductRequest | null>(null);
     const [isSaving, setIsSaving] = useState(false);
     const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
     const [isImporting, setIsImporting] = useState(false);
@@ -70,7 +73,7 @@ export default function InventoryPage() {
     const [openTransactionIds, setOpenTransactionIds] = useState<Set<string>>(new Set());
     const [productToDelete, setProductToDelete] = useState<Product | null>(null);
     const [transactionToDelete, setTransactionToDelete] = useState<Transaction | null>(null);
-
+    const [requestToReject, setRequestToReject] = useState<ProductRequest | null>(null);
 
     const { toast } = useToast();
 
@@ -100,13 +103,11 @@ export default function InventoryPage() {
 
     useEffect(() => {
         try {
-            // Load User
             const storedUserItem = window.localStorage.getItem(USER_STORAGE_KEY);
             if (storedUserItem) {
                 setUser(JSON.parse(storedUserItem));
             }
 
-            // Load Products
             const storedProductsItem = window.localStorage.getItem(PRODUCTS_STORAGE_KEY);
             let loadedProducts: Product[];
             if (storedProductsItem) {
@@ -125,21 +126,29 @@ export default function InventoryPage() {
             }
             setProducts(loadedProducts);
 
-            // Load Transactions
             const storedTransactionsItem = window.localStorage.getItem(TRANSACTIONS_STORAGE_KEY);
-            let loadedTransactions: Transaction[] = [];
             if (storedTransactionsItem) {
-                loadedTransactions = JSON.parse(storedTransactionsItem).map((tx: any) => ({
+                const loadedTransactions = JSON.parse(storedTransactionsItem).map((tx: any) => ({
                     ...tx,
                     date: new Date(tx.date),
                 }));
+                setTransactions(loadedTransactions);
             }
-            setTransactions(loadedTransactions);
+            
+            const storedRequestsItem = window.localStorage.getItem(REQUESTS_STORAGE_KEY);
+            if (storedRequestsItem) {
+                const loadedRequests = JSON.parse(storedRequestsItem).map((req: any) => ({
+                    ...req,
+                    date: new Date(req.date),
+                }));
+                setProductRequests(loadedRequests);
+            }
 
         } catch (error) {
             console.error('Error reading from local storage', error);
             setProducts(initialProducts);
             setTransactions([]);
+            setProductRequests([]);
         }
         setIsLoading(false);
     }, []);
@@ -148,13 +157,14 @@ export default function InventoryPage() {
         if (!isLoading) {
             window.localStorage.setItem(PRODUCTS_STORAGE_KEY, JSON.stringify(products));
             window.localStorage.setItem(TRANSACTIONS_STORAGE_KEY, JSON.stringify(transactions));
+            window.localStorage.setItem(REQUESTS_STORAGE_KEY, JSON.stringify(productRequests));
             if (user) {
                 window.localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(user));
             } else {
                 window.localStorage.removeItem(USER_STORAGE_KEY);
             }
         }
-    }, [products, transactions, user, isLoading]);
+    }, [products, transactions, productRequests, user, isLoading]);
 
     const nextProductId = useMemo(() => {
         if (products.length === 0) return 'P001';
@@ -230,7 +240,6 @@ export default function InventoryPage() {
         setTransactionToDelete(null);
     };
 
-
     const handleSaveProduct = (data: ProductFormData) => {
         setIsSaving(true);
         setTimeout(() => {
@@ -283,11 +292,20 @@ export default function InventoryPage() {
                 totalQuantity: totalQuantityDispensed,
             };
             setTransactions([newTransaction, ...transactions]);
-            toast({ title: "Transaction Saved", description: `Dispensed ${totalQuantityDispensed} of "${productForTransaction.name}".` });
+            
+            if (requestToFulfill) {
+                setProductRequests(productRequests.map(r => 
+                    r.id === requestToFulfill.id ? { ...r, status: 'Completed' } : r
+                ));
+                toast({ title: "Request Fulfilled", description: `Dispensed ${totalQuantityDispensed} of "${productForTransaction.name}".` });
+            } else {
+                toast({ title: "Transaction Saved", description: `Dispensed ${totalQuantityDispensed} of "${productForTransaction.name}".` });
+            }
             
             setIsSaving(false);
             setIsTransactionFormOpen(false);
             setProductForTransaction(null);
+            setRequestToFulfill(null);
         }, 500);
     };
     
@@ -296,9 +314,16 @@ export default function InventoryPage() {
         setIsSaving(true);
     
         setTimeout(() => {
-            // In a real app, this would submit the request to a backend.
-            // For now, we'll just show a success toast message.
-            console.log("Request Submitted:", { product: productForRequest, requestData: data });
+            const newRequest: ProductRequest = {
+                id: uuidv4(),
+                productId: productForRequest.id,
+                productName: productForRequest.name,
+                ...data,
+                date: new Date(),
+                status: 'Pending',
+            };
+            setProductRequests([newRequest, ...productRequests]);
+
             toast({
                 title: "Request Submitted",
                 description: `Your request for ${data.quantity} of "${productForRequest.name}" has been sent for review.`
@@ -307,6 +332,30 @@ export default function InventoryPage() {
             setIsRequestFormOpen(false);
             setProductForRequest(null);
         }, 500);
+    };
+
+    const handleFulfillRequest = (request: ProductRequest) => {
+        const product = products.find(p => p.id === request.productId);
+        if (product) {
+            setRequestToFulfill(request);
+            setProductForTransaction(product);
+            setIsTransactionFormOpen(true);
+        } else {
+            toast({ title: "Product Not Found", description: "The product for this request no longer exists.", variant: "destructive" });
+        }
+    };
+    
+    const handleRejectRequest = (request: ProductRequest) => {
+        setRequestToReject(request);
+    };
+    
+    const handleConfirmRejectRequest = () => {
+        if (!requestToReject) return;
+        setProductRequests(productRequests.map(r => 
+            r.id === requestToReject.id ? { ...r, status: 'Rejected' } : r
+        ));
+        toast({ title: "Request Rejected" });
+        setRequestToReject(null);
     };
 
     const handleImportClick = () => {
@@ -495,12 +544,26 @@ export default function InventoryPage() {
 
     const isProductExpired = (product: Product) => {
         const today = new Date();
-        today.setHours(0, 0, 0, 0); // Compare against the start of today
+        today.setHours(0, 0, 0, 0); 
         return product.lots.some(
             (lot) => lot.quantity > 0 && lot.expirationDate && isValid(lot.expirationDate) && lot.expirationDate < today
         );
     };
 
+    const getStatusBadge = (status: ProductRequestStatus) => {
+        const statusConfig = {
+            'Pending': { color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200', icon: Hourglass },
+            'Completed': { color: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200', icon: CheckCircle2 },
+            'Rejected': { color: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200', icon: XCircle },
+        };
+        const Icon = statusConfig[status].icon;
+        return (
+            <Badge className={cn('gap-1', statusConfig[status].color)}>
+                <Icon className="h-3 w-3" />
+                {status}
+            </Badge>
+        );
+    };
 
     if (isLoading) {
         return (
@@ -552,6 +615,7 @@ export default function InventoryPage() {
                     <Tabs defaultValue="inventory">
                         <TabsList className="mb-4">
                             <TabsTrigger value="inventory">Inventory</TabsTrigger>
+                            {user.role === 'Admin' && <TabsTrigger value="requests">Product Requests <Badge className="ml-2 bg-primary/20 text-primary">{productRequests.filter(r => r.status === 'Pending').length}</Badge></TabsTrigger>}
                             {user.role === 'Admin' && <TabsTrigger value="transactions">Transactions</TabsTrigger>}
                         </TabsList>
                         <TabsContent value="inventory">
@@ -709,6 +773,63 @@ export default function InventoryPage() {
                             </Card>
                         </TabsContent>
                         {user.role === 'Admin' && 
+                            <TabsContent value="requests">
+                                <Card>
+                                    <CardHeader>
+                                        <CardTitle>Product Requests</CardTitle>
+                                        <CardDescription>Review and fulfill pending product requests from staff.</CardDescription>
+                                    </CardHeader>
+                                    <CardContent>
+                                        <div className="border rounded-lg overflow-hidden">
+                                        <Table>
+                                            <TableHeader>
+                                                <TableRow>
+                                                    <TableHead>Requester</TableHead>
+                                                    <TableHead>Product</TableHead>
+                                                    <TableHead>Qty Req.</TableHead>
+                                                    <TableHead>Submitted</TableHead>
+                                                    <TableHead>Status</TableHead>
+                                                    <TableHead className="text-right">Actions</TableHead>
+                                                </TableRow>
+                                            </TableHeader>
+                                            <TableBody>
+                                                {productRequests.length > 0 ? (
+                                                    productRequests.map(req => (
+                                                        <TableRow key={req.id}>
+                                                            <TableCell>
+                                                                <div>{req.requesterName}</div>
+                                                                <div className="text-xs text-muted-foreground">{req.department}</div>
+                                                            </TableCell>
+                                                            <TableCell>
+                                                                <div>{req.productName}</div>
+                                                                <div className="text-xs text-muted-foreground">{req.productId}</div>
+                                                            </TableCell>
+                                                            <TableCell>{req.quantity}</TableCell>
+                                                            <TableCell>{format(req.date, 'PPP')}</TableCell>
+                                                            <TableCell>{getStatusBadge(req.status)}</TableCell>
+                                                            <TableCell className="text-right">
+                                                                {req.status === 'Pending' && (
+                                                                    <div className="flex gap-2 justify-end">
+                                                                        <Button size="sm" variant="outline" onClick={() => handleRejectRequest(req)}>Reject</Button>
+                                                                        <Button size="sm" onClick={() => handleFulfillRequest(req)}>Fulfill</Button>
+                                                                    </div>
+                                                                )}
+                                                            </TableCell>
+                                                        </TableRow>
+                                                    ))
+                                                ) : (
+                                                    <TableRow>
+                                                        <TableCell colSpan={6} className="h-24 text-center">No product requests have been submitted yet.</TableCell>
+                                                    </TableRow>
+                                                )}
+                                            </TableBody>
+                                        </Table>
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            </TabsContent>
+                        }
+                        {user.role === 'Admin' && 
                             <TabsContent value="transactions">
                                 <Card>
                                     <CardHeader>
@@ -806,6 +927,7 @@ export default function InventoryPage() {
                 if (!isOpen) {
                     setIsTransactionFormOpen(false);
                     setProductForTransaction(null);
+                    setRequestToFulfill(null);
                 } else {
                     setIsTransactionFormOpen(true);
                 }
@@ -822,6 +944,7 @@ export default function InventoryPage() {
                             onCancel={() => {
                                 setIsTransactionFormOpen(false);
                                 setProductForTransaction(null);
+                                setRequestToFulfill(null);
                             }}
                             isSaving={isSaving}
                         />
@@ -910,6 +1033,21 @@ export default function InventoryPage() {
                     <AlertDialogFooter>
                         <AlertDialogCancel onClick={() => setTransactionToDelete(null)}>Cancel</AlertDialogCancel>
                         <AlertDialogAction onClick={handleConfirmDeleteTransaction}>Delete</AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+
+            <AlertDialog open={!!requestToReject} onOpenChange={(open) => !open && setRequestToReject(null)}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            This action will mark the request from {requestToReject?.requesterName} as 'Rejected'. This cannot be undone.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel onClick={() => setRequestToReject(null)}>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleConfirmRejectRequest}>Reject Request</AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>

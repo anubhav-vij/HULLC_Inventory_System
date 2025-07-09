@@ -10,12 +10,10 @@ export const LotSchema = z.object({
   location: z.string().min(1, "Storage location is required."),
 });
 
-// Stricter lot schema for new lots, requires quantity > 0.
 export const NewLotSchema = LotSchema.extend({
     quantity: z.coerce.number().min(1, "Quantity must be greater than 0."),
 });
 
-// Base schema for product form data. Allows zero lots for editing.
 export const ProductFormSchema = z.object({
   name: z.string().min(1, "Product name is required."),
   vendor: z.string().min(1, "Vendor is required."),
@@ -24,24 +22,20 @@ export const ProductFormSchema = z.object({
   lots: z.array(LotSchema),
 });
 
-// Stricter form schema for creating a new product. Requires at least one lot.
 export const ProductFormCreateSchema = ProductFormSchema.extend({
     lots: z.array(NewLotSchema).min(1, "At least one lot is required."),
 });
 
-// This is the full product model, as stored in the DB/local storage.
 export const ProductSchema = ProductFormSchema.extend({
   id: z.string(),
 });
 
 
-// Transaction Schemas
 export const TransactionItemSchema = z.object({
   lotId: z.string(),
   quantityTaken: z.coerce.number().min(0).default(0),
 });
 
-// We need the original lots to validate against
 export const createTransactionFormSchema = (productLots: Lot[]) => z.object({
     date: z.date({ required_error: "Transaction date is required." }),
     notes: z.string().optional(),
@@ -85,11 +79,10 @@ export const TransactionSchema = z.object({
     totalQuantity: z.number(),
 });
 
-// Request Schemas
 export const DEPARTMENTS = ["Cardiology", "Neurology", "Oncology", "Pediatrics", "Research & Development"] as const;
 export const PROJECTS = ["Project Alpha", "Project Beta", "Clinical Trial Gamma", "Pre-clinical Study Delta"] as const;
 
-export const ProductRequestSchema = z.object({
+export const ProductRequestFormSchema = z.object({
   requesterName: z.string().min(1, "Your name is required."),
   requesterEmail: z.string().email("Please enter a valid NIH email address."),
   department: z.enum(DEPARTMENTS, { required_error: "Please select a department." }),
@@ -101,6 +94,17 @@ export const ProductRequestSchema = z.object({
   }),
 });
 
+export const ProductRequestStatusSchema = z.enum(['Pending', 'Completed', 'Rejected']);
+
+export const ProductRequestSchema = ProductRequestFormSchema.extend({
+    id: z.string(),
+    productId: z.string(),
+    productName: z.string(),
+    date: z.date(),
+    status: ProductRequestStatusSchema,
+});
+
+
 export type Lot = z.infer<typeof LotSchema>;
 export type Product = z.infer<typeof ProductSchema>;
 export type ProductFormData = z.infer<typeof ProductFormSchema>;
@@ -110,9 +114,11 @@ export type TransactionFormData = {
     notes?: string;
     items: { lotId: string; quantityTaken: number; }[];
 };
-export type ProductRequestFormData = z.infer<typeof ProductRequestSchema>;
+export type ProductRequestFormData = z.infer<typeof ProductRequestFormSchema>;
+export type ProductRequest = z.infer<typeof ProductRequestSchema>;
+export type ProductRequestStatus = z.infer<typeof ProductRequestStatusSchema>;
 
-// User and Auth Types
+
 export type UserRole = 'Admin' | 'Staff';
 
 export type User = {
