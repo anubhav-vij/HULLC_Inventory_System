@@ -74,6 +74,7 @@ This workflow formalizes how staff members obtain materials.
 *   **Rejection:** An Admin can click **"Reject"** on a request, which, after confirmation, marks its status as "Rejected".
 *   **Transaction History:**
     *   All fulfillment and manual dispense events are logged in the **"Transactions"** tab.
+    *   For transactions generated from a staff request, the requester's name and department are displayed, providing clear traceability from request to fulfillment.
     *   Admins can delete erroneous transactions. This action reverses the stock movement, returning the dispensed quantity to the correct inventory lots.
     *   To ensure a clear audit trail, transactions cannot be edited.
 

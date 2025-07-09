@@ -77,6 +77,8 @@ export const TransactionSchema = z.object({
         quantity: z.number(),
     })),
     totalQuantity: z.number(),
+    requesterName: z.string().optional(),
+    department: z.string().optional(),
 });
 
 export const DEPARTMENTS = ["Cardiology", "Neurology", "Oncology", "Pediatrics", "Research & Development"] as const;

@@ -290,6 +290,10 @@ export default function InventoryPage() {
                 notes: data.notes,
                 items: dispensedItems,
                 totalQuantity: totalQuantityDispensed,
+                ...(requestToFulfill && {
+                    requesterName: requestToFulfill.requesterName,
+                    department: requestToFulfill.department
+                })
             };
             setTransactions([newTransaction, ...transactions]);
             
@@ -496,6 +500,8 @@ export default function InventoryPage() {
                 'transaction_notes': tx.notes ?? '',
                 'product_id': tx.productId,
                 'product_name': tx.productName,
+                'requester_name': tx.requesterName ?? 'N/A',
+                'requester_department': tx.department ?? 'N/A',
                 'lot_id': item.lotId,
                 'lot_number': item.lotNumber,
                 'quantity_dispensed': item.quantity,
@@ -852,6 +858,7 @@ export default function InventoryPage() {
                                                     <TableHead>Product</TableHead>
                                                     <TableHead>Date</TableHead>
                                                     <TableHead>Quantity Dispensed</TableHead>
+                                                    <TableHead>Requester</TableHead>
                                                     <TableHead>Notes</TableHead>
                                                     <TableHead className="w-[100px] text-right">Actions</TableHead>
                                                 </TableRow>
@@ -872,6 +879,16 @@ export default function InventoryPage() {
                                                                 <TableCell className="font-medium">{tx.productName} <span className="text-muted-foreground text-xs">({tx.productId})</span></TableCell>
                                                                 <TableCell>{format(tx.date, 'PPP')}</TableCell>
                                                                 <TableCell><Badge variant="outline">-{tx.totalQuantity}</Badge></TableCell>
+                                                                <TableCell>
+                                                                    {tx.requesterName ? (
+                                                                        <div>
+                                                                            <div>{tx.requesterName}</div>
+                                                                            <div className="text-xs text-muted-foreground">{tx.department}</div>
+                                                                        </div>
+                                                                    ) : (
+                                                                        <div className="text-muted-foreground">Manual Entry</div>
+                                                                    )}
+                                                                </TableCell>
                                                                 <TableCell className="truncate max-w-xs">{tx.notes || 'N/A'}</TableCell>
                                                                 <TableCell className="text-right">
                                                                     <DropdownMenu>
@@ -884,7 +901,7 @@ export default function InventoryPage() {
                                                             </TableRow>
                                                             {isOpen && (
                                                                 <TableRow className="bg-muted/50 hover:bg-muted/50">
-                                                                    <TableCell colSpan={6} className="p-0">
+                                                                    <TableCell colSpan={7} className="p-0">
                                                                         <div className="p-4">
                                                                             <h4 className="font-semibold mb-2 ml-2">Dispensed Lots</h4>
                                                                             <Table><TableHeader><TableRow><TableHead>Lot #</TableHead><TableHead>Quantity Taken</TableHead></TableRow></TableHeader><TableBody>{tx.items.map(item => (<TableRow key={item.lotId}><TableCell>{item.lotNumber}</TableCell><TableCell>{item.quantity}</TableCell></TableRow>))}</TableBody></Table>
@@ -896,7 +913,7 @@ export default function InventoryPage() {
                                                     )
                                                 })
                                             ) : (
-                                                <TableRow><TableCell colSpan={6} className="h-24 text-center">No transactions have been recorded yet.</TableCell></TableRow>
+                                                <TableRow><TableCell colSpan={7} className="h-24 text-center">No transactions have been recorded yet.</TableCell></TableRow>
                                             )}
                                             </TableBody>
                                         </Table>
