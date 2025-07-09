@@ -329,7 +329,7 @@ export default function InventoryPage() {
                                                 <TableHead>Product</TableHead>
                                                 <TableHead>Vendor</TableHead>
                                                 <TableHead>Total Quantity</TableHead>
-                                                <TableHead>Location</TableHead>
+                                                <TableHead>Storage Location</TableHead>
                                                 <TableHead className="w-[100px] text-right">Actions</TableHead>
                                             </TableRow>
                                         </TableHeader>
