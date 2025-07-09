@@ -93,3 +93,11 @@ export type TransactionFormData = {
     notes?: string;
     items: { lotId: string; quantityTaken: number; }[];
 };
+
+// User and Auth Types
+export type UserRole = 'Admin' | 'Staff';
+
+export type User = {
+  name: string;
+  role: UserRole;
+};

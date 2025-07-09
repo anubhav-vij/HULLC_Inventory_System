@@ -12,11 +12,11 @@ import { Badge } from '@/components/ui/badge';
 import { ChevronsUpDown, MoreHorizontal, Package, Pencil, PlusCircle, Warehouse, ArrowRightLeft, CloudUpload, Loader2, AlertTriangle } from 'lucide-react';
 import { ProductForm } from './product-form';
 import { TransactionForm } from './transaction-form';
-import { type Product, type Lot, type ProductFormData, type Transaction, type TransactionFormData } from '@/lib/types';
+import { type Product, type Lot, type ProductFormData, type Transaction, type TransactionFormData, type User, type UserRole } from '@/lib/types';
 import { StockPilotLogo } from './icons';
 import { useToast } from '@/hooks/use-toast';
 import { v4 as uuidv4 } from 'uuid';
-import { format } from 'date-fns';
+import { format, isValid } from 'date-fns';
 import Papa from 'papaparse';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
@@ -46,11 +46,13 @@ const initialProducts: Product[] = [
 
 const PRODUCTS_STORAGE_KEY = 'stockpilot-products-data';
 const TRANSACTIONS_STORAGE_KEY = 'stockpilot-transactions-data';
+const USER_STORAGE_KEY = 'stockpilot-user-data';
 
 
 export default function InventoryPage() {
     const [products, setProducts] = useState<Product[]>([]);
     const [transactions, setTransactions] = useState<Transaction[]>([]);
+    const [user, setUser] = useState<User | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [isTransactionFormOpen, setIsTransactionFormOpen] = useState(false);
@@ -65,28 +67,32 @@ export default function InventoryPage() {
 
     useEffect(() => {
         try {
+            // Load User
+            const storedUserItem = window.localStorage.getItem(USER_STORAGE_KEY);
+            if (storedUserItem) {
+                setUser(JSON.parse(storedUserItem));
+            }
+
+            // Load Products
             const storedProductsItem = window.localStorage.getItem(PRODUCTS_STORAGE_KEY);
             let loadedProducts: Product[];
             if (storedProductsItem) {
-                 loadedProducts = JSON.parse(storedProductsItem).map((product: any) => {
-                    const hasLegacyLocation = product.location && (!product.lots[0] || !product.lots[0].location);
-                    return {
-                        ...product,
-                        reorderThreshold: product.reorderThreshold ?? null,
-                        lots: product.lots.map((lot: any) => ({
-                            ...lot,
-                            location: lot.location || (hasLegacyLocation ? product.location : ''),
-                            receiptDate: new Date(lot.receiptDate),
-                            expirationDate: lot.expirationDate ? new Date(lot.expirationDate) : null,
-                        })),
-                        location: undefined, 
-                    };
-                });
+                 loadedProducts = JSON.parse(storedProductsItem).map((product: any) => ({
+                    ...product,
+                    reorderThreshold: product.reorderThreshold ?? null,
+                    lots: product.lots.map((lot: any) => ({
+                        ...lot,
+                        location: lot.location || '',
+                        receiptDate: new Date(lot.receiptDate),
+                        expirationDate: lot.expirationDate ? new Date(lot.expirationDate) : null,
+                    })),
+                }));
             } else {
                 loadedProducts = initialProducts;
             }
             setProducts(loadedProducts);
 
+            // Load Transactions
             const storedTransactionsItem = window.localStorage.getItem(TRANSACTIONS_STORAGE_KEY);
             let loadedTransactions: Transaction[] = [];
             if (storedTransactionsItem) {
@@ -109,8 +115,13 @@ export default function InventoryPage() {
         if (!isLoading) {
             window.localStorage.setItem(PRODUCTS_STORAGE_KEY, JSON.stringify(products));
             window.localStorage.setItem(TRANSACTIONS_STORAGE_KEY, JSON.stringify(transactions));
+            if (user) {
+                window.localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(user));
+            } else {
+                window.localStorage.removeItem(USER_STORAGE_KEY);
+            }
         }
-    }, [products, transactions, isLoading]);
+    }, [products, transactions, user, isLoading]);
 
     const nextProductId = useMemo(() => {
         if (products.length === 0) return 'P001';
@@ -120,6 +131,15 @@ export default function InventoryPage() {
         }, 0);
         return `P${(maxId + 1).toString().padStart(3, '0')}`;
     }, [products]);
+
+    const handleLogin = (role: UserRole) => {
+        const name = role === 'Admin' ? 'Admin User' : 'Staff User';
+        setUser({ name, role });
+    };
+
+    const handleLogout = () => {
+        setUser(null);
+    };
 
     const handleAddNew = () => {
         setProductToEdit(null);
@@ -311,6 +331,34 @@ export default function InventoryPage() {
     };
 
 
+    if (isLoading) {
+        return (
+            <div className="flex items-center justify-center min-h-screen">
+                <Loader2 className="h-12 w-12 animate-spin text-primary" />
+            </div>
+        );
+    }
+    
+    if (!user) {
+        return (
+            <div className="flex items-center justify-center min-h-screen bg-background">
+                <Card className="w-full max-w-sm">
+                    <CardHeader className="text-center">
+                        <div className="flex justify-center items-center gap-3 mb-4">
+                            <StockPilotLogo className="h-8 w-8 text-primary" />
+                            <CardTitle className="text-2xl">StockPilot</CardTitle>
+                        </div>
+                        <CardDescription>Select a role to sign in.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="flex flex-col gap-4">
+                         <Button size="lg" onClick={() => handleLogin('Admin')}>Sign in as Admin</Button>
+                         <Button size="lg" variant="secondary" onClick={() => handleLogin('Staff')}>Sign in as Staff</Button>
+                    </CardContent>
+                </Card>
+            </div>
+        );
+    }
+
     return (
         <div className="min-h-screen w-full bg-background flex flex-col items-center p-4 sm:p-6 lg:p-8">
             <input type="file" ref={fileInputRef} onChange={handleFileImport} style={{ display: 'none' }} accept=".csv" />
@@ -318,7 +366,14 @@ export default function InventoryPage() {
                 <main className="w-full max-w-7xl mx-auto">
                     <div className="flex items-center gap-3 mb-8">
                         <StockPilotLogo className="h-8 w-8 text-primary" />
-                        <h1 className="text-3xl font-bold text-foreground">Inventory Management System</h1>
+                        <h1 className="text-3xl font-bold text-foreground">Inventory Management</h1>
+                         <div className="ml-auto flex items-center gap-4 text-sm">
+                            <div className="text-right">
+                                <p className="font-semibold text-foreground">{user.name}</p>
+                                <p className="text-muted-foreground">{user.role}</p>
+                            </div>
+                            <Button variant="outline" size="sm" onClick={handleLogout}>Logout</Button>
+                        </div>
                     </div>
 
                     <Tabs defaultValue="inventory">
@@ -334,14 +389,16 @@ export default function InventoryPage() {
                                             <CardTitle>HULLC Inventory</CardTitle>
                                             <CardDescription>Manage your products and their stock.</CardDescription>
                                         </div>
-                                        <div className="flex gap-2">
-                                            <Button variant="outline" onClick={() => setIsImportDialogOpen(true)}>
-                                                <CloudUpload className="mr-2 h-4 w-4" /> Import CSV
-                                            </Button>
-                                            <Button onClick={handleAddNew}>
-                                                <PlusCircle className="mr-2 h-4 w-4" /> Add Product
-                                            </Button>
-                                        </div>
+                                        {user.role === 'Admin' && (
+                                            <div className="flex gap-2">
+                                                <Button variant="outline" onClick={() => setIsImportDialogOpen(true)}>
+                                                    <CloudUpload className="mr-2 h-4 w-4" /> Import CSV
+                                                </Button>
+                                                <Button onClick={handleAddNew}>
+                                                    <PlusCircle className="mr-2 h-4 w-4" /> Add Product
+                                                </Button>
+                                            </div>
+                                        )}
                                     </div>
                                 </CardHeader>
                                 <CardContent>
@@ -357,13 +414,7 @@ export default function InventoryPage() {
                                                     <TableHead className="w-[100px] text-right">Actions</TableHead>
                                                 </TableRow>
                                             </TableHeader>
-                                            {isLoading ? (
-                                                <TableBody>
-                                                    <TableRow>
-                                                        <TableCell colSpan={6} className="h-24 text-center">Loading inventory...</TableCell>
-                                                    </TableRow>
-                                                </TableBody>
-                                            ) : products.length > 0 ? (
+                                            {products.length > 0 ? (
                                                 products.map(product => (
                                                     <TableBody key={product.id} className="[&_tr:last-child]:border-0">
                                                         <Collapsible asChild>
@@ -394,7 +445,7 @@ export default function InventoryPage() {
                                                                         <DropdownMenu>
                                                                             <DropdownMenuTrigger asChild><Button variant="ghost" className="h-8 w-8 p-0"><span className="sr-only">Open menu</span><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
                                                                             <DropdownMenuContent align="end">
-                                                                                <DropdownMenuItem onClick={() => handleEdit(product)}><Pencil className="mr-2 h-4 w-4" /> Edit</DropdownMenuItem>
+                                                                                {user.role === 'Admin' && <DropdownMenuItem onClick={() => handleEdit(product)}><Pencil className="mr-2 h-4 w-4" /> Edit</DropdownMenuItem>}
                                                                                 <DropdownMenuItem onClick={() => handleNewTransaction(product)}><ArrowRightLeft className="mr-2 h-4 w-4" /> New Transaction</DropdownMenuItem>
                                                                             </DropdownMenuContent>
                                                                         </DropdownMenu>
@@ -403,7 +454,7 @@ export default function InventoryPage() {
                                                                 <CollapsibleContent asChild>
                                                                     <TableRow className="bg-muted/50 hover:bg-muted/50">
                                                                         <TableCell colSpan={6} className="p-0">
-                                                                            <div className="p-4"><h4 className="font-semibold mb-2 ml-2">Lots for {product.name}</h4><Table><TableHeader><TableRow><TableHead>Lot #</TableHead><TableHead>Quantity</TableHead><TableHead>Receipt Date</TableHead><TableHead>Expiration Date</TableHead><TableHead>Storage Location</TableHead></TableRow></TableHeader><TableBody>{product.lots.map(lot => (<TableRow key={lot.id}><TableCell>{lot.lotNumber}</TableCell><TableCell>{lot.quantity}</TableCell><TableCell>{format(lot.receiptDate, 'PPP')}</TableCell><TableCell>{lot.expirationDate ? format(lot.expirationDate, 'PPP') : 'N/A'}</TableCell><TableCell>{lot.location}</TableCell></TableRow>))}</TableBody></Table></div>
+                                                                            <div className="p-4"><h4 className="font-semibold mb-2 ml-2">Lots for {product.name}</h4><Table><TableHeader><TableRow><TableHead>Lot #</TableHead><TableHead>Quantity</TableHead><TableHead>Receipt Date</TableHead><TableHead>Expiration Date</TableHead><TableHead>Storage Location</TableHead></TableRow></TableHeader><TableBody>{product.lots.map(lot => (<TableRow key={lot.id}><TableCell>{lot.lotNumber}</TableCell><TableCell>{lot.quantity}</TableCell><TableCell>{isValid(lot.receiptDate) ? format(lot.receiptDate, 'PPP') : 'Invalid Date'}</TableCell><TableCell>{lot.expirationDate && isValid(lot.expirationDate) ? format(lot.expirationDate, 'PPP') : 'N/A'}</TableCell><TableCell>{lot.location}</TableCell></TableRow>))}</TableBody></Table></div>
                                                                         </TableCell>
                                                                     </TableRow>
                                                                 </CollapsibleContent>
@@ -439,9 +490,7 @@ export default function InventoryPage() {
                                                 <TableHead>Notes</TableHead>
                                             </TableRow>
                                         </TableHeader>
-                                         {isLoading ? (
-                                            <TableBody><TableRow><TableCell colSpan={5} className="h-24 text-center">Loading transactions...</TableCell></TableRow></TableBody>
-                                        ) : transactions.length > 0 ? (
+                                         {transactions.length > 0 ? (
                                             transactions.map(tx => (
                                                 <TableBody key={tx.id} className="[&_tr:last-child]:border-0">
                                                     <Collapsible asChild>
