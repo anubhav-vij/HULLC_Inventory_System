@@ -19,6 +19,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { format, isValid } from 'date-fns';
 import Papa from 'papaparse';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { cn } from '@/lib/utils';
 
 const initialProducts: Product[] = [
     {
@@ -329,6 +330,18 @@ export default function InventoryPage() {
         }
         return totalQuantity(product.lots) <= product.reorderThreshold;
     };
+    
+    const isProductOutOfStock = (product: Product) => {
+        return totalQuantity(product.lots) === 0;
+    };
+
+    const isProductExpired = (product: Product) => {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0); // Compare against the start of today
+        return product.lots.some(
+            (lot) => lot.expirationDate && isValid(lot.expirationDate) && lot.expirationDate < today
+        );
+    };
 
 
     if (isLoading) {
@@ -416,11 +429,18 @@ export default function InventoryPage() {
                                                 </TableRow>
                                             </TableHeader>
                                             {products.length > 0 ? (
-                                                products.map(product => (
+                                                products.map(product => {
+                                                    const outOfStock = isProductOutOfStock(product);
+                                                    const expired = !outOfStock && isProductExpired(product);
+                                                    return (
                                                     <TableBody key={product.id} className="[&_tr:last-child]:border-0">
                                                         <Collapsible asChild>
                                                             <>
-                                                                <TableRow className="text-sm">
+                                                                <TableRow className={cn(
+                                                                    "text-sm",
+                                                                    outOfStock && "bg-destructive/10 hover:bg-destructive/20 data-[state=selected]:bg-destructive/20",
+                                                                    expired && "bg-orange-100 dark:bg-orange-950 hover:bg-orange-200 dark:hover:bg-orange-900 data-[state=selected]:bg-orange-200"
+                                                                )}>
                                                                     <TableCell><CollapsibleTrigger asChild><Button variant="ghost" size="sm" className="w-9 p-0 data-[state=open]:rotate-90"><ChevronsUpDown className="h-4 w-4" /><span className="sr-only">Toggle</span></Button></CollapsibleTrigger></TableCell>
                                                                     <TableCell className="font-medium">
                                                                         <div className="flex items-center gap-3"><Package className="h-5 w-5 text-muted-foreground"/><div><div>{product.name}</div><div className="text-xs text-muted-foreground">{product.id}</div></div></div>
@@ -463,10 +483,11 @@ export default function InventoryPage() {
                                                             </>
                                                         </Collapsible>
                                                     </TableBody>
-                                                ))
+                                                )})}
                                             ) : (
                                                 <TableBody>
                                                     <TableRow><TableCell colSpan={7} className="h-24 text-center">No products found. Get started by adding a new product.</TableCell></TableRow>
+
                                                 </TableBody>
                                             )}
                                         </Table>
