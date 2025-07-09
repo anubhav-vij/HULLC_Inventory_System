@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
-import { ChevronsUpDown, MoreHorizontal, Package, Pencil, PlusCircle, Warehouse, ArrowRightLeft, CloudUpload, Loader2, AlertTriangle } from 'lucide-react';
+import { ChevronsUpDown, MoreHorizontal, Package, Pencil, PlusCircle, Warehouse, ArrowRightLeft, CloudUpload, Loader2, AlertTriangle, Download } from 'lucide-react';
 import { ProductForm } from './product-form';
 import { TransactionForm } from './transaction-form';
 import { type Product, type Lot, type ProductFormData, type Transaction, type TransactionFormData, type User, type UserRole } from '@/lib/types';
@@ -339,6 +339,76 @@ export default function InventoryPage() {
         });
     };
 
+    const handleExportInventory = () => {
+        const dataToExport = products.flatMap(product => 
+            product.lots.map(lot => ({
+                'product_id': product.id,
+                'product_name': product.name,
+                'vendor': product.vendor,
+                'vendor_part_number': product.vendorPartNumber,
+                'reorder_threshold': product.reorderThreshold ?? '',
+                'lot_id': lot.id,
+                'lot_number': lot.lotNumber,
+                'quantity': lot.quantity,
+                'receipt_date': isValid(lot.receiptDate) ? format(lot.receiptDate, 'yyyy-MM-dd') : '',
+                'expiration_date': lot.expirationDate && isValid(lot.expirationDate) ? format(lot.expirationDate, 'yyyy-MM-dd') : '',
+                'location': lot.location,
+            }))
+        );
+    
+        if (dataToExport.length === 0) {
+            toast({ title: "No Data", description: "There is no inventory data to export.", variant: "destructive" });
+            return;
+        }
+    
+        const csv = Papa.unparse(dataToExport);
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        if (link.href) {
+            URL.revokeObjectURL(link.href);
+        }
+        const url = URL.createObjectURL(blob);
+        link.href = url;
+        link.setAttribute('download', 'inventory_export.csv');
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        toast({ title: "Export Started", description: "Your inventory data is downloading." });
+    };
+    
+    const handleExportTransactions = () => {
+        const dataToExport = transactions.flatMap(tx => 
+            tx.items.map(item => ({
+                'transaction_id': tx.id,
+                'transaction_date': format(tx.date, 'yyyy-MM-dd HH:mm:ss'),
+                'transaction_notes': tx.notes ?? '',
+                'product_id': tx.productId,
+                'product_name': tx.productName,
+                'lot_id': item.lotId,
+                'lot_number': item.lotNumber,
+                'quantity_dispensed': item.quantity,
+            }))
+        );
+    
+        if (dataToExport.length === 0) {
+            toast({ title: "No Data", description: "There are no transactions to export.", variant: "destructive" });
+            return;
+        }
+    
+        const csv = Papa.unparse(dataToExport);
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        if (link.href) {
+            URL.revokeObjectURL(link.href);
+        }
+        const url = URL.createObjectURL(blob);
+        link.href = url;
+        link.setAttribute('download', 'transactions_export.csv');
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        toast({ title: "Export Started", description: "Your transaction data is downloading." });
+    };
 
     const totalQuantity = (lots: Lot[]) => lots.reduce((sum, lot) => sum + lot.quantity, 0);
     
@@ -431,6 +501,9 @@ export default function InventoryPage() {
                                         </div>
                                         {user.role === 'Admin' && (
                                             <div className="flex gap-2">
+                                                <Button variant="outline" onClick={handleExportInventory}>
+                                                    <Download className="mr-2 h-4 w-4" /> Export CSV
+                                                </Button>
                                                 <Button variant="outline" onClick={() => setIsImportDialogOpen(true)}>
                                                     <CloudUpload className="mr-2 h-4 w-4" /> Import CSV
                                                 </Button>
@@ -517,7 +590,31 @@ export default function InventoryPage() {
                                                                 {isOpen && (
                                                                      <TableRow className="bg-muted/50 hover:bg-muted/50">
                                                                         <TableCell colSpan={inventoryColSpan} className="p-0">
-                                                                            <div className="p-4"><h4 className="font-semibold mb-2 ml-2">Lots for {product.name}</h4><Table><TableHeader><TableRow><TableHead>Lot #</TableHead><TableHead>Quantity</TableHead><TableHead>Receipt Date</TableHead><TableHead>Expiration Date</TableHead><TableHead>Storage Location</TableHead></TableRow></TableHeader><TableBody>{product.lots.map(lot => (<TableRow key={lot.id}><TableCell>{lot.lotNumber}</TableCell><TableCell>{lot.quantity}</TableCell><TableCell>{isValid(lot.receiptDate) ? format(lot.receiptDate, 'PPP') : 'Invalid Date'}</TableCell><TableCell>{lot.expirationDate && isValid(lot.expirationDate) ? format(lot.expirationDate, 'PPP') : 'N/A'}</TableCell><TableCell>{lot.location}</TableCell></TableRow>))}</TableBody></Table></div>
+                                                                            <div className="p-4">
+                                                                                <h4 className="font-semibold mb-2 ml-2">Lots for {product.name}</h4>
+                                                                                <Table>
+                                                                                    <TableHeader>
+                                                                                        <TableRow>
+                                                                                            <TableHead>Lot #</TableHead>
+                                                                                            <TableHead>Quantity</TableHead>
+                                                                                            <TableHead>Receipt Date</TableHead>
+                                                                                            <TableHead>Expiration Date</TableHead>
+                                                                                            {user.role === 'Admin' && <TableHead>Storage Location</TableHead>}
+                                                                                        </TableRow>
+                                                                                    </TableHeader>
+                                                                                    <TableBody>
+                                                                                        {product.lots.map(lot => (
+                                                                                            <TableRow key={lot.id}>
+                                                                                                <TableCell>{lot.lotNumber}</TableCell>
+                                                                                                <TableCell>{lot.quantity}</TableCell>
+                                                                                                <TableCell>{isValid(lot.receiptDate) ? format(lot.receiptDate, 'PPP') : 'Invalid Date'}</TableCell>
+                                                                                                <TableCell>{lot.expirationDate && isValid(lot.expirationDate) ? format(lot.expirationDate, 'PPP') : 'N/A'}</TableCell>
+                                                                                                {user.role === 'Admin' && <TableCell>{lot.location}</TableCell>}
+                                                                                            </TableRow>
+                                                                                        ))}
+                                                                                    </TableBody>
+                                                                                </Table>
+                                                                            </div>
                                                                         </TableCell>
                                                                     </TableRow>
                                                                 )}
@@ -535,64 +632,73 @@ export default function InventoryPage() {
                                 </CardContent>
                             </Card>
                         </TabsContent>
-                        <TabsContent value="transactions">
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle>Transaction History</CardTitle>
-                                    <CardDescription>View a log of all inventory transactions.</CardDescription>
-                                </CardHeader>
-                                <CardContent>
-                                    <div className="border rounded-lg overflow-hidden">
-                                    <Table>
-                                        <TableHeader>
-                                            <TableRow>
-                                                <TableHead className="w-[50px]"></TableHead>
-                                                <TableHead>Product</TableHead>
-                                                <TableHead>Date</TableHead>
-                                                <TableHead>Quantity Dispensed</TableHead>
-                                                <TableHead>Notes</TableHead>
-                                            </TableRow>
-                                        </TableHeader>
-                                        <TableBody>
-                                         {transactions.length > 0 ? (
-                                            transactions.map(tx => {
-                                                const isOpen = openTransactionIds.has(tx.id);
-                                                return (
-                                                    <React.Fragment key={tx.id}>
-                                                        <TableRow data-state={isOpen ? 'open' : 'closed'}>
-                                                            <TableCell>
-                                                                <Button variant="ghost" size="sm" className="w-9 p-0 data-[state=open]:rotate-90" onClick={() => toggleTransactionCollapse(tx.id)} data-state={isOpen ? 'open' : 'closed'}>
-                                                                    <ChevronsUpDown className="h-4 w-4" />
-                                                                    <span className="sr-only">Toggle</span>
-                                                                </Button>
-                                                            </TableCell>
-                                                            <TableCell className="font-medium">{tx.productName} <span className="text-muted-foreground text-xs">({tx.productId})</span></TableCell>
-                                                            <TableCell>{format(tx.date, 'PPP')}</TableCell>
-                                                            <TableCell><Badge variant="outline">-{tx.totalQuantity}</Badge></TableCell>
-                                                            <TableCell className="truncate max-w-xs">{tx.notes || 'N/A'}</TableCell>
-                                                        </TableRow>
-                                                        {isOpen && (
-                                                            <TableRow className="bg-muted/50 hover:bg-muted/50">
-                                                                <TableCell colSpan={5} className="p-0">
-                                                                    <div className="p-4">
-                                                                        <h4 className="font-semibold mb-2 ml-2">Dispensed Lots</h4>
-                                                                        <Table><TableHeader><TableRow><TableHead>Lot #</TableHead><TableHead>Quantity Taken</TableHead></TableRow></TableHeader><TableBody>{tx.items.map(item => (<TableRow key={item.lotId}><TableCell>{item.lotNumber}</TableCell><TableCell>{item.quantity}</TableCell></TableRow>))}</TableBody></Table>
-                                                                    </div>
+                        {user.role === 'Admin' && 
+                            <TabsContent value="transactions">
+                                <Card>
+                                    <CardHeader>
+                                        <div className="flex justify-between items-center">
+                                            <div>
+                                                <CardTitle>Transaction History</CardTitle>
+                                                <CardDescription>View a log of all inventory transactions.</CardDescription>
+                                            </div>
+                                            <Button variant="outline" onClick={handleExportTransactions}>
+                                                <Download className="mr-2 h-4 w-4" /> Export CSV
+                                            </Button>
+                                        </div>
+                                    </CardHeader>
+                                    <CardContent>
+                                        <div className="border rounded-lg overflow-hidden">
+                                        <Table>
+                                            <TableHeader>
+                                                <TableRow>
+                                                    <TableHead className="w-[50px]"></TableHead>
+                                                    <TableHead>Product</TableHead>
+                                                    <TableHead>Date</TableHead>
+                                                    <TableHead>Quantity Dispensed</TableHead>
+                                                    <TableHead>Notes</TableHead>
+                                                </TableRow>
+                                            </TableHeader>
+                                            <TableBody>
+                                            {transactions.length > 0 ? (
+                                                transactions.map(tx => {
+                                                    const isOpen = openTransactionIds.has(tx.id);
+                                                    return (
+                                                        <React.Fragment key={tx.id}>
+                                                            <TableRow data-state={isOpen ? 'open' : 'closed'}>
+                                                                <TableCell>
+                                                                    <Button variant="ghost" size="sm" className="w-9 p-0 data-[state=open]:rotate-90" onClick={() => toggleTransactionCollapse(tx.id)} data-state={isOpen ? 'open' : 'closed'}>
+                                                                        <ChevronsUpDown className="h-4 w-4" />
+                                                                        <span className="sr-only">Toggle</span>
+                                                                    </Button>
                                                                 </TableCell>
+                                                                <TableCell className="font-medium">{tx.productName} <span className="text-muted-foreground text-xs">({tx.productId})</span></TableCell>
+                                                                <TableCell>{format(tx.date, 'PPP')}</TableCell>
+                                                                <TableCell><Badge variant="outline">-{tx.totalQuantity}</Badge></TableCell>
+                                                                <TableCell className="truncate max-w-xs">{tx.notes || 'N/A'}</TableCell>
                                                             </TableRow>
-                                                        )}
-                                                    </React.Fragment>
-                                                )
-                                            })
-                                        ) : (
-                                            <TableRow><TableCell colSpan={5} className="h-24 text-center">No transactions have been recorded yet.</TableCell></TableRow>
-                                        )}
-                                        </TableBody>
-                                    </Table>
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        </TabsContent>
+                                                            {isOpen && (
+                                                                <TableRow className="bg-muted/50 hover:bg-muted/50">
+                                                                    <TableCell colSpan={5} className="p-0">
+                                                                        <div className="p-4">
+                                                                            <h4 className="font-semibold mb-2 ml-2">Dispensed Lots</h4>
+                                                                            <Table><TableHeader><TableRow><TableHead>Lot #</TableHead><TableHead>Quantity Taken</TableHead></TableRow></TableHeader><TableBody>{tx.items.map(item => (<TableRow key={item.lotId}><TableCell>{item.lotNumber}</TableCell><TableCell>{item.quantity}</TableCell></TableRow>))}</TableBody></Table>
+                                                                        </div>
+                                                                    </TableCell>
+                                                                </TableRow>
+                                                            )}
+                                                        </React.Fragment>
+                                                    )
+                                                })
+                                            ) : (
+                                                <TableRow><TableCell colSpan={5} className="h-24 text-center">No transactions have been recorded yet.</TableCell></TableRow>
+                                            )}
+                                            </TableBody>
+                                        </Table>
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            </TabsContent>
+                        }
                     </Tabs>
                 </main>
             </TooltipProvider>
