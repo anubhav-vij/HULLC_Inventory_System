@@ -26,7 +26,7 @@ export function ProductForm({ product, onSave, onCancel, isSaving }: ProductForm
     resolver: zodResolver(product ? ProductFormSchema : ProductFormCreateSchema),
     defaultValues: product ? {
       ...product,
-      lots: product.lots.map(lot => ({...lot, expirationDate: lot.expirationDate ? new Date(lot.expirationDate) : null, receiptDate: new Date(lot.receiptDate) }))
+      lots: product.lots.map(lot => ({...lot, expirationDate: lot.expirationDate && isValid(new Date(lot.expirationDate)) ? new Date(lot.expirationDate) : null, receiptDate: isValid(new Date(lot.receiptDate)) ? new Date(lot.receiptDate) : new Date() }))
     } : {
       name: "",
       vendor: "",
@@ -40,6 +40,8 @@ export function ProductForm({ product, onSave, onCancel, isSaving }: ProductForm
     control: form.control,
     name: "lots",
   });
+
+  const isEditing = !!product;
 
   return (
     <Form {...form}>
@@ -111,7 +113,7 @@ export function ProductForm({ product, onSave, onCancel, isSaving }: ProductForm
               {form.formState.errors.lots.message as string}
             </p>
           )}
-          <div className="space-y-4">
+          <div className="space-y-4 max-h-60 overflow-y-auto pr-2">
             {fields.map((field, index) => (
               <div key={field.id} className="p-4 border rounded-lg bg-background space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
