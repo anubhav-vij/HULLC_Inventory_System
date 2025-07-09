@@ -6,9 +6,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
-import { ChevronsUpDown, MoreHorizontal, Package, Pencil, PlusCircle, Warehouse, ArrowRightLeft, CloudUpload, Loader2, AlertTriangle, Download } from 'lucide-react';
+import { ChevronsUpDown, MoreHorizontal, Package, Pencil, PlusCircle, Warehouse, ArrowRightLeft, CloudUpload, Loader2, AlertTriangle, Download, Trash2 } from 'lucide-react';
 import { ProductForm } from './product-form';
 import { TransactionForm } from './transaction-form';
 import { type Product, type Lot, type ProductFormData, type Transaction, type TransactionFormData, type User, type UserRole } from '@/lib/types';
@@ -64,6 +65,10 @@ export default function InventoryPage() {
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [openProductIds, setOpenProductIds] = useState<Set<string>>(new Set());
     const [openTransactionIds, setOpenTransactionIds] = useState<Set<string>>(new Set());
+    const [productToDelete, setProductToDelete] = useState<Product | null>(null);
+    const [transactionToDelete, setTransactionToDelete] = useState<Transaction | null>(null);
+    const [transactionToEdit, setTransactionToEdit] = useState<Transaction | null>(null);
+
 
     const { toast } = useToast();
 
@@ -182,6 +187,54 @@ export default function InventoryPage() {
         setIsTransactionFormOpen(true);
     };
 
+    const handleEditTransaction = (transaction: Transaction) => {
+        const product = products.find(p => p.id === transaction.productId);
+        if (product) {
+            setTransactionToEdit(transaction);
+            setProductForTransaction(product);
+            setIsTransactionFormOpen(true);
+        } else {
+            toast({ title: "Error", description: "Product associated with this transaction not found.", variant: "destructive"});
+        }
+    };
+
+    const handleDeleteProduct = (product: Product) => {
+        setProductToDelete(product);
+    };
+    
+    const handleConfirmDeleteProduct = () => {
+        if (!productToDelete) return;
+        setProducts(products.filter(p => p.id !== productToDelete.id));
+        toast({ title: "Product Deleted", description: `"${productToDelete.name}" has been removed.`});
+        setProductToDelete(null);
+    };
+
+    const handleDeleteTransaction = (transaction: Transaction) => {
+        setTransactionToDelete(transaction);
+    };
+
+    const handleConfirmDeleteTransaction = () => {
+        if (!transactionToDelete) return;
+    
+        const product = products.find(p => p.id === transactionToDelete.productId);
+        if (product) {
+            const updatedLots = product.lots.map(lot => {
+                const transactionItem = transactionToDelete.items.find(item => item.lotId === lot.id);
+                if (transactionItem) {
+                    return { ...lot, quantity: lot.quantity + transactionItem.quantity };
+                }
+                return lot;
+            });
+            const updatedProduct = { ...product, lots: updatedLots };
+            setProducts(products.map(p => p.id === updatedProduct.id ? updatedProduct : p));
+        }
+    
+        setTransactions(transactions.filter(t => t.id !== transactionToDelete.id));
+        toast({ title: "Transaction Deleted", description: `Transaction from ${format(transactionToDelete.date, 'PPP')} has been removed.`});
+        setTransactionToDelete(null);
+    };
+
+
     const handleSaveProduct = (data: ProductFormData) => {
         setIsSaving(true);
         setTimeout(() => {
@@ -203,48 +256,70 @@ export default function InventoryPage() {
     const handleSaveTransaction = (data: TransactionFormData) => {
         if (!productForTransaction) return;
         setIsSaving(true);
-
+    
         setTimeout(() => {
-            // Update product lot quantities
-            const updatedLots = productForTransaction.lots.map(lot => {
+            let updatedProduct = { ...productForTransaction };
+    
+            if (transactionToEdit) {
+                const originalItems = transactionToEdit.items;
+                updatedProduct.lots = updatedProduct.lots.map(lot => {
+                    const originalItem = originalItems.find(item => item.lotId === lot.id);
+                    if (originalItem) {
+                        return { ...lot, quantity: lot.quantity + originalItem.quantity };
+                    }
+                    return lot;
+                });
+            }
+    
+            const finalLots = updatedProduct.lots.map(lot => {
                 const transactionItem = data.items.find(item => item.lotId === lot.id);
                 if (transactionItem) {
                     return { ...lot, quantity: lot.quantity - transactionItem.quantityTaken };
                 }
                 return lot;
             });
-            const updatedProduct: Product = { ...productForTransaction, lots: updatedLots };
+    
+            updatedProduct = { ...updatedProduct, lots: finalLots };
             setProducts(products.map(p => p.id === updatedProduct.id ? updatedProduct : p));
-            
-            // Create and save new transaction
+    
             const dispensedItems = data.items
                 .filter(item => item.quantityTaken > 0)
                 .map(item => {
                     const lot = productForTransaction.lots.find(l => l.id === item.lotId)!;
                     return { lotId: lot.id, lotNumber: lot.lotNumber, quantity: item.quantityTaken };
                 });
-
             const totalQuantityDispensed = dispensedItems.reduce((sum, item) => sum + item.quantity, 0);
-
-            const newTransaction: Transaction = {
-                id: uuidv4(),
-                productId: productForTransaction.id,
-                productName: productForTransaction.name,
-                date: data.date,
-                notes: data.notes,
-                items: dispensedItems,
-                totalQuantity: totalQuantityDispensed,
-            };
-
-            setTransactions([newTransaction, ...transactions]);
-
-            toast({ title: "Transaction Saved", description: `Dispensed ${totalQuantityDispensed} of "${productForTransaction.name}".`});
-
+    
+            if (transactionToEdit) {
+                const updatedTransaction: Transaction = {
+                    ...transactionToEdit,
+                    date: data.date,
+                    notes: data.notes,
+                    items: dispensedItems,
+                    totalQuantity: totalQuantityDispensed,
+                };
+                setTransactions(transactions.map(t => t.id === updatedTransaction.id ? updatedTransaction : t));
+                toast({ title: "Transaction Updated", description: `Transaction for "${productForTransaction.name}" has been updated.` });
+            } else {
+                const newTransaction: Transaction = {
+                    id: uuidv4(),
+                    productId: productForTransaction.id,
+                    productName: productForTransaction.name,
+                    date: data.date,
+                    notes: data.notes,
+                    items: dispensedItems,
+                    totalQuantity: totalQuantityDispensed,
+                };
+                setTransactions([newTransaction, ...transactions]);
+                toast({ title: "Transaction Saved", description: `Dispensed ${totalQuantityDispensed} of "${productForTransaction.name}".` });
+            }
+    
             setIsSaving(false);
             setIsTransactionFormOpen(false);
             setProductForTransaction(null);
+            setTransactionToEdit(null);
         }, 500);
-    }
+    };
     
     const handleImportClick = () => {
         fileInputRef.current?.click();
@@ -582,6 +657,8 @@ export default function InventoryPage() {
                                                                                 <DropdownMenuContent align="end">
                                                                                     <DropdownMenuItem onClick={() => handleEdit(product)}><Pencil className="mr-2 h-4 w-4" /> Edit</DropdownMenuItem>
                                                                                     <DropdownMenuItem onClick={() => handleNewTransaction(product)}><ArrowRightLeft className="mr-2 h-4 w-4" /> New Transaction</DropdownMenuItem>
+                                                                                    <DropdownMenuSeparator />
+                                                                                    <DropdownMenuItem onClick={() => handleDeleteProduct(product)} className="text-destructive focus:text-destructive focus:bg-destructive/10"><Trash2 className="mr-2 h-4 w-4" /> Delete</DropdownMenuItem>
                                                                                 </DropdownMenuContent>
                                                                             </DropdownMenu>
                                                                         </TableCell>
@@ -656,6 +733,7 @@ export default function InventoryPage() {
                                                     <TableHead>Date</TableHead>
                                                     <TableHead>Quantity Dispensed</TableHead>
                                                     <TableHead>Notes</TableHead>
+                                                    <TableHead className="w-[100px] text-right">Actions</TableHead>
                                                 </TableRow>
                                             </TableHeader>
                                             <TableBody>
@@ -675,10 +753,20 @@ export default function InventoryPage() {
                                                                 <TableCell>{format(tx.date, 'PPP')}</TableCell>
                                                                 <TableCell><Badge variant="outline">-{tx.totalQuantity}</Badge></TableCell>
                                                                 <TableCell className="truncate max-w-xs">{tx.notes || 'N/A'}</TableCell>
+                                                                <TableCell className="text-right">
+                                                                    <DropdownMenu>
+                                                                        <DropdownMenuTrigger asChild><Button variant="ghost" className="h-8 w-8 p-0"><span className="sr-only">Open menu</span><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
+                                                                        <DropdownMenuContent align="end">
+                                                                            <DropdownMenuItem onClick={() => handleEditTransaction(tx)}><Pencil className="mr-2 h-4 w-4" /> Edit</DropdownMenuItem>
+                                                                            <DropdownMenuSeparator />
+                                                                            <DropdownMenuItem onClick={() => handleDeleteTransaction(tx)} className="text-destructive focus:text-destructive focus:bg-destructive/10"><Trash2 className="mr-2 h-4 w-4" /> Delete</DropdownMenuItem>
+                                                                        </DropdownMenuContent>
+                                                                    </DropdownMenu>
+                                                                </TableCell>
                                                             </TableRow>
                                                             {isOpen && (
                                                                 <TableRow className="bg-muted/50 hover:bg-muted/50">
-                                                                    <TableCell colSpan={5} className="p-0">
+                                                                    <TableCell colSpan={6} className="p-0">
                                                                         <div className="p-4">
                                                                             <h4 className="font-semibold mb-2 ml-2">Dispensed Lots</h4>
                                                                             <Table><TableHeader><TableRow><TableHead>Lot #</TableHead><TableHead>Quantity Taken</TableHead></TableRow></TableHeader><TableBody>{tx.items.map(item => (<TableRow key={item.lotId}><TableCell>{item.lotNumber}</TableCell><TableCell>{item.quantity}</TableCell></TableRow>))}</TableBody></Table>
@@ -690,7 +778,7 @@ export default function InventoryPage() {
                                                     )
                                                 })
                                             ) : (
-                                                <TableRow><TableCell colSpan={5} className="h-24 text-center">No transactions have been recorded yet.</TableCell></TableRow>
+                                                <TableRow><TableCell colSpan={6} className="h-24 text-center">No transactions have been recorded yet.</TableCell></TableRow>
                                             )}
                                             </TableBody>
                                         </Table>
@@ -717,17 +805,30 @@ export default function InventoryPage() {
                 </DialogContent>
             </Dialog>
 
-            <Dialog open={isTransactionFormOpen} onOpenChange={setIsTransactionFormOpen}>
+            <Dialog open={isTransactionFormOpen} onOpenChange={(isOpen) => {
+                if (!isOpen) {
+                    setIsTransactionFormOpen(false);
+                    setProductForTransaction(null);
+                    setTransactionToEdit(null);
+                } else {
+                    setIsTransactionFormOpen(true);
+                }
+            }}>
                 <DialogContent className="max-w-3xl">
                     <DialogHeader>
-                        <DialogTitle>New Transaction for {productForTransaction?.name}</DialogTitle>
+                        <DialogTitle>{transactionToEdit ? 'Edit Transaction' : `New Transaction for ${productForTransaction?.name}`}</DialogTitle>
                         <DialogDescription>Record the quantity of items dispensed from each lot.</DialogDescription>
                     </DialogHeader>
                     {productForTransaction && (
                         <TransactionForm
                             product={productForTransaction}
+                            transaction={transactionToEdit}
                             onSave={handleSaveTransaction}
-                            onCancel={() => setIsTransactionFormOpen(false)}
+                            onCancel={() => {
+                                setIsTransactionFormOpen(false);
+                                setProductForTransaction(null);
+                                setTransactionToEdit(null);
+                            }}
                             isSaving={isSaving}
                         />
                     )}
@@ -759,6 +860,36 @@ export default function InventoryPage() {
                     </div>
                 </DialogContent>
             </Dialog>
+
+            <AlertDialog open={!!productToDelete} onOpenChange={(open) => !open && setProductToDelete(null)}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            This action cannot be undone. This will permanently delete the product "{productToDelete?.name}".
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel onClick={() => setProductToDelete(null)}>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleConfirmDeleteProduct}>Delete</AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+            
+            <AlertDialog open={!!transactionToDelete} onOpenChange={(open) => !open && setTransactionToDelete(null)}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            This action cannot be undone. This will permanently delete the transaction from {transactionToDelete && format(transactionToDelete.date, 'PPP')} and return the dispensed items to inventory.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel onClick={() => setTransactionToDelete(null)}>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleConfirmDeleteTransaction}>Delete</AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div>
     );
 }

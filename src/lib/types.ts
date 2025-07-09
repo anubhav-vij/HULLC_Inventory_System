@@ -42,30 +42,36 @@ export const TransactionItemSchema = z.object({
 });
 
 // We need the original lots to validate against
-export const createTransactionFormSchema = (productLots: Lot[]) => z.object({
-  date: z.date({ required_error: "Transaction date is required." }),
-  notes: z.string().optional(),
-  items: z.array(TransactionItemSchema)
-    .min(1)
-    .refine(
-        (items) => items.some((item) => item.quantityTaken > 0),
-        { message: "You must dispense a quantity greater than zero from at least one lot." }
-    )
-    .refine(
-        (items) => {
-            for(const item of items) {
-                const lot = productLots.find(l => l.id === item.lotId);
-                if (lot && item.quantityTaken > lot.quantity) {
-                    return false; // Found an item where quantity taken exceeds available
-                }
-            }
-            return true; // All good
-        },
-        {
-            message: "Quantity to dispense cannot exceed available quantity for that lot.",
-            path: ["root"], // General form error
-        }
-    ),
+export const createTransactionFormSchema = (productLots: Lot[], originalTransaction: Transaction | null = null) => z.object({
+    date: z.date({ required_error: "Transaction date is required." }),
+    notes: z.string().optional(),
+    items: z.array(TransactionItemSchema)
+      .min(1)
+      .refine(
+          (items) => items.some((item) => item.quantityTaken > 0),
+          { message: "You must dispense a quantity greater than zero from at least one lot." }
+      )
+      .refine(
+          (items) => {
+              for(const item of items) {
+                  const lot = productLots.find(l => l.id === item.lotId);
+                  if (!lot) continue; 
+
+                  const originalQuantityTaken = originalTransaction?.items.find(i => i.lotId === lot.id)?.quantity ?? 0;
+                  
+                  const maxAvailable = lot.quantity + originalQuantityTaken;
+
+                  if (item.quantityTaken > maxAvailable) {
+                      return false;
+                  }
+              }
+              return true; 
+          },
+          {
+              message: "Quantity to dispense cannot exceed available quantity for that lot.",
+              path: ["root"], 
+          }
+      ),
 });
 
 
