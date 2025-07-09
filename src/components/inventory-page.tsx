@@ -409,6 +409,7 @@ export default function InventoryPage() {
                                                     <TableHead className="w-[50px]"></TableHead>
                                                     <TableHead>Product</TableHead>
                                                     <TableHead>Vendor</TableHead>
+                                                    <TableHead>Vendor Part #</TableHead>
                                                     <TableHead>Total Quantity</TableHead>
                                                     <TableHead>Storage Location</TableHead>
                                                     <TableHead className="w-[100px] text-right">Actions</TableHead>
@@ -422,9 +423,10 @@ export default function InventoryPage() {
                                                                 <TableRow className="text-sm">
                                                                     <TableCell><CollapsibleTrigger asChild><Button variant="ghost" size="sm" className="w-9 p-0 data-[state=open]:rotate-90"><ChevronsUpDown className="h-4 w-4" /><span className="sr-only">Toggle</span></Button></CollapsibleTrigger></TableCell>
                                                                     <TableCell className="font-medium">
-                                                                        <div className="flex items-center gap-3"><Package className="h-5 w-5 text-muted-foreground"/><div><div>{product.name}</div><div className="text-xs text-muted-foreground">{product.id} / {product.vendorPartNumber}</div></div></div>
+                                                                        <div className="flex items-center gap-3"><Package className="h-5 w-5 text-muted-foreground"/><div><div>{product.name}</div><div className="text-xs text-muted-foreground">{product.id}</div></div></div>
                                                                     </TableCell>
                                                                     <TableCell>{product.vendor}</TableCell>
+                                                                    <TableCell>{product.vendorPartNumber}</TableCell>
                                                                     <TableCell>
                                                                         <div className="flex items-center gap-2">
                                                                             <Badge variant={needsReorder(product) ? "destructive" : "secondary"}>{totalQuantity(product.lots)}</Badge>
@@ -453,7 +455,7 @@ export default function InventoryPage() {
                                                                 </TableRow>
                                                                 <CollapsibleContent asChild>
                                                                     <TableRow className="bg-muted/50 hover:bg-muted/50">
-                                                                        <TableCell colSpan={6} className="p-0">
+                                                                        <TableCell colSpan={7} className="p-0">
                                                                             <div className="p-4"><h4 className="font-semibold mb-2 ml-2">Lots for {product.name}</h4><Table><TableHeader><TableRow><TableHead>Lot #</TableHead><TableHead>Quantity</TableHead><TableHead>Receipt Date</TableHead><TableHead>Expiration Date</TableHead><TableHead>Storage Location</TableHead></TableRow></TableHeader><TableBody>{product.lots.map(lot => (<TableRow key={lot.id}><TableCell>{lot.lotNumber}</TableCell><TableCell>{lot.quantity}</TableCell><TableCell>{isValid(lot.receiptDate) ? format(lot.receiptDate, 'PPP') : 'Invalid Date'}</TableCell><TableCell>{lot.expirationDate && isValid(lot.expirationDate) ? format(lot.expirationDate, 'PPP') : 'N/A'}</TableCell><TableCell>{lot.location}</TableCell></TableRow>))}</TableBody></Table></div>
                                                                         </TableCell>
                                                                     </TableRow>
@@ -464,7 +466,7 @@ export default function InventoryPage() {
                                                 ))
                                             ) : (
                                                 <TableBody>
-                                                    <TableRow><TableCell colSpan={6} className="h-24 text-center">No products found. Get started by adding a new product.</TableCell></TableRow>
+                                                    <TableRow><TableCell colSpan={7} className="h-24 text-center">No products found. Get started by adding a new product.</TableCell></TableRow>
                                                 </TableBody>
                                             )}
                                         </Table>
