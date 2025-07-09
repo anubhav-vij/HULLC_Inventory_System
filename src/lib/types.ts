@@ -20,6 +20,7 @@ export const ProductFormSchema = z.object({
   name: z.string().min(1, "Product name is required."),
   vendor: z.string().min(1, "Vendor is required."),
   vendorPartNumber: z.string().min(1, "Vendor part number is required."),
+  reorderThreshold: z.coerce.number().min(0, "Reorder threshold must be zero or more.").nullable().default(null),
   lots: z.array(LotSchema),
 });
 

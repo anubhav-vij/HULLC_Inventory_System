@@ -31,6 +31,7 @@ export function ProductForm({ product, onSave, onCancel, isSaving }: ProductForm
       name: "",
       vendor: "",
       vendorPartNumber: "",
+      reorderThreshold: null,
       lots: [{ lotNumber: "", quantity: 1, receiptDate: new Date(), expirationDate: null, location: "" }],
     },
   });
@@ -43,7 +44,7 @@ export function ProductForm({ product, onSave, onCancel, isSaving }: ProductForm
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSave)} className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <FormField
             control={form.control}
             name="name"
@@ -73,6 +74,28 @@ export function ProductForm({ product, onSave, onCancel, isSaving }: ProductForm
               <FormItem>
                 <FormLabel>Vendor Part #</FormLabel>
                 <FormControl><Input placeholder="e.g., ABC-12345" {...field} /></FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="reorderThreshold"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Reorder Threshold</FormLabel>
+                <FormControl>
+                  <Input
+                    type="number"
+                    placeholder="e.g., 10"
+                    {...field}
+                    value={field.value ?? ''}
+                    onChange={e => {
+                        const value = e.target.value;
+                        field.onChange(value === '' ? null : parseInt(value, 10));
+                    }}
+                  />
+                </FormControl>
                 <FormMessage />
               </FormItem>
             )}
