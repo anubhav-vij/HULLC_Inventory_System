@@ -7,7 +7,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Badge } from '@/components/ui/badge';
 import { ChevronsUpDown, MoreHorizontal, Package, Pencil, PlusCircle, Warehouse, ArrowRightLeft, CloudUpload, Loader2, AlertTriangle } from 'lucide-react';
 import { ProductForm } from './product-form';
@@ -63,8 +62,34 @@ export default function InventoryPage() {
     const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
     const [isImporting, setIsImporting] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
-    
+    const [openProductIds, setOpenProductIds] = useState<Set<string>>(new Set());
+    const [openTransactionIds, setOpenTransactionIds] = useState<Set<string>>(new Set());
+
     const { toast } = useToast();
+
+    const toggleProductCollapse = (productId: string) => {
+        setOpenProductIds(prev => {
+            const newSet = new Set(prev);
+            if (newSet.has(productId)) {
+                newSet.delete(productId);
+            } else {
+                newSet.add(productId);
+            }
+            return newSet;
+        });
+    };
+
+    const toggleTransactionCollapse = (transactionId: string) => {
+        setOpenTransactionIds(prev => {
+            const newSet = new Set(prev);
+            if (newSet.has(transactionId)) {
+                newSet.delete(transactionId);
+            } else {
+                newSet.add(transactionId);
+            }
+            return newSet;
+        });
+    };
 
     useEffect(() => {
         try {
@@ -428,20 +453,28 @@ export default function InventoryPage() {
                                                     <TableHead className="w-[100px] text-right">Actions</TableHead>
                                                 </TableRow>
                                             </TableHeader>
-                                            {products.length > 0 ? (
-                                                products.map(product => {
-                                                    const outOfStock = isProductOutOfStock(product);
-                                                    const expired = !outOfStock && isProductExpired(product);
-                                                    return (
-                                                    <TableBody key={product.id} className="[&_tr:last-child]:border-0">
-                                                        <Collapsible asChild>
-                                                            <>
-                                                                <TableRow className={cn(
-                                                                    "text-sm",
-                                                                    outOfStock && "bg-destructive/10 hover:bg-destructive/20 data-[state=selected]:bg-destructive/20",
-                                                                    expired && "bg-orange-100 dark:bg-orange-950 hover:bg-orange-200 dark:hover:bg-orange-900 data-[state=selected]:bg-orange-200"
-                                                                )}>
-                                                                    <TableCell><CollapsibleTrigger asChild><Button variant="ghost" size="sm" className="w-9 p-0 data-[state=open]:rotate-90"><ChevronsUpDown className="h-4 w-4" /><span className="sr-only">Toggle</span></Button></CollapsibleTrigger></TableCell>
+                                            <TableBody>
+                                                {products.length > 0 ? (
+                                                    products.map(product => {
+                                                        const outOfStock = isProductOutOfStock(product);
+                                                        const isExpiredFlag = !outOfStock && isProductExpired(product);
+                                                        const isOpen = openProductIds.has(product.id);
+                                                        
+                                                        return (
+                                                            <React.Fragment key={product.id}>
+                                                                <TableRow 
+                                                                    data-state={isOpen ? 'open' : 'closed'}
+                                                                    className={cn("text-sm", {
+                                                                        "bg-destructive/10 hover:bg-destructive/20": outOfStock,
+                                                                        "bg-orange-100 dark:bg-orange-950 hover:bg-orange-200 dark:hover:bg-orange-900": isExpiredFlag,
+                                                                    })}
+                                                                >
+                                                                    <TableCell>
+                                                                        <Button variant="ghost" size="sm" className="w-9 p-0 data-[state=open]:rotate-90" onClick={() => toggleProductCollapse(product.id)} data-state={isOpen ? 'open' : 'closed'}>
+                                                                            <ChevronsUpDown className="h-4 w-4" />
+                                                                            <span className="sr-only">Toggle</span>
+                                                                        </Button>
+                                                                    </TableCell>
                                                                     <TableCell className="font-medium">
                                                                         <div className="flex items-center gap-3"><Package className="h-5 w-5 text-muted-foreground"/><div><div>{product.name}</div><div className="text-xs text-muted-foreground">{product.id}</div></div></div>
                                                                     </TableCell>
@@ -473,23 +506,22 @@ export default function InventoryPage() {
                                                                         </DropdownMenu>
                                                                     </TableCell>
                                                                 </TableRow>
-                                                                <CollapsibleContent asChild>
-                                                                    <TableRow className="bg-muted/50 hover:bg-muted/50">
+                                                                {isOpen && (
+                                                                     <TableRow className="bg-muted/50 hover:bg-muted/50">
                                                                         <TableCell colSpan={7} className="p-0">
                                                                             <div className="p-4"><h4 className="font-semibold mb-2 ml-2">Lots for {product.name}</h4><Table><TableHeader><TableRow><TableHead>Lot #</TableHead><TableHead>Quantity</TableHead><TableHead>Receipt Date</TableHead><TableHead>Expiration Date</TableHead><TableHead>Storage Location</TableHead></TableRow></TableHeader><TableBody>{product.lots.map(lot => (<TableRow key={lot.id}><TableCell>{lot.lotNumber}</TableCell><TableCell>{lot.quantity}</TableCell><TableCell>{isValid(lot.receiptDate) ? format(lot.receiptDate, 'PPP') : 'Invalid Date'}</TableCell><TableCell>{lot.expirationDate && isValid(lot.expirationDate) ? format(lot.expirationDate, 'PPP') : 'N/A'}</TableCell><TableCell>{lot.location}</TableCell></TableRow>))}</TableBody></Table></div>
                                                                         </TableCell>
                                                                     </TableRow>
-                                                                </CollapsibleContent>
-                                                            </>
-                                                        </Collapsible>
-                                                    </TableBody>
-                                                )})}
-                                            ) : (
-                                                <TableBody>
-                                                    <TableRow><TableCell colSpan={7} className="h-24 text-center">No products found. Get started by adding a new product.</TableCell></TableRow>
-
-                                                </TableBody>
-                                            )}
+                                                                )}
+                                                            </React.Fragment>
+                                                        )
+                                                    })
+                                                ) : (
+                                                    <TableRow>
+                                                        <TableCell colSpan={7} className="h-24 text-center">No products found. Get started by adding a new product.</TableCell>
+                                                    </TableRow>
+                                                )}
+                                            </TableBody>
                                         </Table>
                                     </div>
                                 </CardContent>
@@ -513,35 +545,41 @@ export default function InventoryPage() {
                                                 <TableHead>Notes</TableHead>
                                             </TableRow>
                                         </TableHeader>
+                                        <TableBody>
                                          {transactions.length > 0 ? (
-                                            transactions.map(tx => (
-                                                <TableBody key={tx.id} className="[&_tr:last-child]:border-0">
-                                                    <Collapsible asChild>
-                                                    <>
-                                                    <TableRow>
-                                                        <TableCell><CollapsibleTrigger asChild><Button variant="ghost" size="sm" className="w-9 p-0 data-[state=open]:rotate-90"><ChevronsUpDown className="h-4 w-4" /><span className="sr-only">Toggle</span></Button></CollapsibleTrigger></TableCell>
-                                                        <TableCell className="font-medium">{tx.productName} <span className="text-muted-foreground text-xs">({tx.productId})</span></TableCell>
-                                                        <TableCell>{format(tx.date, 'PPP')}</TableCell>
-                                                        <TableCell><Badge variant="outline">-{tx.totalQuantity}</Badge></TableCell>
-                                                        <TableCell className="truncate max-w-xs">{tx.notes || 'N/A'}</TableCell>
-                                                    </TableRow>
-                                                    <CollapsibleContent asChild>
-                                                        <TableRow className="bg-muted/50 hover:bg-muted/50">
-                                                            <TableCell colSpan={5} className="p-0">
-                                                                <div className="p-4">
-                                                                    <h4 className="font-semibold mb-2 ml-2">Dispensed Lots</h4>
-                                                                    <Table><TableHeader><TableRow><TableHead>Lot #</TableHead><TableHead>Quantity Taken</TableHead></TableRow></TableHeader><TableBody>{tx.items.map(item => (<TableRow key={item.lotId}><TableCell>{item.lotNumber}</TableCell><TableCell>{item.quantity}</TableCell></TableRow>))}</TableBody></Table>
-                                                                </div>
+                                            transactions.map(tx => {
+                                                const isOpen = openTransactionIds.has(tx.id);
+                                                return (
+                                                    <React.Fragment key={tx.id}>
+                                                        <TableRow data-state={isOpen ? 'open' : 'closed'}>
+                                                            <TableCell>
+                                                                <Button variant="ghost" size="sm" className="w-9 p-0 data-[state=open]:rotate-90" onClick={() => toggleTransactionCollapse(tx.id)} data-state={isOpen ? 'open' : 'closed'}>
+                                                                    <ChevronsUpDown className="h-4 w-4" />
+                                                                    <span className="sr-only">Toggle</span>
+                                                                </Button>
                                                             </TableCell>
+                                                            <TableCell className="font-medium">{tx.productName} <span className="text-muted-foreground text-xs">({tx.productId})</span></TableCell>
+                                                            <TableCell>{format(tx.date, 'PPP')}</TableCell>
+                                                            <TableCell><Badge variant="outline">-{tx.totalQuantity}</Badge></TableCell>
+                                                            <TableCell className="truncate max-w-xs">{tx.notes || 'N/A'}</TableCell>
                                                         </TableRow>
-                                                    </CollapsibleContent>
-                                                    </>
-                                                    </Collapsible>
-                                                </TableBody>
-                                            ))
+                                                        {isOpen && (
+                                                            <TableRow className="bg-muted/50 hover:bg-muted/50">
+                                                                <TableCell colSpan={5} className="p-0">
+                                                                    <div className="p-4">
+                                                                        <h4 className="font-semibold mb-2 ml-2">Dispensed Lots</h4>
+                                                                        <Table><TableHeader><TableRow><TableHead>Lot #</TableHead><TableHead>Quantity Taken</TableHead></TableRow></TableHeader><TableBody>{tx.items.map(item => (<TableRow key={item.lotId}><TableCell>{item.lotNumber}</TableCell><TableCell>{item.quantity}</TableCell></TableRow>))}</TableBody></Table>
+                                                                    </div>
+                                                                </TableCell>
+                                                            </TableRow>
+                                                        )}
+                                                    </React.Fragment>
+                                                )
+                                            })
                                         ) : (
-                                            <TableBody><TableRow><TableCell colSpan={5} className="h-24 text-center">No transactions have been recorded yet.</TableCell></TableRow></TableBody>
+                                            <TableRow><TableCell colSpan={5} className="h-24 text-center">No transactions have been recorded yet.</TableCell></TableRow>
                                         )}
+                                        </TableBody>
                                     </Table>
                                     </div>
                                 </CardContent>
