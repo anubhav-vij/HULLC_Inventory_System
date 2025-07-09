@@ -364,7 +364,7 @@ export default function InventoryPage() {
         const today = new Date();
         today.setHours(0, 0, 0, 0); // Compare against the start of today
         return product.lots.some(
-            (lot) => lot.expirationDate && isValid(lot.expirationDate) && lot.expirationDate < today
+            (lot) => lot.quantity > 0 && lot.expirationDate && isValid(lot.expirationDate) && lot.expirationDate < today
         );
     };
 
@@ -397,6 +397,8 @@ export default function InventoryPage() {
         );
     }
 
+    const inventoryColSpan = user.role === 'Admin' ? 7 : 4;
+
     return (
         <div className="min-h-screen w-full bg-background flex flex-col items-center p-4 sm:p-6 lg:p-8">
             <input type="file" ref={fileInputRef} onChange={handleFileImport} style={{ display: 'none' }} accept=".csv" />
@@ -417,7 +419,7 @@ export default function InventoryPage() {
                     <Tabs defaultValue="inventory">
                         <TabsList className="mb-4">
                             <TabsTrigger value="inventory">Inventory</TabsTrigger>
-                            <TabsTrigger value="transactions">Transactions</TabsTrigger>
+                            {user.role === 'Admin' && <TabsTrigger value="transactions">Transactions</TabsTrigger>}
                         </TabsList>
                         <TabsContent value="inventory">
                             <Card>
@@ -448,9 +450,9 @@ export default function InventoryPage() {
                                                     <TableHead>Product</TableHead>
                                                     <TableHead>Vendor</TableHead>
                                                     <TableHead>Vendor Part #</TableHead>
-                                                    <TableHead>Total Quantity</TableHead>
-                                                    <TableHead>Storage Location</TableHead>
-                                                    <TableHead className="w-[100px] text-right">Actions</TableHead>
+                                                    {user.role === 'Admin' && <TableHead>Total Quantity</TableHead>}
+                                                    {user.role === 'Admin' && <TableHead>Storage Location</TableHead>}
+                                                    {user.role === 'Admin' && <TableHead className="w-[100px] text-right">Actions</TableHead>}
                                                 </TableRow>
                                             </TableHeader>
                                             <TableBody>
@@ -480,35 +482,41 @@ export default function InventoryPage() {
                                                                     </TableCell>
                                                                     <TableCell>{product.vendor}</TableCell>
                                                                     <TableCell>{product.vendorPartNumber}</TableCell>
-                                                                    <TableCell>
-                                                                        <div className="flex items-center gap-2">
-                                                                            <Badge variant={needsReorder(product) ? "destructive" : "secondary"}>{totalQuantity(product.lots)}</Badge>
-                                                                            {needsReorder(product) && (
-                                                                                <Tooltip>
-                                                                                    <TooltipTrigger>
-                                                                                        <AlertTriangle className="h-4 w-4 text-destructive" />
-                                                                                    </TooltipTrigger>
-                                                                                    <TooltipContent>
-                                                                                        <p>Quantity is at or below reorder threshold ({product.reorderThreshold})</p>
-                                                                                    </TooltipContent>
-                                                                                </Tooltip>
-                                                                            )}
-                                                                        </div>
-                                                                    </TableCell>
-                                                                    <TableCell><div className="flex items-center gap-2"><Warehouse className="h-4 w-4 text-muted-foreground"/>{getDisplayLocation(product.lots)}</div></TableCell>
-                                                                    <TableCell className="text-right">
-                                                                        <DropdownMenu>
-                                                                            <DropdownMenuTrigger asChild><Button variant="ghost" className="h-8 w-8 p-0"><span className="sr-only">Open menu</span><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
-                                                                            <DropdownMenuContent align="end">
-                                                                                {user.role === 'Admin' && <DropdownMenuItem onClick={() => handleEdit(product)}><Pencil className="mr-2 h-4 w-4" /> Edit</DropdownMenuItem>}
-                                                                                <DropdownMenuItem onClick={() => handleNewTransaction(product)}><ArrowRightLeft className="mr-2 h-4 w-4" /> New Transaction</DropdownMenuItem>
-                                                                            </DropdownMenuContent>
-                                                                        </DropdownMenu>
-                                                                    </TableCell>
+                                                                    {user.role === 'Admin' && (
+                                                                        <TableCell>
+                                                                            <div className="flex items-center gap-2">
+                                                                                <Badge variant={needsReorder(product) ? "destructive" : "secondary"}>{totalQuantity(product.lots)}</Badge>
+                                                                                {needsReorder(product) && (
+                                                                                    <Tooltip>
+                                                                                        <TooltipTrigger>
+                                                                                            <AlertTriangle className="h-4 w-4 text-destructive" />
+                                                                                        </TooltipTrigger>
+                                                                                        <TooltipContent>
+                                                                                            <p>Quantity is at or below reorder threshold ({product.reorderThreshold})</p>
+                                                                                        </TooltipContent>
+                                                                                    </Tooltip>
+                                                                                )}
+                                                                            </div>
+                                                                        </TableCell>
+                                                                    )}
+                                                                    {user.role === 'Admin' && (
+                                                                        <TableCell><div className="flex items-center gap-2"><Warehouse className="h-4 w-4 text-muted-foreground"/>{getDisplayLocation(product.lots)}</div></TableCell>
+                                                                    )}
+                                                                    {user.role === 'Admin' && (
+                                                                        <TableCell className="text-right">
+                                                                            <DropdownMenu>
+                                                                                <DropdownMenuTrigger asChild><Button variant="ghost" className="h-8 w-8 p-0"><span className="sr-only">Open menu</span><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
+                                                                                <DropdownMenuContent align="end">
+                                                                                    <DropdownMenuItem onClick={() => handleEdit(product)}><Pencil className="mr-2 h-4 w-4" /> Edit</DropdownMenuItem>
+                                                                                    <DropdownMenuItem onClick={() => handleNewTransaction(product)}><ArrowRightLeft className="mr-2 h-4 w-4" /> New Transaction</DropdownMenuItem>
+                                                                                </DropdownMenuContent>
+                                                                            </DropdownMenu>
+                                                                        </TableCell>
+                                                                    )}
                                                                 </TableRow>
                                                                 {isOpen && (
                                                                      <TableRow className="bg-muted/50 hover:bg-muted/50">
-                                                                        <TableCell colSpan={7} className="p-0">
+                                                                        <TableCell colSpan={inventoryColSpan} className="p-0">
                                                                             <div className="p-4"><h4 className="font-semibold mb-2 ml-2">Lots for {product.name}</h4><Table><TableHeader><TableRow><TableHead>Lot #</TableHead><TableHead>Quantity</TableHead><TableHead>Receipt Date</TableHead><TableHead>Expiration Date</TableHead><TableHead>Storage Location</TableHead></TableRow></TableHeader><TableBody>{product.lots.map(lot => (<TableRow key={lot.id}><TableCell>{lot.lotNumber}</TableCell><TableCell>{lot.quantity}</TableCell><TableCell>{isValid(lot.receiptDate) ? format(lot.receiptDate, 'PPP') : 'Invalid Date'}</TableCell><TableCell>{lot.expirationDate && isValid(lot.expirationDate) ? format(lot.expirationDate, 'PPP') : 'N/A'}</TableCell><TableCell>{lot.location}</TableCell></TableRow>))}</TableBody></Table></div>
                                                                         </TableCell>
                                                                     </TableRow>
@@ -518,7 +526,7 @@ export default function InventoryPage() {
                                                     })
                                                 ) : (
                                                     <TableRow>
-                                                        <TableCell colSpan={7} className="h-24 text-center">No products found. Get started by adding a new product.</TableCell>
+                                                        <TableCell colSpan={inventoryColSpan} className="h-24 text-center">No products found. Get started by adding a new product.</TableCell>
                                                     </TableRow>
                                                 )}
                                             </TableBody>
