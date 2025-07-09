@@ -67,7 +67,6 @@ export default function InventoryPage() {
     const [openTransactionIds, setOpenTransactionIds] = useState<Set<string>>(new Set());
     const [productToDelete, setProductToDelete] = useState<Product | null>(null);
     const [transactionToDelete, setTransactionToDelete] = useState<Transaction | null>(null);
-    const [transactionToEdit, setTransactionToEdit] = useState<Transaction | null>(null);
 
 
     const { toast } = useToast();
@@ -187,17 +186,6 @@ export default function InventoryPage() {
         setIsTransactionFormOpen(true);
     };
 
-    const handleEditTransaction = (transaction: Transaction) => {
-        const product = products.find(p => p.id === transaction.productId);
-        if (product) {
-            setTransactionToEdit(transaction);
-            setProductForTransaction(product);
-            setIsTransactionFormOpen(true);
-        } else {
-            toast({ title: "Error", description: "Product associated with this transaction not found.", variant: "destructive"});
-        }
-    };
-
     const handleDeleteProduct = (product: Product) => {
         setProductToDelete(product);
     };
@@ -258,20 +246,7 @@ export default function InventoryPage() {
         setIsSaving(true);
     
         setTimeout(() => {
-            let updatedProduct = { ...productForTransaction };
-    
-            if (transactionToEdit) {
-                const originalItems = transactionToEdit.items;
-                updatedProduct.lots = updatedProduct.lots.map(lot => {
-                    const originalItem = originalItems.find(item => item.lotId === lot.id);
-                    if (originalItem) {
-                        return { ...lot, quantity: lot.quantity + originalItem.quantity };
-                    }
-                    return lot;
-                });
-            }
-    
-            const finalLots = updatedProduct.lots.map(lot => {
+            const finalLots = productForTransaction.lots.map(lot => {
                 const transactionItem = data.items.find(item => item.lotId === lot.id);
                 if (transactionItem) {
                     return { ...lot, quantity: lot.quantity - transactionItem.quantityTaken };
@@ -279,7 +254,7 @@ export default function InventoryPage() {
                 return lot;
             });
     
-            updatedProduct = { ...updatedProduct, lots: finalLots };
+            const updatedProduct = { ...productForTransaction, lots: finalLots };
             setProducts(products.map(p => p.id === updatedProduct.id ? updatedProduct : p));
     
             const dispensedItems = data.items
@@ -290,34 +265,21 @@ export default function InventoryPage() {
                 });
             const totalQuantityDispensed = dispensedItems.reduce((sum, item) => sum + item.quantity, 0);
     
-            if (transactionToEdit) {
-                const updatedTransaction: Transaction = {
-                    ...transactionToEdit,
-                    date: data.date,
-                    notes: data.notes,
-                    items: dispensedItems,
-                    totalQuantity: totalQuantityDispensed,
-                };
-                setTransactions(transactions.map(t => t.id === updatedTransaction.id ? updatedTransaction : t));
-                toast({ title: "Transaction Updated", description: `Transaction for "${productForTransaction.name}" has been updated.` });
-            } else {
-                const newTransaction: Transaction = {
-                    id: uuidv4(),
-                    productId: productForTransaction.id,
-                    productName: productForTransaction.name,
-                    date: data.date,
-                    notes: data.notes,
-                    items: dispensedItems,
-                    totalQuantity: totalQuantityDispensed,
-                };
-                setTransactions([newTransaction, ...transactions]);
-                toast({ title: "Transaction Saved", description: `Dispensed ${totalQuantityDispensed} of "${productForTransaction.name}".` });
-            }
-    
+            const newTransaction: Transaction = {
+                id: uuidv4(),
+                productId: productForTransaction.id,
+                productName: productForTransaction.name,
+                date: data.date,
+                notes: data.notes,
+                items: dispensedItems,
+                totalQuantity: totalQuantityDispensed,
+            };
+            setTransactions([newTransaction, ...transactions]);
+            toast({ title: "Transaction Saved", description: `Dispensed ${totalQuantityDispensed} of "${productForTransaction.name}".` });
+            
             setIsSaving(false);
             setIsTransactionFormOpen(false);
             setProductForTransaction(null);
-            setTransactionToEdit(null);
         }, 500);
     };
     
@@ -757,8 +719,6 @@ export default function InventoryPage() {
                                                                     <DropdownMenu>
                                                                         <DropdownMenuTrigger asChild><Button variant="ghost" className="h-8 w-8 p-0"><span className="sr-only">Open menu</span><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
                                                                         <DropdownMenuContent align="end">
-                                                                            <DropdownMenuItem onClick={() => handleEditTransaction(tx)}><Pencil className="mr-2 h-4 w-4" /> Edit</DropdownMenuItem>
-                                                                            <DropdownMenuSeparator />
                                                                             <DropdownMenuItem onClick={() => handleDeleteTransaction(tx)} className="text-destructive focus:text-destructive focus:bg-destructive/10"><Trash2 className="mr-2 h-4 w-4" /> Delete</DropdownMenuItem>
                                                                         </DropdownMenuContent>
                                                                     </DropdownMenu>
@@ -809,25 +769,22 @@ export default function InventoryPage() {
                 if (!isOpen) {
                     setIsTransactionFormOpen(false);
                     setProductForTransaction(null);
-                    setTransactionToEdit(null);
                 } else {
                     setIsTransactionFormOpen(true);
                 }
             }}>
                 <DialogContent className="max-w-3xl">
                     <DialogHeader>
-                        <DialogTitle>{transactionToEdit ? 'Edit Transaction' : `New Transaction for ${productForTransaction?.name}`}</DialogTitle>
+                        <DialogTitle>{`New Transaction for ${productForTransaction?.name}`}</DialogTitle>
                         <DialogDescription>Record the quantity of items dispensed from each lot.</DialogDescription>
                     </DialogHeader>
                     {productForTransaction && (
                         <TransactionForm
                             product={productForTransaction}
-                            transaction={transactionToEdit}
                             onSave={handleSaveTransaction}
                             onCancel={() => {
                                 setIsTransactionFormOpen(false);
                                 setProductForTransaction(null);
-                                setTransactionToEdit(null);
                             }}
                             isSaving={isSaving}
                         />

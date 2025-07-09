@@ -17,29 +17,17 @@ import { Separator } from "./ui/separator";
 
 type TransactionFormProps = {
   product: Product;
-  transaction?: Transaction | null;
   onSave: (data: TransactionFormData) => void;
   onCancel: () => void;
   isSaving: boolean;
 };
 
-export function TransactionForm({ product, transaction, onSave, onCancel, isSaving }: TransactionFormProps) {
-  const transactionFormSchema = createTransactionFormSchema(product.lots, transaction);
-  const isEditing = !!transaction;
+export function TransactionForm({ product, onSave, onCancel, isSaving }: TransactionFormProps) {
+  const transactionFormSchema = createTransactionFormSchema(product.lots);
 
   const form = useForm<TransactionFormData>({
     resolver: zodResolver(transactionFormSchema),
-    defaultValues: transaction ? {
-        date: new Date(transaction.date),
-        notes: transaction.notes || "",
-        items: product.lots.map(lot => {
-            const transactionItem = transaction.items.find(item => item.lotId === lot.id);
-            return {
-                lotId: lot.id,
-                quantityTaken: transactionItem?.quantity || 0,
-            };
-        })
-    } : {
+    defaultValues: {
       date: new Date(),
       notes: "",
       items: product.lots.map(lot => ({
@@ -154,7 +142,7 @@ export function TransactionForm({ product, transaction, onSave, onCancel, isSavi
             <Button type="button" variant="ghost" onClick={onCancel} disabled={isSaving}>Cancel</Button>
             <Button type="submit" disabled={isSaving || totalDispensed === 0}>
                 {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {isSaving ? 'Saving...' : (isEditing ? 'Update Transaction' : 'Save Transaction')}
+                {isSaving ? 'Saving...' : 'Save Transaction'}
             </Button>
         </div>
       </form>

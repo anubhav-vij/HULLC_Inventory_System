@@ -42,7 +42,7 @@ export const TransactionItemSchema = z.object({
 });
 
 // We need the original lots to validate against
-export const createTransactionFormSchema = (productLots: Lot[], originalTransaction: Transaction | null = null) => z.object({
+export const createTransactionFormSchema = (productLots: Lot[]) => z.object({
     date: z.date({ required_error: "Transaction date is required." }),
     notes: z.string().optional(),
     items: z.array(TransactionItemSchema)
@@ -56,12 +56,8 @@ export const createTransactionFormSchema = (productLots: Lot[], originalTransact
               for(const item of items) {
                   const lot = productLots.find(l => l.id === item.lotId);
                   if (!lot) continue; 
-
-                  const originalQuantityTaken = originalTransaction?.items.find(i => i.lotId === lot.id)?.quantity ?? 0;
                   
-                  const maxAvailable = lot.quantity + originalQuantityTaken;
-
-                  if (item.quantityTaken > maxAvailable) {
+                  if (item.quantityTaken > lot.quantity) {
                       return false;
                   }
               }
