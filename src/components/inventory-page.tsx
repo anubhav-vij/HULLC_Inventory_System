@@ -25,10 +25,9 @@ const initialProducts: Product[] = [
         name: "Test Product A",
         vendor: "Test Vendor",
         vendorPartNumber: "Part 001",
-        location: "Room 1",
         lots: [
-            { id: uuidv4(), lotNumber: "Lot 1", quantity: 100, receiptDate: new Date("2025-02-25"), expirationDate: new Date("2026-02-28") },
-            { id: uuidv4(), lotNumber: "Lot 2", quantity: 10, receiptDate: new Date("2025-02-02"), expirationDate: new Date("2025-03-03") },
+            { id: uuidv4(), lotNumber: "Lot 1", quantity: 100, receiptDate: new Date("2025-02-25"), expirationDate: new Date("2026-02-28"), location: "Room 1" },
+            { id: uuidv4(), lotNumber: "Lot 2", quantity: 10, receiptDate: new Date("2025-02-02"), expirationDate: new Date("2025-03-03"), location: "Room 2" },
         ]
     },
     {
@@ -36,9 +35,8 @@ const initialProducts: Product[] = [
         name: "Another Item B",
         vendor: "Sample Inc.",
         vendorPartNumber: "Item-B-42",
-        location: "Warehouse 3",
         lots: [
-            { id: uuidv4(), lotNumber: "Lot-XYZ", quantity: 500, receiptDate: new Date("2024-08-15"), expirationDate: new Date("2025-08-15") },
+            { id: uuidv4(), lotNumber: "Lot-XYZ", quantity: 500, receiptDate: new Date("2024-08-15"), expirationDate: new Date("2025-08-15"), location: "Warehouse 3" },
         ]
     }
 ];
@@ -67,14 +65,19 @@ export default function InventoryPage() {
             const storedProductsItem = window.localStorage.getItem(PRODUCTS_STORAGE_KEY);
             let loadedProducts: Product[];
             if (storedProductsItem) {
-                loadedProducts = JSON.parse(storedProductsItem).map((product: any) => ({
-                    ...product,
-                    lots: product.lots.map((lot: any) => ({
-                        ...lot,
-                        receiptDate: new Date(lot.receiptDate),
-                        expirationDate: lot.expirationDate ? new Date(lot.expirationDate) : null,
-                    })),
-                }));
+                 loadedProducts = JSON.parse(storedProductsItem).map((product: any) => {
+                    const hasLegacyLocation = product.location && (!product.lots[0] || !product.lots[0].location);
+                    return {
+                        ...product,
+                        lots: product.lots.map((lot: any) => ({
+                            ...lot,
+                            location: lot.location || (hasLegacyLocation ? product.location : ''),
+                            receiptDate: new Date(lot.receiptDate),
+                            expirationDate: lot.expirationDate ? new Date(lot.expirationDate) : null,
+                        })),
+                        location: undefined, 
+                    };
+                });
             } else {
                 loadedProducts = initialProducts;
             }
@@ -231,18 +234,18 @@ export default function InventoryPage() {
                             lotNumber: lot_number,
                             quantity: parseInt(quantity, 10) || 0,
                             receiptDate: new Date(receipt_date),
-                            expirationDate: expiration_date ? new Date(expiration_date) : null
+                            expirationDate: expiration_date ? new Date(expiration_date) : null,
+                            location: location
                         };
 
                         if (importedProductsMap.has(product_id)) {
                             importedProductsMap.get(product_id)!.lots.push(lot);
                         } else {
-                            const newProduct: Product = {
+                            const newProduct: Omit<Product, 'lots'> & { lots: Lot[] } = {
                                 id: product_id,
                                 name: product_name,
                                 vendor: vendor,
                                 vendorPartNumber: vendor_part_number,
-                                location: location,
                                 lots: [lot]
                             };
                             importedProductsMap.set(product_id, newProduct);
@@ -287,6 +290,14 @@ export default function InventoryPage() {
 
 
     const totalQuantity = (lots: Lot[]) => lots.reduce((sum, lot) => sum + lot.quantity, 0);
+    
+    const getDisplayLocation = (lots: Lot[]) => {
+        if (!lots || lots.length === 0) return 'N/A';
+        const uniqueLocations = [...new Set(lots.map(lot => lot.location))];
+        if (uniqueLocations.length === 1) return uniqueLocations[0];
+        return "Multiple Locations";
+    };
+
 
     return (
         <div className="min-h-screen w-full bg-background flex flex-col items-center p-4 sm:p-6 lg:p-8">
@@ -351,7 +362,7 @@ export default function InventoryPage() {
                                                                 </TableCell>
                                                                 <TableCell>{product.vendor}</TableCell>
                                                                 <TableCell><Badge variant="secondary">{totalQuantity(product.lots)}</Badge></TableCell>
-                                                                <TableCell><div className="flex items-center gap-2"><Warehouse className="h-4 w-4 text-muted-foreground"/>{product.location}</div></TableCell>
+                                                                <TableCell><div className="flex items-center gap-2"><Warehouse className="h-4 w-4 text-muted-foreground"/>{getDisplayLocation(product.lots)}</div></TableCell>
                                                                 <TableCell className="text-right">
                                                                     <DropdownMenu>
                                                                         <DropdownMenuTrigger asChild><Button variant="ghost" className="h-8 w-8 p-0"><span className="sr-only">Open menu</span><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
@@ -365,7 +376,7 @@ export default function InventoryPage() {
                                                             <CollapsibleContent asChild>
                                                                 <TableRow className="bg-muted/50 hover:bg-muted/50">
                                                                     <TableCell colSpan={6} className="p-0">
-                                                                        <div className="p-4"><h4 className="font-semibold mb-2 ml-2">Lots for {product.name}</h4><Table><TableHeader><TableRow><TableHead>Lot #</TableHead><TableHead>Quantity</TableHead><TableHead>Receipt Date</TableHead><TableHead>Expiration Date</TableHead></TableRow></TableHeader><TableBody>{product.lots.map(lot => (<TableRow key={lot.id}><TableCell>{lot.lotNumber}</TableCell><TableCell>{lot.quantity}</TableCell><TableCell>{format(lot.receiptDate, 'PPP')}</TableCell><TableCell>{lot.expirationDate ? format(lot.expirationDate, 'PPP') : 'N/A'}</TableCell></TableRow>))}</TableBody></Table></div>
+                                                                        <div className="p-4"><h4 className="font-semibold mb-2 ml-2">Lots for {product.name}</h4><Table><TableHeader><TableRow><TableHead>Lot #</TableHead><TableHead>Quantity</TableHead><TableHead>Receipt Date</TableHead><TableHead>Expiration Date</TableHead><TableHead>Storage Location</TableHead></TableRow></TableHeader><TableBody>{product.lots.map(lot => (<TableRow key={lot.id}><TableCell>{lot.lotNumber}</TableCell><TableCell>{lot.quantity}</TableCell><TableCell>{format(lot.receiptDate, 'PPP')}</TableCell><TableCell>{lot.expirationDate ? format(lot.expirationDate, 'PPP') : 'N/A'}</TableCell><TableCell>{lot.location}</TableCell></TableRow>))}</TableBody></Table></div>
                                                                     </TableCell>
                                                                 </TableRow>
                                                             </CollapsibleContent>
@@ -485,7 +496,7 @@ export default function InventoryPage() {
                         </code>
                     </div>
                     <p className="text-sm text-muted-foreground">
-                        Each row in the CSV represents a single lot. Products with multiple lots should have multiple rows with the same product information. Dates should be in YYYY-MM-DD format.
+                        Each row in the CSV represents a single lot, including its specific storage location. Products with multiple lots should have multiple rows with the same product information but potentially different lot details. Dates should be in YYYY-MM-DD format.
                     </p>
                     <div className="flex justify-end gap-2 pt-4">
                         <Button variant="ghost" onClick={() => setIsImportDialogOpen(false)} disabled={isImporting}>Cancel</Button>

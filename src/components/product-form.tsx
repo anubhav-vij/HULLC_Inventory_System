@@ -24,12 +24,14 @@ type ProductFormProps = {
 export function ProductForm({ product, onSave, onCancel, isSaving }: ProductFormProps) {
   const form = useForm<ProductFormData>({
     resolver: zodResolver(product ? ProductFormSchema : ProductFormCreateSchema),
-    defaultValues: product || {
+    defaultValues: product ? {
+      ...product,
+      lots: product.lots.map(lot => ({...lot, expirationDate: lot.expirationDate ? new Date(lot.expirationDate) : null, receiptDate: new Date(lot.receiptDate) }))
+    } : {
       name: "",
       vendor: "",
       vendorPartNumber: "",
-      location: "",
-      lots: [{ lotNumber: "", quantity: 1, receiptDate: new Date(), expirationDate: null }],
+      lots: [{ lotNumber: "", quantity: 1, receiptDate: new Date(), expirationDate: null, location: "" }],
     },
   });
 
@@ -41,7 +43,7 @@ export function ProductForm({ product, onSave, onCancel, isSaving }: ProductForm
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSave)} className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <FormField
             control={form.control}
             name="name"
@@ -75,17 +77,6 @@ export function ProductForm({ product, onSave, onCancel, isSaving }: ProductForm
               </FormItem>
             )}
           />
-          <FormField
-            control={form.control}
-            name="location"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Storage Location</FormLabel>
-                <FormControl><Input placeholder="e.g., Room 101, Shelf A" {...field} /></FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
         </div>
 
         <Separator />
@@ -100,7 +91,7 @@ export function ProductForm({ product, onSave, onCancel, isSaving }: ProductForm
           <div className="space-y-4">
             {fields.map((field, index) => (
               <div key={field.id} className="p-4 border rounded-lg bg-background space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-start">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
                   <FormField
                     control={form.control}
                     name={`lots.${index}.lotNumber`}
@@ -123,6 +114,17 @@ export function ProductForm({ product, onSave, onCancel, isSaving }: ProductForm
                       </FormItem>
                     )}
                   />
+                  <FormField
+                    control={form.control}
+                    name={`lots.${index}.location`}
+                    render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>Storage Location</FormLabel>
+                            <FormControl><Input placeholder="e.g., Room 101, Shelf A" {...field} /></FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    )}
+                   />
                   <FormField
                     control={form.control}
                     name={`lots.${index}.receiptDate`}
@@ -194,7 +196,7 @@ export function ProductForm({ product, onSave, onCancel, isSaving }: ProductForm
               </div>
             ))}
             <div className="flex justify-start">
-                 <Button type="button" variant="secondary" onClick={() => append({ lotNumber: '', quantity: 1, receiptDate: new Date(), expirationDate: null })}>
+                 <Button type="button" variant="secondary" onClick={() => append({ lotNumber: '', quantity: 1, receiptDate: new Date(), expirationDate: null, location: '' })}>
                     <PlusCircle className="mr-2 h-4 w-4" /> Add Another Lot
                 </Button>
             </div>

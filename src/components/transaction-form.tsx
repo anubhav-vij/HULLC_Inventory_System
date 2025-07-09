@@ -104,6 +104,7 @@ export function TransactionForm({ product, onSave, onCancel, isSaving }: Transac
                     <div key={field.id} className="grid grid-cols-3 gap-4 items-center p-3 border rounded-lg bg-background">
                         <div className="space-y-1">
                             <p className="font-medium">{productLot.lotNumber}</p>
+                            <p className="text-sm text-muted-foreground">Loc: {productLot.location}</p>
                             <p className="text-sm text-muted-foreground">Expires: {productLot.expirationDate ? format(productLot.expirationDate, 'PPP') : 'N/A'}</p>
                         </div>
                         <div className="space-y-1">
