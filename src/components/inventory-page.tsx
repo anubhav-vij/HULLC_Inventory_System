@@ -9,10 +9,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
-import { ChevronsUpDown, MoreHorizontal, Package, Pencil, PlusCircle, Warehouse, ArrowRightLeft, CloudUpload, Loader2, AlertTriangle, Download, Trash2 } from 'lucide-react';
+import { ChevronsUpDown, MoreHorizontal, Package, Pencil, PlusCircle, Warehouse, ArrowRightLeft, CloudUpload, Loader2, AlertTriangle, Download, Trash2, FileQuestion } from 'lucide-react';
 import { ProductForm } from './product-form';
 import { TransactionForm } from './transaction-form';
-import { type Product, type Lot, type ProductFormData, type Transaction, type TransactionFormData, type User, type UserRole } from '@/lib/types';
+import { RequestForm } from './request-form';
+import { type Product, type Lot, type ProductFormData, type Transaction, type TransactionFormData, type User, type UserRole, type ProductRequestFormData } from '@/lib/types';
 import { StockPilotLogo } from './icons';
 import { useToast } from '@/hooks/use-toast';
 import { v4 as uuidv4 } from 'uuid';
@@ -57,8 +58,10 @@ export default function InventoryPage() {
     const [isLoading, setIsLoading] = useState(true);
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [isTransactionFormOpen, setIsTransactionFormOpen] = useState(false);
+    const [isRequestFormOpen, setIsRequestFormOpen] = useState(false);
     const [productToEdit, setProductToEdit] = useState<Product | null>(null);
     const [productForTransaction, setProductForTransaction] = useState<Product | null>(null);
+    const [productForRequest, setProductForRequest] = useState<Product | null>(null);
     const [isSaving, setIsSaving] = useState(false);
     const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
     const [isImporting, setIsImporting] = useState(false);
@@ -186,6 +189,11 @@ export default function InventoryPage() {
         setIsTransactionFormOpen(true);
     };
 
+    const handleRequestProduct = (product: Product) => {
+        setProductForRequest(product);
+        setIsRequestFormOpen(true);
+    };
+
     const handleDeleteProduct = (product: Product) => {
         setProductToDelete(product);
     };
@@ -283,6 +291,24 @@ export default function InventoryPage() {
         }, 500);
     };
     
+    const handleSaveRequest = (data: ProductRequestFormData) => {
+        if (!productForRequest) return;
+        setIsSaving(true);
+    
+        setTimeout(() => {
+            // In a real app, this would submit the request to a backend.
+            // For now, we'll just show a success toast message.
+            console.log("Request Submitted:", { product: productForRequest, requestData: data });
+            toast({
+                title: "Request Submitted",
+                description: `Your request for ${data.quantity} of "${productForRequest.name}" has been sent for review.`
+            });
+            setIsSaving(false);
+            setIsRequestFormOpen(false);
+            setProductForRequest(null);
+        }, 500);
+    };
+
     const handleImportClick = () => {
         fileInputRef.current?.click();
     };
@@ -556,13 +582,16 @@ export default function InventoryPage() {
                                         <Table>
                                             <TableHeader>
                                                 <TableRow>
-                                                    <TableHead className="w-[50px]"></TableHead>
+                                                    {user.role === 'Admin' && <TableHead className="w-[50px]"></TableHead>}
                                                     <TableHead>Product</TableHead>
                                                     <TableHead>Vendor</TableHead>
                                                     <TableHead>Vendor Part #</TableHead>
                                                     {user.role === 'Admin' && <TableHead>Total Quantity</TableHead>}
                                                     {user.role === 'Admin' && <TableHead>Storage Location</TableHead>}
-                                                    {user.role === 'Admin' && <TableHead className="w-[100px] text-right">Actions</TableHead>}
+                                                    {user.role === 'Admin' ? 
+                                                        <TableHead className="w-[100px] text-right">Actions</TableHead> :
+                                                        <TableHead className="w-[120px] text-right">Request</TableHead>
+                                                    }
                                                 </TableRow>
                                             </TableHeader>
                                             <TableBody>
@@ -581,14 +610,14 @@ export default function InventoryPage() {
                                                                         "bg-orange-100 dark:bg-orange-950 hover:bg-orange-200 dark:hover:bg-orange-900": isExpiredFlag,
                                                                     })}
                                                                 >
-                                                                    <TableCell>
-                                                                        {user.role === 'Admin' && (
+                                                                    {user.role === 'Admin' && (
+                                                                        <TableCell>
                                                                             <Button variant="ghost" size="sm" className="w-9 p-0 data-[state=open]:rotate-90" onClick={() => toggleProductCollapse(product.id)} data-state={isOpen ? 'open' : 'closed'}>
                                                                                 <ChevronsUpDown className="h-4 w-4" />
                                                                                 <span className="sr-only">Toggle</span>
                                                                             </Button>
-                                                                        )}
-                                                                    </TableCell>
+                                                                        </TableCell>
+                                                                    )}
                                                                     <TableCell className="font-medium">
                                                                         <div className="flex items-center gap-3"><Package className="h-5 w-5 text-muted-foreground"/><div><div>{product.name}</div><div className="text-xs text-muted-foreground">{product.id}</div></div></div>
                                                                     </TableCell>
@@ -614,7 +643,7 @@ export default function InventoryPage() {
                                                                     {user.role === 'Admin' && (
                                                                         <TableCell><div className="flex items-center gap-2"><Warehouse className="h-4 w-4 text-muted-foreground"/>{getDisplayLocation(product.lots)}</div></TableCell>
                                                                     )}
-                                                                    {user.role === 'Admin' && (
+                                                                    {user.role === 'Admin' ? (
                                                                         <TableCell className="text-right">
                                                                             <DropdownMenu>
                                                                                 <DropdownMenuTrigger asChild><Button variant="ghost" className="h-8 w-8 p-0"><span className="sr-only">Open menu</span><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
@@ -625,6 +654,12 @@ export default function InventoryPage() {
                                                                                     <DropdownMenuItem onClick={() => handleDeleteProduct(product)} className="text-destructive focus:text-destructive focus:bg-destructive/10"><Trash2 className="mr-2 h-4 w-4" /> Delete</DropdownMenuItem>
                                                                                 </DropdownMenuContent>
                                                                             </DropdownMenu>
+                                                                        </TableCell>
+                                                                    ) : (
+                                                                        <TableCell className="text-right">
+                                                                            <Button size="sm" onClick={() => handleRequestProduct(product)}>
+                                                                                <FileQuestion className="mr-2 h-4 w-4" /> Request
+                                                                            </Button>
                                                                         </TableCell>
                                                                     )}
                                                                 </TableRow>
@@ -787,6 +822,35 @@ export default function InventoryPage() {
                             onCancel={() => {
                                 setIsTransactionFormOpen(false);
                                 setProductForTransaction(null);
+                            }}
+                            isSaving={isSaving}
+                        />
+                    )}
+                </DialogContent>
+            </Dialog>
+
+            <Dialog open={isRequestFormOpen} onOpenChange={(isOpen) => {
+                if (!isOpen) {
+                    setIsRequestFormOpen(false);
+                    setProductForRequest(null);
+                } else {
+                    setIsRequestFormOpen(true);
+                }
+            }}>
+                <DialogContent className="max-w-3xl">
+                    <DialogHeader>
+                        <DialogTitle>Product Request</DialogTitle>
+                        <DialogDescription>
+                            Fill out the form below to request a product. Your request will be sent for review.
+                        </DialogDescription>
+                    </DialogHeader>
+                    {productForRequest && (
+                        <RequestForm
+                            product={productForRequest}
+                            onSave={handleSaveRequest}
+                            onCancel={() => {
+                                setIsRequestFormOpen(false);
+                                setProductForRequest(null);
                             }}
                             isSaving={isSaving}
                         />

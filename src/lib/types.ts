@@ -85,6 +85,21 @@ export const TransactionSchema = z.object({
     totalQuantity: z.number(),
 });
 
+// Request Schemas
+export const DEPARTMENTS = ["Cardiology", "Neurology", "Oncology", "Pediatrics", "Research & Development"] as const;
+export const PROJECTS = ["Project Alpha", "Project Beta", "Clinical Trial Gamma", "Pre-clinical Study Delta"] as const;
+
+export const ProductRequestSchema = z.object({
+  requesterName: z.string().min(1, "Your name is required."),
+  requesterEmail: z.string().email("Please enter a valid NIH email address."),
+  department: z.enum(DEPARTMENTS, { required_error: "Please select a department." }),
+  quantity: z.coerce.number().min(1, "Quantity must be at least 1."),
+  project: z.enum(PROJECTS, { required_error: "Please select a project." }),
+  justification: z.string().min(1, "Justification is required."),
+  sopRead: z.boolean().refine(val => val === true, {
+    message: "You must confirm you have read the SOP.",
+  }),
+});
 
 export type Lot = z.infer<typeof LotSchema>;
 export type Product = z.infer<typeof ProductSchema>;
@@ -95,6 +110,7 @@ export type TransactionFormData = {
     notes?: string;
     items: { lotId: string; quantityTaken: number; }[];
 };
+export type ProductRequestFormData = z.infer<typeof ProductRequestSchema>;
 
 // User and Auth Types
 export type UserRole = 'Admin' | 'Staff';
