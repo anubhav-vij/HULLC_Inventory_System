@@ -77,7 +77,7 @@ export const TransactionSchema = z.object({
         quantity: z.number(),
     })),
     totalQuantity: z.number(),
-    requesterName: z.string().optional(),
+    requestorName: z.string().optional(),
     department: z.string().optional(),
 });
 
@@ -85,8 +85,8 @@ export const DEPARTMENTS = ["Cardiology", "Neurology", "Oncology", "Pediatrics",
 export const PROJECTS = ["Project Alpha", "Project Beta", "Clinical Trial Gamma", "Pre-clinical Study Delta"] as const;
 
 export const ProductRequestFormSchema = z.object({
-  requesterName: z.string().min(1, "Your name is required."),
-  requesterEmail: z.string().email("Please enter a valid NIH email address."),
+  requestorName: z.string().min(1, "Your name is required."),
+  requestorEmail: z.string().email("Please enter a valid NIH email address."),
   department: z.enum(DEPARTMENTS, { required_error: "Please select a department." }),
   quantity: z.coerce.number().min(1, "Quantity must be at least 1."),
   project: z.enum(PROJECTS, { required_error: "Please select a project." }),

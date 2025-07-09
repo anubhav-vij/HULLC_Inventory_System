@@ -55,7 +55,7 @@ This workflow formalizes how staff members obtain materials.
 *   **Step 1: Staff Submits Request:**
     *   A Staff user clicks the "Request" button on any product in the inventory dashboard, regardless of its stock level or expiration status.
     *   A **Product Request Form** opens, capturing:
-        *   Requester Name and NIH Email Address
+        *   Requestor Name and NIH Email Address
         *   Department and Project (from predefined dropdown lists)
         *   Quantity needed
         *   Written justification for the request
@@ -66,7 +66,7 @@ This workflow formalizes how staff members obtain materials.
 
 #### 3.5. Request Fulfillment & Transaction Management (Admin-only)
 
-*   **"Product Requests" Tab:** This tab provides Admins with a table of all submitted requests, showing requester details, product information, and status.
+*   **"Product Requests" Tab:** This tab provides Admins with a table of all submitted requests, showing requestor details, product information, and status.
 *   **Fulfillment:**
     *   An Admin can click the **"Fulfill"** button on a pending request.
     *   This action opens the **New Transaction** form, pre-populating the relevant product. The Admin enters the quantity dispensed from one or more lots.
@@ -74,7 +74,7 @@ This workflow formalizes how staff members obtain materials.
 *   **Rejection:** An Admin can click **"Reject"** on a request, which, after confirmation, marks its status as "Rejected".
 *   **Transaction History:**
     *   All fulfillment and manual dispense events are logged in the **"Transactions"** tab.
-    *   For transactions generated from a staff request, the requester's name and department are displayed, providing clear traceability from request to fulfillment.
+    *   For transactions generated from a staff request, the requestor's name and department are displayed, providing clear traceability from request to fulfillment.
     *   Admins can delete erroneous transactions. This action reverses the stock movement, returning the dispensed quantity to the correct inventory lots.
     *   To ensure a clear audit trail, transactions cannot be edited.
 

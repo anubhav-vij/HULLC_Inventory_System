@@ -24,8 +24,8 @@ export function RequestForm({ product, onSave, onCancel, isSaving }: RequestForm
   const form = useForm<ProductRequestFormData>({
     resolver: zodResolver(ProductRequestFormSchema),
     defaultValues: {
-      requesterName: "",
-      requesterEmail: "",
+      requestorName: "",
+      requestorEmail: "",
       department: undefined,
       quantity: 1,
       project: undefined,
@@ -59,10 +59,10 @@ export function RequestForm({ product, onSave, onCancel, isSaving }: RequestForm
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <FormField
               control={form.control}
-              name="requesterName"
+              name="requestorName"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Your Name</FormLabel>
+                  <FormLabel>Requestor Name</FormLabel>
                   <FormControl><Input placeholder="e.g., Jane Doe" {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>
@@ -70,10 +70,10 @@ export function RequestForm({ product, onSave, onCancel, isSaving }: RequestForm
             />
             <FormField
               control={form.control}
-              name="requesterEmail"
+              name="requestorEmail"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>NIH Email Address</FormLabel>
+                  <FormLabel>Requestor Email Address</FormLabel>
                   <FormControl><Input type="email" placeholder="e.g., jane.doe@nih.gov" {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>

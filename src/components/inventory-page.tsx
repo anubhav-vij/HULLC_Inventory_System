@@ -291,7 +291,7 @@ export default function InventoryPage() {
                 items: dispensedItems,
                 totalQuantity: totalQuantityDispensed,
                 ...(requestToFulfill && {
-                    requesterName: requestToFulfill.requesterName,
+                    requestorName: requestToFulfill.requestorName,
                     department: requestToFulfill.department
                 })
             };
@@ -500,8 +500,8 @@ export default function InventoryPage() {
                 'transaction_notes': tx.notes ?? '',
                 'product_id': tx.productId,
                 'product_name': tx.productName,
-                'requester_name': tx.requesterName ?? 'N/A',
-                'requester_department': tx.department ?? 'N/A',
+                'requestor_name': tx.requestorName ?? 'N/A',
+                'department': tx.department ?? 'N/A',
                 'lot_id': item.lotId,
                 'lot_number': item.lotNumber,
                 'quantity_dispensed': item.quantity,
@@ -790,7 +790,7 @@ export default function InventoryPage() {
                                         <Table>
                                             <TableHeader>
                                                 <TableRow>
-                                                    <TableHead>Requester</TableHead>
+                                                    <TableHead>Requestor</TableHead>
                                                     <TableHead>Product</TableHead>
                                                     <TableHead>Qty Req.</TableHead>
                                                     <TableHead>Submitted</TableHead>
@@ -803,7 +803,7 @@ export default function InventoryPage() {
                                                     productRequests.map(req => (
                                                         <TableRow key={req.id}>
                                                             <TableCell>
-                                                                <div>{req.requesterName}</div>
+                                                                <div>{req.requestorName}</div>
                                                                 <div className="text-xs text-muted-foreground">{req.department}</div>
                                                             </TableCell>
                                                             <TableCell>
@@ -858,7 +858,8 @@ export default function InventoryPage() {
                                                     <TableHead>Product</TableHead>
                                                     <TableHead>Date</TableHead>
                                                     <TableHead>Quantity Dispensed</TableHead>
-                                                    <TableHead>Requester</TableHead>
+                                                    <TableHead>Requestor</TableHead>
+                                                    <TableHead>Department</TableHead>
                                                     <TableHead>Notes</TableHead>
                                                     <TableHead className="w-[100px] text-right">Actions</TableHead>
                                                 </TableRow>
@@ -880,14 +881,10 @@ export default function InventoryPage() {
                                                                 <TableCell>{format(tx.date, 'PPP')}</TableCell>
                                                                 <TableCell><Badge variant="outline">-{tx.totalQuantity}</Badge></TableCell>
                                                                 <TableCell>
-                                                                    {tx.requesterName ? (
-                                                                        <div>
-                                                                            <div>{tx.requesterName}</div>
-                                                                            <div className="text-xs text-muted-foreground">{tx.department}</div>
-                                                                        </div>
-                                                                    ) : (
-                                                                        <div className="text-muted-foreground">Manual Entry</div>
-                                                                    )}
+                                                                    {tx.requestorName || <span className="text-muted-foreground">Manual Entry</span>}
+                                                                </TableCell>
+                                                                <TableCell>
+                                                                    {tx.department || <span className="text-muted-foreground">N/A</span>}
                                                                 </TableCell>
                                                                 <TableCell className="truncate max-w-xs">{tx.notes || 'N/A'}</TableCell>
                                                                 <TableCell className="text-right">
@@ -901,7 +898,7 @@ export default function InventoryPage() {
                                                             </TableRow>
                                                             {isOpen && (
                                                                 <TableRow className="bg-muted/50 hover:bg-muted/50">
-                                                                    <TableCell colSpan={7} className="p-0">
+                                                                    <TableCell colSpan={8} className="p-0">
                                                                         <div className="p-4">
                                                                             <h4 className="font-semibold mb-2 ml-2">Dispensed Lots</h4>
                                                                             <Table><TableHeader><TableRow><TableHead>Lot #</TableHead><TableHead>Quantity Taken</TableHead></TableRow></TableHeader><TableBody>{tx.items.map(item => (<TableRow key={item.lotId}><TableCell>{item.lotNumber}</TableCell><TableCell>{item.quantity}</TableCell></TableRow>))}</TableBody></Table>
@@ -913,7 +910,7 @@ export default function InventoryPage() {
                                                     )
                                                 })
                                             ) : (
-                                                <TableRow><TableCell colSpan={7} className="h-24 text-center">No transactions have been recorded yet.</TableCell></TableRow>
+                                                <TableRow><TableCell colSpan={8} className="h-24 text-center">No transactions have been recorded yet.</TableCell></TableRow>
                                             )}
                                             </TableBody>
                                         </Table>
@@ -1059,7 +1056,7 @@ export default function InventoryPage() {
                     <AlertDialogHeader>
                         <AlertDialogTitle>Are you sure?</AlertDialogTitle>
                         <AlertDialogDescription>
-                            This action will mark the request from {requestToReject?.requesterName} as 'Rejected'. This cannot be undone.
+                            This action will mark the request from {requestToReject?.requestorName} as 'Rejected'. This cannot be undone.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
