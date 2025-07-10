@@ -7,7 +7,7 @@
 
 ### 1. Overview
 
-StockPilot is a specialized web-based inventory management system designed to provide streamlined tracking of products and their associated lots. The application is built around a role-based access control system, offering distinct functionalities for administrators who manage the inventory and staff members who request materials. Key features include detailed lot-level tracking, visual status alerts for stock levels and expirations, a formal product request workflow, and robust data management capabilities for administrators.
+StockPilot is a specialized web-based inventory management system designed to provide streamlined tracking of products and their associated lots. The application is built around a role-based access control system, offering distinct functionalities for administrators who manage the inventory and staff members who request materials. Key features include detailed lot-level tracking with file attachments, visual status alerts for stock levels and expirations, a formal product request workflow, and robust data management capabilities for administrators.
 
 ### 2. User Roles & Permissions
 
@@ -35,25 +35,26 @@ This is the primary interface for viewing product information, accessible via th
 
 *   **Product Table:** A comprehensive table lists all products.
     *   **Admin View:** Includes columns for `Product`, `Vendor`, `Vendor Part #`, `Total Quantity`, `Storage Location`, and `Actions`.
-    *   **Staff View:** A simplified view showing only `Product`, `Vendor`, `Vendor Part #`, and a `Request` button.
+    *   **Staff View:** A simplified view showing only `Product`, `Vendor`, `Vendor Part #`, and an `Action` button.
 *   **Visual Status Indicators:** Product rows are color-coded for immediate status identification:
     *   **Red Background:** The product has a total quantity of zero.
     *   **Orange Background:** The product has at least one lot that has passed its expiration date.
     *   **Reorder Alert:** A warning triangle icon appears next to the quantity if it is at or below the set reorder threshold (Admin view only).
-*   **Collapsible Lot Details (Admin-only):** Admins can expand any product row to view a detailed breakdown of its constituent lots, including `Lot #`, `Quantity`, `Receipt Date`, `Expiration Date`, and `Storage Location`. This feature is disabled for Staff.
+*   **Collapsible Lot Details (Admin-only):** Admins can expand any product row to view a detailed breakdown of its constituent lots, including `Lot #`, `Quantity`, `Receipt Date`, `Expiration Date`, `Storage Location`, and `File`. This feature is disabled for Staff.
 
 #### 3.3. Product Lifecycle Management (Admin-only)
 
 *   **Add Product:** Admins can add new products through a form that captures all necessary details and requires the creation of at least one initial lot.
 *   **Edit Product:** Admins can modify all details of an existing product and manage its lots (add, edit, remove) via a scrollable form.
 *   **Delete Product:** Admins can permanently delete a product from the system after confirming the action in a dialog box.
+*   **Lot-Level File Attachments:** For each lot, an Admin can upload an associated file (e.g., certificate of analysis, scanned label). Supported file types are PDF, JPEG, and TIFF. The file can be downloaded within the same user session. To prevent exceeding browser storage limits, the file data is not stored permanently; after a page reload, the filename remains visible, but the file is not downloadable.
 
 #### 3.4. Product Request Workflow
 
 This workflow formalizes how staff members obtain materials.
 
 *   **Step 1: Staff Submits Request:**
-    *   A Staff user clicks the "Request" button on any product in the inventory dashboard, regardless of its stock level or expiration status.
+    *   A Staff user clicks the "Request Item" button on any product in the inventory dashboard.
     *   A **Product Request Form** opens, capturing:
         *   Requestor Name and NIH Email Address
         *   Department and Project (from predefined dropdown lists)
@@ -69,20 +70,21 @@ This workflow formalizes how staff members obtain materials.
 *   **"Product Requests" Tab:** This tab provides Admins with a table of all submitted requests, showing requestor details, product information, and status.
 *   **Fulfillment:**
     *   An Admin can click the **"Fulfill"** button on a pending request.
-    *   This action opens the **New Transaction** form, pre-populating the relevant product. The Admin enters the quantity dispensed from one or more lots.
+    *   This action opens the **New Transaction** form, pre-populating the relevant product. The Admin enters the quantity dispensed from one or more lots and must provide notes.
     *   Upon saving the transaction, the corresponding product request is **automatically marked as "Completed"**.
 *   **Rejection:** An Admin can click **"Reject"** on a request, which, after confirmation, marks its status as "Rejected".
 *   **Transaction History:**
     *   All fulfillment and manual dispense events are logged in the **"Transactions"** tab.
-    *   For transactions generated from a staff request, the requestor's name and department are displayed, providing clear traceability from request to fulfillment.
+    *   The table displays separate columns for `Requestor` and `Department` for clear traceability.
     *   Admins can delete erroneous transactions. This action reverses the stock movement, returning the dispensed quantity to the correct inventory lots.
-    *   To ensure a clear audit trail, transactions cannot be edited.
+    *   To ensure a clear audit trail, transactions cannot be edited, and notes are mandatory.
 
 #### 3.6. Data Portability (Admin-only)
 
 *   **CSV Import:** Admins can use a CSV file to bulk-add or update products and their lots.
-*   **CSV Export:** Dedicated "Export CSV" buttons on the "Inventory" and "Transactions" tabs allow Admins to download complete datasets for offline analysis or record-keeping.
+*   **CSV Export:** Dedicated "Export CSV" buttons on the "Inventory" and "Transactions" tabs allow Admins to download complete datasets for offline analysis or record-keeping. The transactions export includes separate `requestor_name` and `department` columns.
 
 #### 3.7. Backend Capabilities (Non-User-Facing)
 
 *   **AI-Powered Expiration Prediction:** The system's backend includes a Genkit AI flow (`predict-expiration-dates`) capable of predicting product expiration dates based on product data. This AI feature is not currently integrated into the front-end interface.
+```
