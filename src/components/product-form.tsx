@@ -33,6 +33,7 @@ export function ProductForm({ product, onSave, onCancel, isSaving }: ProductForm
       ...product,
       lots: product.lots.map(lot => ({
         ...lot,
+        id: lot.id, // Ensure existing ID is passed
         image: lot.image ?? null,
         receiptDate: lot.receiptDate ? new Date(lot.receiptDate) : new Date(),
         expirationDate: lot.expirationDate ? new Date(lot.expirationDate) : null,
@@ -68,10 +69,7 @@ export function ProductForm({ product, onSave, onCancel, isSaving }: ProductForm
       }
       const reader = new FileReader();
       reader.onloadend = () => {
-        const currentLots = form.getValues('lots');
-        const updatedLots = [...currentLots];
-        updatedLots[index].image = reader.result as string;
-        form.setValue('lots', updatedLots, { shouldValidate: true, shouldDirty: true });
+        form.setValue(`lots.${index}.image`, reader.result as string, { shouldValidate: true, shouldDirty: true });
       };
       reader.onerror = () => {
          toast({
@@ -85,14 +83,15 @@ export function ProductForm({ product, onSave, onCancel, isSaving }: ProductForm
   };
 
   const handleRemoveImage = (index: number) => {
-    const currentLots = form.getValues('lots');
-    const updatedLots = [...currentLots];
-    updatedLots[index].image = null;
-    form.setValue('lots', updatedLots, { shouldValidate: true, shouldDirty: true });
+    form.setValue(`lots.${index}.image`, null, { shouldValidate: true, shouldDirty: true });
   };
   
   const triggerFileInput = (index: number) => {
-    fileInputRefs.current[index]?.click();
+    fileInputRefs.current[index] = document.createElement('input');
+    fileInputRefs.current[index]!.type = 'file';
+    fileInputRefs.current[index]!.accept = "image/png, image/jpeg, image/gif";
+    fileInputRefs.current[index]!.onchange = (e) => handleFileChange(e as any, index);
+    fileInputRefs.current[index]!.click();
   };
 
   return (
@@ -168,6 +167,7 @@ export function ProductForm({ product, onSave, onCancel, isSaving }: ProductForm
           <div className="space-y-4 max-h-60 overflow-y-auto pr-2">
             {fields.map((field, index) => (
               <div key={field.id} className="p-4 border rounded-lg bg-background space-y-4">
+                <input type="hidden" {...form.register(`lots.${index}.id`)} />
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
                   <FormField
                     control={form.control}
@@ -276,13 +276,6 @@ export function ProductForm({ product, onSave, onCancel, isSaving }: ProductForm
                         </div>
                       ) : (
                         <>
-                          <input
-                            type="file"
-                            ref={el => fileInputRefs.current[index] = el}
-                            onChange={(e) => handleFileChange(e, index)}
-                            className="hidden"
-                            accept="image/png, image/jpeg, image/gif"
-                          />
                           <Button type="button" variant="outline" onClick={() => triggerFileInput(index)}>
                             <Upload className="mr-2 h-4 w-4"/>
                             Upload Image
@@ -304,7 +297,7 @@ export function ProductForm({ product, onSave, onCancel, isSaving }: ProductForm
               </div>
             ))}
             <div className="flex justify-start">
-                 <Button type="button" variant="secondary" onClick={() => append({ lotNumber: '', quantity: 1, receiptDate: new Date(), expirationDate: null, location: '', image: null })}>
+                 <Button type="button" variant="secondary" onClick={() => append({ id: uuidv4(), lotNumber: '', quantity: 1, receiptDate: new Date(), expirationDate: null, location: '', image: null })}>
                     <PlusCircle className="mr-2 h-4 w-4" /> Add Another Lot
                 </Button>
             </div>

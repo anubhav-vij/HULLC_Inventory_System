@@ -247,22 +247,28 @@ export default function InventoryPage() {
         setTimeout(() => {
             if (productToEdit) {
                 // This is an existing product being edited.
-                setProducts(prevProducts => {
-                    return prevProducts.map(p => {
+                setProducts(prevProducts =>
+                    prevProducts.map(p => {
                         if (p.id === productToEdit.id) {
+                            // This is the product to update.
                             return {
-                                ...p,
-                                ...data,
+                                ...p, // Keep existing fields like id
+                                ...data, // Apply all new data from the form
                                 lots: data.lots.map(formLot => {
-                                    // Check if the lot already exists or is new
+                                    // If a lot has an ID, it's an existing lot. If not, it's new.
+                                    // The form now includes a hidden `id` field, so we can rely on that.
                                     const existingLot = p.lots.find(l => l.id === formLot.id);
-                                    return existingLot ? { ...existingLot, ...formLot } : { ...formLot, id: uuidv4() };
+                                    if (existingLot) {
+                                        return { ...existingLot, ...formLot };
+                                    }
+                                    // This is a brand new lot being added to an existing product
+                                    return { ...formLot, id: uuidv4() };
                                 }),
                             };
                         }
-                        return p;
-                    });
-                });
+                        return p; // This is not the product being edited, return it as is.
+                    })
+                );
                 toast({ title: "Product Updated", description: `"${data.name}" has been updated successfully.` });
             } else {
                 // This is a new product.
