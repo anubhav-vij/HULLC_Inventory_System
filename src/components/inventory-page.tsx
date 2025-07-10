@@ -245,23 +245,24 @@ export default function InventoryPage() {
         setTimeout(() => {
             if (productToEdit) {
                 // This is an existing product being edited.
-                setProducts(prevProducts =>
+                 setProducts(prevProducts =>
                     prevProducts.map(p => {
                         if (p.id === productToEdit.id) {
                             // This is the product to update.
+                            const updatedLots = data.lots.map(formLot => {
+                                const existingLot = p.lots.find(l => l.id === formLot.id);
+                                if (existingLot) {
+                                    // It's an existing lot, merge new data.
+                                    return { ...existingLot, ...formLot };
+                                }
+                                // It's a brand new lot being added to an existing product.
+                                return { ...formLot, id: uuidv4() };
+                            });
+    
                             return {
                                 ...p, // Keep existing fields like id
                                 ...data, // Apply all new data from the form
-                                lots: data.lots.map(formLot => {
-                                    // If a lot has an ID, it's an existing lot. If not, it's new.
-                                    // The form now includes a hidden `id` field, so we can rely on that.
-                                    const existingLot = p.lots.find(l => l.id === formLot.id);
-                                    if (existingLot) {
-                                        return { ...existingLot, ...formLot };
-                                    }
-                                    // This is a brand new lot being added to an existing product
-                                    return { ...formLot, id: uuidv4() };
-                                }),
+                                lots: updatedLots,
                             };
                         }
                         return p; // This is not the product being edited, return it as is.
@@ -754,7 +755,7 @@ export default function InventoryPage() {
                                                                     ) : (
                                                                         <TableCell className="text-right">
                                                                             <Button size="sm" onClick={() => handleRequestProduct(product)}>
-                                                                                <FileQuestion className="mr-2 h-4 w-4" /> Request
+                                                                                <FileQuestion className="mr-2 h-4 w-4" /> Request Item
                                                                             </Button>
                                                                         </TableCell>
                                                                     )}
