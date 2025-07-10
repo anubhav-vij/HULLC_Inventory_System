@@ -1,20 +1,19 @@
 "use client";
 
-import React, { useRef } from 'react';
+import React from 'react';
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useFieldArray, useForm } from "react-hook-form";
+import { v4 as uuidv4 } from 'uuid';
 import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { CalendarIcon, Loader2, PlusCircle, Trash2, Upload, X } from "lucide-react";
+import { CalendarIcon, Loader2, PlusCircle, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format, isValid } from "date-fns";
 import { type Product, ProductFormSchema, type ProductFormData, ProductFormCreateSchema } from "@/lib/types";
 import { Separator } from "./ui/separator";
-import Image from 'next/image';
-import { useToast } from './ui/use-toast';
 
 type ProductFormProps = {
   product?: Product | null;
@@ -24,9 +23,6 @@ type ProductFormProps = {
 };
 
 export function ProductForm({ product, onSave, onCancel, isSaving }: ProductFormProps) {
-  const { toast } = useToast();
-  const fileInputRefs = useRef<(HTMLInputElement | null)[]>([]);
-
   const form = useForm<ProductFormData>({
     resolver: zodResolver(product ? ProductFormSchema : ProductFormCreateSchema),
     defaultValues: product ? {
@@ -34,7 +30,6 @@ export function ProductForm({ product, onSave, onCancel, isSaving }: ProductForm
       lots: product.lots.map(lot => ({
         ...lot,
         id: lot.id, // Ensure existing ID is passed
-        image: lot.image ?? null,
         receiptDate: lot.receiptDate ? new Date(lot.receiptDate) : new Date(),
         expirationDate: lot.expirationDate ? new Date(lot.expirationDate) : null,
       }))
@@ -43,7 +38,7 @@ export function ProductForm({ product, onSave, onCancel, isSaving }: ProductForm
       vendor: "",
       vendorPartNumber: "",
       reorderThreshold: null,
-      lots: [{ lotNumber: "", quantity: 1, receiptDate: new Date(), expirationDate: null, location: "", image: null }],
+      lots: [{ lotNumber: "", quantity: 1, receiptDate: new Date(), expirationDate: null, location: "" }],
     },
   });
 
@@ -54,44 +49,6 @@ export function ProductForm({ product, onSave, onCancel, isSaving }: ProductForm
 
   const onSubmit = (data: ProductFormData) => {
     onSave(data);
-  };
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, index: number) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      if (file.size > 2 * 1024 * 1024) { // 2MB limit
-        toast({
-          variant: "destructive",
-          title: "File too large",
-          description: "Please upload an image smaller than 2MB.",
-        });
-        return;
-      }
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        form.setValue(`lots.${index}.image`, reader.result as string, { shouldValidate: true, shouldDirty: true });
-      };
-      reader.onerror = () => {
-         toast({
-          variant: "destructive",
-          title: "Error reading file",
-          description: "Could not read the selected image file.",
-        });
-      }
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const handleRemoveImage = (index: number) => {
-    form.setValue(`lots.${index}.image`, null, { shouldValidate: true, shouldDirty: true });
-  };
-  
-  const triggerFileInput = (index: number) => {
-    fileInputRefs.current[index] = document.createElement('input');
-    fileInputRefs.current[index]!.type = 'file';
-    fileInputRefs.current[index]!.accept = "image/png, image/jpeg, image/gif";
-    fileInputRefs.current[index]!.onchange = (e) => handleFileChange(e as any, index);
-    fileInputRefs.current[index]!.click();
   };
 
   return (
@@ -168,7 +125,7 @@ export function ProductForm({ product, onSave, onCancel, isSaving }: ProductForm
             {fields.map((field, index) => (
               <div key={field.id} className="p-4 border rounded-lg bg-background space-y-4">
                 <input type="hidden" {...form.register(`lots.${index}.id`)} />
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
                   <FormField
                     control={form.control}
                     name={`lots.${index}.lotNumber`}
@@ -259,30 +216,6 @@ export function ProductForm({ product, onSave, onCancel, isSaving }: ProductForm
                       </FormItem>
                     )}
                   />
-                  <div className="flex flex-col gap-2">
-                     <FormLabel>Lot Image</FormLabel>
-                      {form.watch(`lots.${index}.image`) ? (
-                        <div className="relative h-20 w-20 rounded-md overflow-hidden">
-                           <Image src={form.watch(`lots.${index}.image`)!} alt="Lot image preview" layout="fill" objectFit="cover" />
-                           <Button 
-                             type="button" 
-                             variant="destructive" 
-                             size="icon" 
-                             className="absolute top-1 right-1 h-6 w-6"
-                             onClick={() => handleRemoveImage(index)}
-                           >
-                             <X className="h-4 w-4" />
-                           </Button>
-                        </div>
-                      ) : (
-                        <>
-                          <Button type="button" variant="outline" onClick={() => triggerFileInput(index)}>
-                            <Upload className="mr-2 h-4 w-4"/>
-                            Upload Image
-                          </Button>
-                        </>
-                      )}
-                  </div>
                 </div>
                  <Button
                     type="button"
@@ -297,7 +230,7 @@ export function ProductForm({ product, onSave, onCancel, isSaving }: ProductForm
               </div>
             ))}
             <div className="flex justify-start">
-                 <Button type="button" variant="secondary" onClick={() => append({ id: uuidv4(), lotNumber: '', quantity: 1, receiptDate: new Date(), expirationDate: null, location: '', image: null })}>
+                 <Button type="button" variant="secondary" onClick={() => append({ id: uuidv4(), lotNumber: '', quantity: 1, receiptDate: new Date(), expirationDate: null, location: '' })}>
                     <PlusCircle className="mr-2 h-4 w-4" /> Add Another Lot
                 </Button>
             </div>

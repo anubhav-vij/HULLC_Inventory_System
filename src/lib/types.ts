@@ -8,7 +8,6 @@ export const LotSchema = z.object({
   receiptDate: z.date({ required_error: "Receipt date is required." }),
   expirationDate: z.date().nullable().default(null),
   location: z.string().min(1, "Storage location is required."),
-  image: z.string().nullable().optional(),
 });
 
 export const NewLotSchema = LotSchema.extend({

@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
-import { ChevronsUpDown, MoreHorizontal, Package, Pencil, PlusCircle, Warehouse, ArrowRightLeft, CloudUpload, Loader2, AlertTriangle, Download, Trash2, FileQuestion, CheckCircle2, XCircle, Hourglass, Image as ImageIcon } from 'lucide-react';
+import { ChevronsUpDown, MoreHorizontal, Package, Pencil, PlusCircle, Warehouse, ArrowRightLeft, CloudUpload, Loader2, AlertTriangle, Download, Trash2, FileQuestion, CheckCircle2, XCircle, Hourglass } from 'lucide-react';
 import { ProductForm } from './product-form';
 import { TransactionForm } from './transaction-form';
 import { RequestForm } from './request-form';
@@ -21,7 +21,6 @@ import { format, isValid } from 'date-fns';
 import Papa from 'papaparse';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
-import Image from 'next/image';
 
 const initialProducts: Product[] = [
     {
@@ -31,8 +30,8 @@ const initialProducts: Product[] = [
         vendorPartNumber: "Part 001",
         reorderThreshold: 20,
         lots: [
-            { id: uuidv4(), lotNumber: "Lot 1", quantity: 100, receiptDate: new Date("2025-02-25"), expirationDate: new Date("2026-02-28"), location: "Room 1", image: null },
-            { id: uuidv4(), lotNumber: "Lot 2", quantity: 10, receiptDate: new Date("2025-02-02"), expirationDate: new Date("2025-03-03"), location: "Room 2", image: null },
+            { id: uuidv4(), lotNumber: "Lot 1", quantity: 100, receiptDate: new Date("2025-02-25"), expirationDate: new Date("2026-02-28"), location: "Room 1" },
+            { id: uuidv4(), lotNumber: "Lot 2", quantity: 10, receiptDate: new Date("2025-02-02"), expirationDate: new Date("2025-03-03"), location: "Room 2" },
         ]
     },
     {
@@ -42,7 +41,7 @@ const initialProducts: Product[] = [
         vendorPartNumber: "Item-B-42",
         reorderThreshold: 100,
         lots: [
-            { id: uuidv4(), lotNumber: "Lot-XYZ", quantity: 500, receiptDate: new Date("2024-08-15"), expirationDate: new Date("2025-08-15"), location: "Warehouse 3", image: null },
+            { id: uuidv4(), lotNumber: "Lot-XYZ", quantity: 500, receiptDate: new Date("2024-08-15"), expirationDate: new Date("2025-08-15"), location: "Warehouse 3" },
         ]
     }
 ];
@@ -120,7 +119,6 @@ export default function InventoryPage() {
                         location: lot.location || '',
                         receiptDate: new Date(lot.receiptDate),
                         expirationDate: lot.expirationDate ? new Date(lot.expirationDate) : null,
-                        image: lot.image || null,
                     })),
                 }));
             } else {
@@ -430,7 +428,6 @@ export default function InventoryPage() {
                             receiptDate: new Date(receipt_date),
                             expirationDate: expiration_date ? new Date(expiration_date) : null,
                             location: location,
-                            image: null,
                         };
 
                         if (importedProductsMap.has(product_id)) {
@@ -775,7 +772,6 @@ export default function InventoryPage() {
                                                                                             <TableHead>Receipt Date</TableHead>
                                                                                             <TableHead>Expiration Date</TableHead>
                                                                                             <TableHead>Storage Location</TableHead>
-                                                                                            <TableHead>Image</TableHead>
                                                                                         </TableRow>
                                                                                     </TableHeader>
                                                                                     <TableBody>
@@ -786,17 +782,6 @@ export default function InventoryPage() {
                                                                                                 <TableCell>{isValid(lot.receiptDate) ? format(lot.receiptDate, 'PPP') : 'Invalid Date'}</TableCell>
                                                                                                 <TableCell>{lot.expirationDate && isValid(lot.expirationDate) ? format(lot.expirationDate, 'PPP') : 'N/A'}</TableCell>
                                                                                                 <TableCell>{lot.location}</TableCell>
-                                                                                                <TableCell>
-                                                                                                    {lot.image ? (
-                                                                                                        <div className="relative h-16 w-16">
-                                                                                                            <Image src={lot.image} alt={`Lot ${lot.lotNumber} image`} layout="fill" objectFit="cover" className="rounded-md" />
-                                                                                                        </div>
-                                                                                                    ) : (
-                                                                                                        <div className="h-16 w-16 flex items-center justify-center bg-secondary rounded-md">
-                                                                                                            <ImageIcon className="h-6 w-6 text-muted-foreground" />
-                                                                                                        </div>
-                                                                                                    )}
-                                                                                                </TableCell>
                                                                                             </TableRow>
                                                                                         ))}
                                                                                     </TableBody>
