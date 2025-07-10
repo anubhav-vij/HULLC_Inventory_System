@@ -250,7 +250,11 @@ export default function InventoryPage() {
                 setProducts(products.map(p => p.id === updatedProduct.id ? updatedProduct : p));
                 toast({ title: "Product Updated", description: `"${updatedProduct.name}" has been updated successfully.` });
             } else {
-                const newProduct: Product = { ...data, id: nextProductId, lots: data.lots.map(lot => ({...lot, id: uuidv4()})) };
+                const newProduct: Product = {
+                    ...data,
+                    id: nextProductId,
+                    lots: data.lots.map(lot => ({...lot, id: uuidv4()}))
+                };
                 setProducts([...products, newProduct]);
                 toast({ title: "Product Added", description: `"${newProduct.name}" has been added successfully.` });
             }
@@ -1083,5 +1087,3 @@ export default function InventoryPage() {
         </div>
     );
 }
-
-    

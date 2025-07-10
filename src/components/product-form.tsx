@@ -46,6 +46,10 @@ export function ProductForm({ product, onSave, onCancel, isSaving }: ProductForm
     name: "lots",
   });
 
+  const onSubmit = (data: ProductFormData) => {
+    onSave(data);
+  };
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, index: number) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -59,7 +63,9 @@ export function ProductForm({ product, onSave, onCancel, isSaving }: ProductForm
       }
       const reader = new FileReader();
       reader.onloadend = () => {
-        update(index, { ...fields[index], image: reader.result as string });
+        const currentLots = form.getValues('lots');
+        currentLots[index].image = reader.result as string;
+        form.setValue('lots', currentLots, { shouldValidate: true, shouldDirty: true });
       };
       reader.onerror = () => {
          toast({
@@ -73,7 +79,9 @@ export function ProductForm({ product, onSave, onCancel, isSaving }: ProductForm
   };
 
   const handleRemoveImage = (index: number) => {
-    update(index, { ...fields[index], image: null });
+    const currentLots = form.getValues('lots');
+    currentLots[index].image = null;
+    form.setValue('lots', currentLots, { shouldValidate: true, shouldDirty: true });
   };
   
   const triggerFileInput = (index: number) => {
@@ -82,7 +90,7 @@ export function ProductForm({ product, onSave, onCancel, isSaving }: ProductForm
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSave)} className="space-y-6">
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <FormField
             control={form.control}
@@ -307,5 +315,3 @@ export function ProductForm({ product, onSave, onCancel, isSaving }: ProductForm
     </Form>
   );
 }
-
-    
