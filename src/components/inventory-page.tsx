@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
-import { ChevronsUpDown, MoreHorizontal, Package, Pencil, PlusCircle, Warehouse, ArrowRightLeft, CloudUpload, Loader2, AlertTriangle, Download, Trash2, CheckCircle2, XCircle, Hourglass } from 'lucide-react';
+import { ChevronsUpDown, MoreHorizontal, Package, Pencil, PlusCircle, Warehouse, ArrowRightLeft, CloudUpload, Loader2, AlertTriangle, Download, Trash2, CheckCircle2, XCircle, Hourglass, HelpCircle } from 'lucide-react';
 import { ProductForm } from './product-form';
 import { TransactionForm } from './transaction-form';
 import { RequestForm } from './request-form';
@@ -240,14 +240,14 @@ export default function InventoryPage() {
         setTransactionToDelete(null);
     };
 
-     const handleSaveProduct = (data: ProductFormData) => {
+    const handleSaveProduct = (data: ProductFormData) => {
         setIsSaving(true);
         setTimeout(() => {
             if (productToEdit) {
-                 setProducts(prevProducts =>
+                setProducts(prevProducts =>
                     prevProducts.map(p => {
                         if (p.id === productToEdit.id) {
-                             const updatedLots = data.lots.map(formLot => {
+                            const updatedLots = data.lots.map(formLot => {
                                 const existingLot = p.lots.find(l => l.id === formLot.id);
                                 return existingLot ? { ...existingLot, ...formLot } : { ...formLot, id: uuidv4() };
                             });
@@ -995,7 +995,7 @@ export default function InventoryPage() {
                     setIsRequestFormOpen(true);
                 }
             }}>
-                <DialogContent className="max-w-3xl">
+                <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col">
                     <DialogHeader>
                         <DialogTitle>Product Request</DialogTitle>
                         <DialogDescription>

@@ -35,27 +35,29 @@ export function RequestForm({ product, onSave, onCancel, isSaving }: RequestForm
   });
 
   return (
-    <div className="space-y-6">
-      <Card className="bg-muted/50">
-        <CardHeader>
-          <CardTitle className="text-lg">Requesting Product</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
-            <p className="font-medium">Product Name:</p>
-            <p>{product.name}</p>
-            <p className="font-medium">Product ID:</p>
-            <p>{product.id}</p>
-            <p className="font-medium">Vendor:</p>
-            <p>{product.vendor}</p>
-            <p className="font-medium">Vendor Part #:</p>
-            <p>{product.vendorPartNumber}</p>
-          </div>
-        </CardContent>
-      </Card>
+    <div className="flex flex-col flex-1 min-h-0">
+      <div className="flex-shrink-0">
+        <Card className="bg-muted/50">
+          <CardHeader>
+            <CardTitle className="text-lg">Requesting Product</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm">
+              <p className="font-medium">Product Name:</p>
+              <p>{product.name}</p>
+              <p className="font-medium">Product ID:</p>
+              <p>{product.id}</p>
+              <p className="font-medium">Vendor:</p>
+              <p>{product.vendor}</p>
+              <p className="font-medium">Vendor Part #:</p>
+              <p>{product.vendorPartNumber}</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
 
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSave)} className="space-y-4 max-h-[50vh] overflow-y-auto pr-4">
+        <form onSubmit={form.handleSubmit(onSave)} className="space-y-4 flex-1 overflow-y-auto pr-4 mt-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <FormField
               control={form.control}
@@ -171,8 +173,7 @@ export function RequestForm({ product, onSave, onCancel, isSaving }: RequestForm
                 </FormItem>
               )}
             />
-
-          <div className="flex justify-end gap-2 pt-4">
+          <div className="flex-shrink-0 flex justify-end gap-2 pt-4">
               <Button type="button" variant="ghost" onClick={onCancel} disabled={isSaving}>Cancel</Button>
               <Button type="submit" disabled={isSaving}>
                   {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
