@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
-import { ChevronsUpDown, MoreHorizontal, Package, Pencil, PlusCircle, Warehouse, ArrowRightLeft, CloudUpload, Loader2, AlertTriangle, Download, Trash2, FileQuestion, CheckCircle2, XCircle, Hourglass } from 'lucide-react';
+import { ChevronsUpDown, MoreHorizontal, Package, Pencil, PlusCircle, Warehouse, ArrowRightLeft, CloudUpload, Loader2, AlertTriangle, Download, Trash2, CheckCircle2, XCircle, Hourglass } from 'lucide-react';
 import { ProductForm } from './product-form';
 import { TransactionForm } from './transaction-form';
 import { RequestForm } from './request-form';
@@ -244,33 +244,28 @@ export default function InventoryPage() {
         setIsSaving(true);
         setTimeout(() => {
             if (productToEdit) {
-                // This is an existing product being edited.
                  setProducts(prevProducts =>
                     prevProducts.map(p => {
                         if (p.id === productToEdit.id) {
-                            // This is the product to update.
                             const updatedLots = data.lots.map(formLot => {
                                 const existingLot = p.lots.find(l => l.id === formLot.id);
                                 if (existingLot) {
-                                    // It's an existing lot, merge new data.
                                     return { ...existingLot, ...formLot };
                                 }
-                                // It's a brand new lot being added to an existing product.
                                 return { ...formLot, id: uuidv4() };
                             });
     
                             return {
-                                ...p, // Keep existing fields like id
-                                ...data, // Apply all new data from the form
+                                ...p,
+                                ...data,
                                 lots: updatedLots,
                             };
                         }
-                        return p; // This is not the product being edited, return it as is.
+                        return p;
                     })
                 );
                 toast({ title: "Product Updated", description: `"${data.name}" has been updated successfully.` });
             } else {
-                // This is a new product.
                 const newProduct: Product = {
                     ...data,
                     id: nextProductId,
@@ -755,7 +750,7 @@ export default function InventoryPage() {
                                                                     ) : (
                                                                         <TableCell className="text-right">
                                                                             <Button size="sm" onClick={() => handleRequestProduct(product)}>
-                                                                                <FileQuestion className="mr-2 h-4 w-4" /> Request Item
+                                                                                Request Item
                                                                             </Button>
                                                                         </TableCell>
                                                                     )}
