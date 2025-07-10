@@ -246,16 +246,32 @@ export default function InventoryPage() {
         setIsSaving(true);
         setTimeout(() => {
             if (productToEdit) {
-                const updatedProduct: Product = { ...productToEdit, ...data };
-                setProducts(products.map(p => p.id === updatedProduct.id ? updatedProduct : p));
-                toast({ title: "Product Updated", description: `"${updatedProduct.name}" has been updated successfully.` });
+                // This is an existing product being edited.
+                setProducts(prevProducts => {
+                    return prevProducts.map(p => {
+                        if (p.id === productToEdit.id) {
+                            return {
+                                ...p,
+                                ...data,
+                                lots: data.lots.map(formLot => {
+                                    // Check if the lot already exists or is new
+                                    const existingLot = p.lots.find(l => l.id === formLot.id);
+                                    return existingLot ? { ...existingLot, ...formLot } : { ...formLot, id: uuidv4() };
+                                }),
+                            };
+                        }
+                        return p;
+                    });
+                });
+                toast({ title: "Product Updated", description: `"${data.name}" has been updated successfully.` });
             } else {
+                // This is a new product.
                 const newProduct: Product = {
                     ...data,
                     id: nextProductId,
                     lots: data.lots.map(lot => ({...lot, id: uuidv4()}))
                 };
-                setProducts([...products, newProduct]);
+                setProducts(prevProducts => [...prevProducts, newProduct]);
                 toast({ title: "Product Added", description: `"${newProduct.name}" has been added successfully.` });
             }
             setIsSaving(false);
@@ -794,7 +810,7 @@ export default function InventoryPage() {
                                             </TableBody>
                                         </Table>
                                     </div>
-                                </CardContent>
+                                 </CardContent>
                             </Card>
                         </TabsContent>
                         {user.role === 'Admin' && 
