@@ -39,7 +39,7 @@ export const TransactionItemSchema = z.object({
 
 export const createTransactionFormSchema = (productLots: Lot[]) => z.object({
     date: z.date({ required_error: "Transaction date is required." }),
-    notes: z.string().optional(),
+    notes: z.string().min(1, "Notes are required for each transaction."),
     items: z.array(TransactionItemSchema)
       .min(1)
       .refine(
@@ -71,7 +71,7 @@ export const TransactionSchema = z.object({
     productId: z.string(),
     productName: z.string(),
     date: z.date(),
-    notes: z.string().optional(),
+    notes: z.string(),
     items: z.array(z.object({
         lotId: z.string(),
         lotNumber: z.string(),
@@ -114,7 +114,7 @@ export type ProductFormData = z.infer<typeof ProductFormSchema>;
 export type Transaction = z.infer<typeof TransactionSchema>;
 export type TransactionFormData = {
     date: Date;
-    notes?: string;
+    notes: string;
     items: { lotId: string; quantityTaken: number; }[];
 };
 export type ProductRequestFormData = z.infer<typeof ProductRequestFormSchema>;
@@ -128,5 +128,3 @@ export type User = {
   name: string;
   role: UserRole;
 };
-
-    

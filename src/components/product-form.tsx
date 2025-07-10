@@ -31,7 +31,7 @@ export function ProductForm({ product, onSave, onCancel, isSaving }: ProductForm
     resolver: zodResolver(product ? ProductFormSchema : ProductFormCreateSchema),
     defaultValues: product ? {
       ...product,
-      lots: product.lots.map(lot => ({...lot, expirationDate: lot.expirationDate && isValid(new Date(lot.expirationDate)) ? new Date(lot.expirationDate) : null, receiptDate: isValid(new Date(lot.receiptDate)) ? new Date(lot.receiptDate) : new Date() }))
+      lots: product.lots.map(lot => ({...lot, image: lot.image ?? null, expirationDate: lot.expirationDate && isValid(new Date(lot.expirationDate)) ? new Date(lot.expirationDate) : null, receiptDate: isValid(new Date(lot.receiptDate)) ? new Date(lot.receiptDate) : new Date() }))
     } : {
       name: "",
       vendor: "",
@@ -41,7 +41,7 @@ export function ProductForm({ product, onSave, onCancel, isSaving }: ProductForm
     },
   });
 
-  const { fields, append, remove, update } = useFieldArray({
+  const { fields, append, remove } = useFieldArray({
     control: form.control,
     name: "lots",
   });
@@ -64,8 +64,9 @@ export function ProductForm({ product, onSave, onCancel, isSaving }: ProductForm
       const reader = new FileReader();
       reader.onloadend = () => {
         const currentLots = form.getValues('lots');
-        currentLots[index].image = reader.result as string;
-        form.setValue('lots', currentLots, { shouldValidate: true, shouldDirty: true });
+        const updatedLots = [...currentLots];
+        updatedLots[index].image = reader.result as string;
+        form.setValue('lots', updatedLots, { shouldValidate: true, shouldDirty: true });
       };
       reader.onerror = () => {
          toast({
@@ -80,8 +81,9 @@ export function ProductForm({ product, onSave, onCancel, isSaving }: ProductForm
 
   const handleRemoveImage = (index: number) => {
     const currentLots = form.getValues('lots');
-    currentLots[index].image = null;
-    form.setValue('lots', currentLots, { shouldValidate: true, shouldDirty: true });
+    const updatedLots = [...currentLots];
+    updatedLots[index].image = null;
+    form.setValue('lots', updatedLots, { shouldValidate: true, shouldDirty: true });
   };
   
   const triggerFileInput = (index: number) => {

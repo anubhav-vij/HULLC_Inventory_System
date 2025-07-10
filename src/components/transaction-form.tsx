@@ -85,7 +85,7 @@ export function TransactionForm({ product, onSave, onCancel, isSaving }: Transac
             name="notes"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Notes (Optional)</FormLabel>
+                <FormLabel>Notes</FormLabel>
                 <FormControl><Textarea placeholder="e.g., Dispensed for Study XYZ" {...field} /></FormControl>
                 <FormMessage />
               </FormItem>
