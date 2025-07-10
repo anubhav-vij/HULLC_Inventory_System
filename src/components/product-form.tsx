@@ -31,7 +31,12 @@ export function ProductForm({ product, onSave, onCancel, isSaving }: ProductForm
     resolver: zodResolver(product ? ProductFormSchema : ProductFormCreateSchema),
     defaultValues: product ? {
       ...product,
-      lots: product.lots.map(lot => ({...lot, image: lot.image ?? null, expirationDate: lot.expirationDate && isValid(new Date(lot.expirationDate)) ? new Date(lot.expirationDate) : null, receiptDate: isValid(new Date(lot.receiptDate)) ? new Date(lot.receiptDate) : new Date() }))
+      lots: product.lots.map(lot => ({
+        ...lot,
+        image: lot.image ?? null,
+        receiptDate: lot.receiptDate ? new Date(lot.receiptDate) : new Date(),
+        expirationDate: lot.expirationDate ? new Date(lot.expirationDate) : null,
+      }))
     } : {
       name: "",
       vendor: "",
@@ -256,9 +261,9 @@ export function ProductForm({ product, onSave, onCancel, isSaving }: ProductForm
                   />
                   <div className="flex flex-col gap-2">
                      <FormLabel>Lot Image</FormLabel>
-                      {field.image ? (
+                      {form.watch(`lots.${index}.image`) ? (
                         <div className="relative h-20 w-20 rounded-md overflow-hidden">
-                           <Image src={field.image} alt="Lot image preview" layout="fill" objectFit="cover" />
+                           <Image src={form.watch(`lots.${index}.image`)!} alt="Lot image preview" layout="fill" objectFit="cover" />
                            <Button 
                              type="button" 
                              variant="destructive" 
