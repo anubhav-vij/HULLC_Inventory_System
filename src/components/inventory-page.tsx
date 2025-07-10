@@ -240,24 +240,23 @@ export default function InventoryPage() {
         setTransactionToDelete(null);
     };
 
-    const handleSaveProduct = (data: ProductFormData) => {
+     const handleSaveProduct = (data: ProductFormData) => {
         setIsSaving(true);
         setTimeout(() => {
             if (productToEdit) {
                  setProducts(prevProducts =>
                     prevProducts.map(p => {
                         if (p.id === productToEdit.id) {
-                            const updatedLots = data.lots.map(formLot => {
+                             const updatedLots = data.lots.map(formLot => {
                                 const existingLot = p.lots.find(l => l.id === formLot.id);
-                                if (existingLot) {
-                                    return { ...existingLot, ...formLot };
-                                }
-                                return { ...formLot, id: uuidv4() };
+                                return existingLot ? { ...existingLot, ...formLot } : { ...formLot, id: uuidv4() };
                             });
-    
                             return {
                                 ...p,
-                                ...data,
+                                name: data.name,
+                                vendor: data.vendor,
+                                vendorPartNumber: data.vendorPartNumber,
+                                reorderThreshold: data.reorderThreshold,
                                 lots: updatedLots,
                             };
                         }
@@ -682,7 +681,7 @@ export default function InventoryPage() {
                                                     {user.role === 'Admin' && <TableHead>Storage Location</TableHead>}
                                                     {user.role === 'Admin' ? 
                                                         <TableHead className="w-[100px] text-right">Actions</TableHead> :
-                                                        <TableHead className="w-[120px] text-right">Request</TableHead>
+                                                        <TableHead className="w-[120px] text-right">Action</TableHead>
                                                     }
                                                 </TableRow>
                                             </TableHeader>
