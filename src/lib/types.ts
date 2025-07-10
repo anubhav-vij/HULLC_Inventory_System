@@ -1,6 +1,12 @@
 import { z } from 'zod';
 import { v4 as uuidv4 } from 'uuid';
 
+export const LotFileSchema = z.object({
+  name: z.string(),
+  type: z.string(),
+  data: z.string(),
+});
+
 export const LotSchema = z.object({
   id: z.string().default(() => uuidv4()),
   lotNumber: z.string().min(1, "Lot number is required."),
@@ -8,6 +14,7 @@ export const LotSchema = z.object({
   receiptDate: z.date({ required_error: "Receipt date is required." }),
   expirationDate: z.date().nullable().default(null),
   location: z.string().min(1, "Storage location is required."),
+  file: LotFileSchema.nullable().default(null),
 });
 
 export const NewLotSchema = LotSchema.extend({
@@ -108,6 +115,7 @@ export const ProductRequestSchema = ProductRequestFormSchema.extend({
 
 
 export type Lot = z.infer<typeof LotSchema>;
+export type LotFile = z.infer<typeof LotFileSchema>;
 export type Product = z.infer<typeof ProductSchema>;
 export type ProductFormData = z.infer<typeof ProductFormSchema>;
 export type Transaction = z.infer<typeof TransactionSchema>;

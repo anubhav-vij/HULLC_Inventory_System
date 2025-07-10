@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
-import { ChevronsUpDown, MoreHorizontal, Package, Pencil, PlusCircle, Warehouse, ArrowRightLeft, CloudUpload, Loader2, AlertTriangle, Download, Trash2, CheckCircle2, XCircle, Hourglass, HelpCircle } from 'lucide-react';
+import { ChevronsUpDown, MoreHorizontal, Package, Pencil, PlusCircle, Warehouse, ArrowRightLeft, CloudUpload, Loader2, AlertTriangle, Download, Trash2, CheckCircle2, XCircle, Hourglass, FileText } from 'lucide-react';
 import { ProductForm } from './product-form';
 import { TransactionForm } from './transaction-form';
 import { RequestForm } from './request-form';
@@ -30,8 +30,8 @@ const initialProducts: Product[] = [
         vendorPartNumber: "Part 001",
         reorderThreshold: 20,
         lots: [
-            { id: uuidv4(), lotNumber: "Lot 1", quantity: 100, receiptDate: new Date("2025-02-25"), expirationDate: new Date("2026-02-28"), location: "Room 1" },
-            { id: uuidv4(), lotNumber: "Lot 2", quantity: 10, receiptDate: new Date("2025-02-02"), expirationDate: new Date("2025-03-03"), location: "Room 2" },
+            { id: uuidv4(), lotNumber: "Lot 1", quantity: 100, receiptDate: new Date("2025-02-25"), expirationDate: new Date("2026-02-28"), location: "Room 1", file: null },
+            { id: uuidv4(), lotNumber: "Lot 2", quantity: 10, receiptDate: new Date("2025-02-02"), expirationDate: new Date("2025-03-03"), location: "Room 2", file: null },
         ]
     },
     {
@@ -41,7 +41,7 @@ const initialProducts: Product[] = [
         vendorPartNumber: "Item-B-42",
         reorderThreshold: 100,
         lots: [
-            { id: uuidv4(), lotNumber: "Lot-XYZ", quantity: 500, receiptDate: new Date("2024-08-15"), expirationDate: new Date("2025-08-15"), location: "Warehouse 3" },
+            { id: uuidv4(), lotNumber: "Lot-XYZ", quantity: 500, receiptDate: new Date("2024-08-15"), expirationDate: new Date("2025-08-15"), location: "Warehouse 3", file: null },
         ]
     }
 ];
@@ -119,6 +119,7 @@ export default function InventoryPage() {
                         location: lot.location || '',
                         receiptDate: new Date(lot.receiptDate),
                         expirationDate: lot.expirationDate ? new Date(lot.expirationDate) : null,
+                        file: lot.file || null,
                     })),
                 }));
             } else {
@@ -244,30 +245,25 @@ export default function InventoryPage() {
         setIsSaving(true);
         setTimeout(() => {
             if (productToEdit) {
-                setProducts(prevProducts =>
-                    prevProducts.map(p => {
-                        if (p.id === productToEdit.id) {
-                            const updatedLots = data.lots.map(formLot => {
-                                const existingLot = p.lots.find(l => l.id === formLot.id);
-                                return existingLot ? { ...existingLot, ...formLot } : { ...formLot, id: uuidv4() };
-                            });
-                            return {
-                                ...p,
-                                name: data.name,
-                                vendor: data.vendor,
-                                vendorPartNumber: data.vendorPartNumber,
-                                reorderThreshold: data.reorderThreshold,
-                                lots: updatedLots,
-                            };
-                        }
-                        return p;
+                // Update existing product
+                const updatedProduct: Product = {
+                    ...productToEdit,
+                    ...data,
+                    lots: data.lots.map(formLot => {
+                        const existingLot = productToEdit.lots.find(l => l.id === formLot.id);
+                        return { 
+                            ...formLot, 
+                            id: existingLot ? existingLot.id : uuidv4() 
+                        };
                     })
-                );
+                };
+                setProducts(products.map(p => p.id === productToEdit.id ? updatedProduct : p));
                 toast({ title: "Product Updated", description: `"${data.name}" has been updated successfully.` });
             } else {
+                // Add new product
                 const newProduct: Product = {
-                    ...data,
                     id: nextProductId,
+                    ...data,
                     lots: data.lots.map(lot => ({...lot, id: uuidv4()}))
                 };
                 setProducts(prevProducts => [...prevProducts, newProduct]);
@@ -423,6 +419,7 @@ export default function InventoryPage() {
                             receiptDate: new Date(receipt_date),
                             expirationDate: expiration_date ? new Date(expiration_date) : null,
                             location: location,
+                            file: null,
                         };
 
                         if (importedProductsMap.has(product_id)) {
@@ -490,6 +487,7 @@ export default function InventoryPage() {
                 'receipt_date': isValid(lot.receiptDate) ? format(lot.receiptDate, 'yyyy-MM-dd') : '',
                 'expiration_date': lot.expirationDate && isValid(lot.expirationDate) ? format(lot.expirationDate, 'yyyy-MM-dd') : '',
                 'location': lot.location,
+                'file_name': lot.file?.name ?? '',
             }))
         );
     
@@ -547,6 +545,17 @@ export default function InventoryPage() {
         link.click();
         document.body.removeChild(link);
         toast({ title: "Export Started", description: "Your transaction data is downloading." });
+    };
+
+    const handleDownloadFile = (lot: Lot) => {
+        if (lot.file) {
+            const link = document.createElement('a');
+            link.href = lot.file.data;
+            link.download = lot.file.name;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
     };
 
     const totalQuantity = (lots: Lot[]) => lots.reduce((sum, lot) => sum + lot.quantity, 0);
@@ -767,6 +776,7 @@ export default function InventoryPage() {
                                                                                             <TableHead>Receipt Date</TableHead>
                                                                                             <TableHead>Expiration Date</TableHead>
                                                                                             <TableHead>Storage Location</TableHead>
+                                                                                            <TableHead>File</TableHead>
                                                                                         </TableRow>
                                                                                     </TableHeader>
                                                                                     <TableBody>
@@ -777,6 +787,16 @@ export default function InventoryPage() {
                                                                                                 <TableCell>{isValid(lot.receiptDate) ? format(lot.receiptDate, 'PPP') : 'Invalid Date'}</TableCell>
                                                                                                 <TableCell>{lot.expirationDate && isValid(lot.expirationDate) ? format(lot.expirationDate, 'PPP') : 'N/A'}</TableCell>
                                                                                                 <TableCell>{lot.location}</TableCell>
+                                                                                                <TableCell>
+                                                                                                    {lot.file ? (
+                                                                                                         <Button variant="link" size="sm" className="p-0 h-auto" onClick={() => handleDownloadFile(lot)}>
+                                                                                                            <FileText className="mr-2 h-4 w-4" />
+                                                                                                            <span className="truncate max-w-[150px]">{lot.file.name}</span>
+                                                                                                        </Button>
+                                                                                                    ) : (
+                                                                                                        <span className="text-muted-foreground text-xs">No file</span>
+                                                                                                    )}
+                                                                                                </TableCell>
                                                                                             </TableRow>
                                                                                         ))}
                                                                                     </TableBody>
@@ -995,7 +1015,7 @@ export default function InventoryPage() {
                     setIsRequestFormOpen(true);
                 }
             }}>
-                <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col">
+                <DialogContent className="max-w-3xl flex flex-col">
                     <DialogHeader>
                         <DialogTitle>Product Request</DialogTitle>
                         <DialogDescription>

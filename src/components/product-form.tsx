@@ -9,7 +9,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { CalendarIcon, Loader2, PlusCircle, Trash2 } from "lucide-react";
+import { CalendarIcon, Loader2, PlusCircle, Trash2, FileUp, X, Paperclip } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format, isValid } from "date-fns";
 import { type Product, ProductFormSchema, type ProductFormData, ProductFormCreateSchema } from "@/lib/types";
@@ -22,6 +22,8 @@ type ProductFormProps = {
   isSaving: boolean;
 };
 
+const VALID_FILE_TYPES = "application/pdf,image/jpeg,image/tiff";
+
 export function ProductForm({ product, onSave, onCancel, isSaving }: ProductFormProps) {
   const form = useForm<ProductFormData>({
     resolver: zodResolver(product ? ProductFormSchema : ProductFormCreateSchema),
@@ -29,23 +31,50 @@ export function ProductForm({ product, onSave, onCancel, isSaving }: ProductForm
       ...product,
       lots: product.lots.map(lot => ({
         ...lot,
-        id: lot.id, // Ensure existing ID is passed
+        id: lot.id,
         receiptDate: lot.receiptDate ? new Date(lot.receiptDate) : new Date(),
         expirationDate: lot.expirationDate ? new Date(lot.expirationDate) : null,
+        file: lot.file,
       }))
     } : {
       name: "",
       vendor: "",
       vendorPartNumber: "",
       reorderThreshold: null,
-      lots: [{ lotNumber: "", quantity: 1, receiptDate: new Date(), expirationDate: null, location: "" }],
+      lots: [{ lotNumber: "", quantity: 1, receiptDate: new Date(), expirationDate: null, location: "", file: null }],
     },
   });
 
-  const { fields, append, remove } = useFieldArray({
+  const { fields, append, remove, update } = useFieldArray({
     control: form.control,
     name: "lots",
   });
+  
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, index: number) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const dataUrl = event.target?.result as string;
+        const currentLot = fields[index];
+        update(index, {
+          ...currentLot,
+          file: {
+            name: file.name,
+            type: file.type,
+            data: dataUrl,
+          }
+        });
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const removeFile = (index: number) => {
+    const currentLot = fields[index];
+    update(index, { ...currentLot, file: null });
+  };
+
 
   const onSubmit = (data: ProductFormData) => {
     onSave(data);
@@ -121,7 +150,7 @@ export function ProductForm({ product, onSave, onCancel, isSaving }: ProductForm
               {form.formState.errors.lots.message as string}
             </p>
           )}
-          <div className="space-y-4 max-h-60 overflow-y-auto pr-2">
+          <div className="space-y-4 max-h-80 overflow-y-auto pr-2">
             {fields.map((field, index) => (
               <div key={field.id} className="p-4 border rounded-lg bg-background space-y-4">
                 <input type="hidden" {...form.register(`lots.${index}.id`)} />
@@ -216,6 +245,42 @@ export function ProductForm({ product, onSave, onCancel, isSaving }: ProductForm
                       </FormItem>
                     )}
                   />
+                   <FormField
+                      control={form.control}
+                      name={`lots.${index}.file`}
+                      render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>Lot File</FormLabel>
+                            {field.value ? (
+                                <div className="flex items-center justify-between p-2 border rounded-md">
+                                    <div className="flex items-center gap-2 truncate">
+                                      <Paperclip className="h-4 w-4" />
+                                      <span className="text-sm truncate">{field.value.name}</span>
+                                    </div>
+                                    <Button type="button" variant="ghost" size="icon" className="h-6 w-6" onClick={() => removeFile(index)}>
+                                        <X className="h-4 w-4" />
+                                    </Button>
+                                </div>
+                            ) : (
+                              <FormControl>
+                                  <div className="relative">
+                                      <Button type="button" variant="outline" className="w-full" onClick={() => document.getElementById(`file-input-${index}`)?.click()}>
+                                          <FileUp className="mr-2 h-4 w-4" /> Upload File
+                                      </Button>
+                                      <Input
+                                          id={`file-input-${index}`}
+                                          type="file"
+                                          className="hidden"
+                                          accept={VALID_FILE_TYPES}
+                                          onChange={(e) => handleFileChange(e, index)}
+                                      />
+                                  </div>
+                              </FormControl>
+                            )}
+                            <FormMessage />
+                        </FormItem>
+                      )}
+                    />
                 </div>
                  <Button
                     type="button"
@@ -230,7 +295,7 @@ export function ProductForm({ product, onSave, onCancel, isSaving }: ProductForm
               </div>
             ))}
             <div className="flex justify-start">
-                 <Button type="button" variant="secondary" onClick={() => append({ id: uuidv4(), lotNumber: '', quantity: 1, receiptDate: new Date(), expirationDate: null, location: '' })}>
+                 <Button type="button" variant="secondary" onClick={() => append({ id: uuidv4(), lotNumber: '', quantity: 1, receiptDate: new Date(), expirationDate: null, location: '', file: null })}>
                     <PlusCircle className="mr-2 h-4 w-4" /> Add Another Lot
                 </Button>
             </div>
