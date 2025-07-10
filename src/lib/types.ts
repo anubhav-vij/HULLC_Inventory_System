@@ -2,9 +2,9 @@ import { z } from 'zod';
 import { v4 as uuidv4 } from 'uuid';
 
 export const LotFileSchema = z.object({
+  id: z.string(), // used as the key in IndexedDB
   name: z.string(),
   type: z.string(),
-  data: z.string(),
 });
 
 export const LotSchema = z.object({

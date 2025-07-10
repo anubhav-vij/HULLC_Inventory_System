@@ -14,6 +14,8 @@ import { cn } from "@/lib/utils";
 import { format, isValid } from "date-fns";
 import { type Product, ProductFormSchema, type ProductFormData, ProductFormCreateSchema } from "@/lib/types";
 import { Separator } from "./ui/separator";
+import { deleteFile, storeFile } from '@/lib/file-store';
+import { useToast } from '@/hooks/use-toast';
 
 type ProductFormProps = {
   product?: Product | null;
@@ -25,6 +27,7 @@ type ProductFormProps = {
 const VALID_FILE_TYPES = "application/pdf,image/jpeg,image/tiff";
 
 export function ProductForm({ product, onSave, onCancel, isSaving }: ProductFormProps) {
+  const { toast } = useToast();
   const form = useForm<ProductFormData>({
     resolver: zodResolver(product ? ProductFormSchema : ProductFormCreateSchema),
     defaultValues: product ? {
@@ -50,30 +53,54 @@ export function ProductForm({ product, onSave, onCancel, isSaving }: ProductForm
     name: "lots",
   });
   
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, index: number) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>, index: number) => {
     const file = e.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const dataUrl = event.target?.result as string;
+      const fileId = uuidv4();
+      try {
+        await storeFile(fileId, file);
         const currentLot = fields[index];
+        
+        // If there was an old file, delete it
+        if (currentLot.file?.id) {
+          await deleteFile(currentLot.file.id);
+        }
+
         update(index, {
           ...currentLot,
           file: {
+            id: fileId,
             name: file.name,
             type: file.type,
-            data: dataUrl,
           }
         });
-      };
-      reader.readAsDataURL(file);
+        toast({ title: "File Uploaded", description: `${file.name} has been saved.` });
+      } catch (error) {
+        toast({ title: "Upload Failed", description: "Could not save the file.", variant: "destructive" });
+      }
     }
   };
 
-  const removeFile = (index: number) => {
+  const removeFile = async (index: number) => {
     const currentLot = fields[index];
-    update(index, { ...currentLot, file: null });
+    if (currentLot.file?.id) {
+        try {
+            await deleteFile(currentLot.file.id);
+            update(index, { ...currentLot, file: null });
+            toast({ title: "File Removed" });
+        } catch (error) {
+            toast({ title: "Error", description: "Could not remove the file.", variant: "destructive" });
+        }
+    }
   };
+
+  const handleRemoveLot = async (index: number) => {
+    const lotToRemove = fields[index];
+    if (lotToRemove.file?.id) {
+        await deleteFile(lotToRemove.file.id);
+    }
+    remove(index);
+  }
 
 
   const onSubmit = (data: ProductFormData) => {
@@ -286,7 +313,7 @@ export function ProductForm({ product, onSave, onCancel, isSaving }: ProductForm
                     type="button"
                     variant="outline"
                     size="sm"
-                    onClick={() => remove(index)}
+                    onClick={() => handleRemoveLot(index)}
                     className="text-destructive hover:text-destructive"
                     disabled={fields.length <= 1}
                   >

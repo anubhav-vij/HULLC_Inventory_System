@@ -21,6 +21,8 @@ import { format, isValid } from 'date-fns';
 import Papa from 'papaparse';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
+import { deleteFile, getFile } from '@/lib/file-store';
+
 
 const initialProducts: Product[] = [
     {
@@ -157,17 +159,7 @@ export default function InventoryPage() {
     useEffect(() => {
         if (!isLoading) {
             try {
-                // Create a deep copy of products and strip out file data before saving
-                const productsToStore = JSON.parse(JSON.stringify(products));
-                productsToStore.forEach((product: Product) => {
-                    product.lots.forEach(lot => {
-                        if (lot.file) {
-                            lot.file.data = ''; // Strip file data to avoid quota issues
-                        }
-                    });
-                });
-
-                window.localStorage.setItem(PRODUCTS_STORAGE_KEY, JSON.stringify(productsToStore));
+                window.localStorage.setItem(PRODUCTS_STORAGE_KEY, JSON.stringify(products));
                 window.localStorage.setItem(TRANSACTIONS_STORAGE_KEY, JSON.stringify(transactions));
                 window.localStorage.setItem(REQUESTS_STORAGE_KEY, JSON.stringify(productRequests));
                 if (user) {
@@ -228,8 +220,16 @@ export default function InventoryPage() {
         setProductToDelete(product);
     };
     
-    const handleConfirmDeleteProduct = () => {
+    const handleConfirmDeleteProduct = async () => {
         if (!productToDelete) return;
+
+        // Delete associated files from IndexedDB
+        for (const lot of productToDelete.lots) {
+            if (lot.file?.id) {
+                await deleteFile(lot.file.id);
+            }
+        }
+
         setProducts(products.filter(p => p.id !== productToDelete.id));
         toast({ title: "Product Deleted", description: `"${productToDelete.name}" has been removed.`});
         setProductToDelete(null);
@@ -260,29 +260,25 @@ export default function InventoryPage() {
         setTransactionToDelete(null);
     };
 
-    const handleSaveProduct = (data: ProductFormData) => {
+    const handleSaveProduct = async (data: ProductFormData) => {
         setIsSaving(true);
-        setTimeout(() => {
+        try {
             if (productToEdit) {
-                // Update existing product
-                const updatedProducts = products.map(p => {
-                    if (p.id === productToEdit.id) {
-                        return {
-                            ...p,
-                            ...data,
-                            lots: data.lots.map(formLot => {
-                                // Find the original lot to preserve file data if a new file isn't uploaded
-                                const originalLot = p.lots.find(l => l.id === formLot.id);
-                                return {
-                                    ...formLot,
-                                    id: formLot.id || uuidv4(),
-                                    file: formLot.file ? formLot.file : originalLot?.file ?? null,
-                                };
-                            })
-                        };
+                // Find lots that were removed and delete their files
+                const originalLotIds = new Set(productToEdit.lots.map(l => l.id));
+                const currentLotIds = new Set(data.lots.map(l => l.id));
+                for (const lotId of originalLotIds) {
+                    if (!currentLotIds.has(lotId)) {
+                        const lotToRemove = productToEdit.lots.find(l => l.id === lotId);
+                        if (lotToRemove?.file?.id) {
+                            await deleteFile(lotToRemove.file.id);
+                        }
                     }
-                    return p;
-                });
+                }
+
+                const updatedProducts = products.map(p => 
+                    p.id === productToEdit.id ? { ...p, ...data } : p
+                );
                 setProducts(updatedProducts);
                 toast({ title: "Product Updated", description: `"${data.name}" has been updated successfully.` });
             } else {
@@ -295,10 +291,14 @@ export default function InventoryPage() {
                 setProducts(prevProducts => [...prevProducts, newProduct]);
                 toast({ title: "Product Added", description: `"${newProduct.name}" has been added successfully.` });
             }
-            setIsSaving(false);
             setIsFormOpen(false);
             setProductToEdit(null);
-        }, 500);
+        } catch (error) {
+            console.error("Error saving product:", error);
+            toast({ title: "Save Failed", description: "There was an error saving the product.", variant: "destructive" });
+        } finally {
+            setIsSaving(false);
+        }
     };
 
     const handleSaveTransaction = (data: TransactionFormData) => {
@@ -573,14 +573,21 @@ export default function InventoryPage() {
         toast({ title: "Export Started", description: "Your transaction data is downloading." });
     };
 
-    const handleDownloadFile = (lot: Lot) => {
-        if (lot.file && lot.file.data) {
-            const link = document.createElement('a');
-            link.href = lot.file.data;
-            link.download = lot.file.name;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
+    const handleDownloadFile = async (lot: Lot) => {
+        if (lot.file?.id) {
+            const fileBlob = await getFile(lot.file.id);
+            if (fileBlob) {
+                const url = URL.createObjectURL(fileBlob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = lot.file.name;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+            } else {
+                toast({ title: "Download Failed", description: "File not found in storage.", variant: "destructive" });
+            }
         }
     };
 
@@ -815,19 +822,10 @@ export default function InventoryPage() {
                                                                                                 <TableCell>{lot.location}</TableCell>
                                                                                                 <TableCell>
                                                                                                     {lot.file ? (
-                                                                                                        <Tooltip>
-                                                                                                            <TooltipTrigger asChild>
-                                                                                                                <Button variant="link" size="sm" className="p-0 h-auto" onClick={() => handleDownloadFile(lot)} disabled={!lot.file.data}>
-                                                                                                                    <FileText className="mr-2 h-4 w-4" />
-                                                                                                                    <span className="truncate max-w-[150px]">{lot.file.name}</span>
-                                                                                                                </Button>
-                                                                                                            </TooltipTrigger>
-                                                                                                            {!lot.file.data && (
-                                                                                                                <TooltipContent>
-                                                                                                                    <p>Download unavailable after page reload.</p>
-                                                                                                                </TooltipContent>
-                                                                                                            )}
-                                                                                                        </Tooltip>
+                                                                                                        <Button variant="link" size="sm" className="p-0 h-auto" onClick={() => handleDownloadFile(lot)}>
+                                                                                                            <FileText className="mr-2 h-4 w-4" />
+                                                                                                            <span className="truncate max-w-[150px]">{lot.file.name}</span>
+                                                                                                        </Button>
                                                                                                     ) : (
                                                                                                         <span className="text-muted-foreground text-xs">No file</span>
                                                                                                     )}
@@ -1102,7 +1100,7 @@ export default function InventoryPage() {
                     <AlertDialogHeader>
                         <AlertDialogTitle>Are you sure?</AlertDialogTitle>
                         <AlertDialogDescription>
-                            This action cannot be undone. This will permanently delete the product "{productToDelete?.name}".
+                            This action cannot be undone. This will permanently delete the product "{productToDelete?.name}" and all associated lot files.
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
