@@ -119,7 +119,7 @@ export default function InventoryPage() {
                         location: lot.location || '',
                         receiptDate: new Date(lot.receiptDate),
                         expirationDate: lot.expirationDate ? new Date(lot.expirationDate) : null,
-                        file: lot.file || null,
+                        file: lot.file,
                     })),
                 }));
             } else {
@@ -156,16 +156,35 @@ export default function InventoryPage() {
 
     useEffect(() => {
         if (!isLoading) {
-            window.localStorage.setItem(PRODUCTS_STORAGE_KEY, JSON.stringify(products));
-            window.localStorage.setItem(TRANSACTIONS_STORAGE_KEY, JSON.stringify(transactions));
-            window.localStorage.setItem(REQUESTS_STORAGE_KEY, JSON.stringify(productRequests));
-            if (user) {
-                window.localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(user));
-            } else {
-                window.localStorage.removeItem(USER_STORAGE_KEY);
+            try {
+                // Create a deep copy of products and strip out file data before saving
+                const productsToStore = JSON.parse(JSON.stringify(products));
+                productsToStore.forEach((product: Product) => {
+                    product.lots.forEach(lot => {
+                        if (lot.file) {
+                            lot.file.data = ''; // Strip file data to avoid quota issues
+                        }
+                    });
+                });
+
+                window.localStorage.setItem(PRODUCTS_STORAGE_KEY, JSON.stringify(productsToStore));
+                window.localStorage.setItem(TRANSACTIONS_STORAGE_KEY, JSON.stringify(transactions));
+                window.localStorage.setItem(REQUESTS_STORAGE_KEY, JSON.stringify(productRequests));
+                if (user) {
+                    window.localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(user));
+                } else {
+                    window.localStorage.removeItem(USER_STORAGE_KEY);
+                }
+            } catch (error) {
+                console.error("Failed to save to localStorage:", error);
+                toast({
+                    title: "Save Error",
+                    description: "Could not save changes. Your browser's storage might be full.",
+                    variant: "destructive",
+                });
             }
         }
-    }, [products, transactions, productRequests, user, isLoading]);
+    }, [products, transactions, productRequests, user, isLoading, toast]);
 
     const nextProductId = useMemo(() => {
         if (products.length === 0) return 'P001';
@@ -246,18 +265,25 @@ export default function InventoryPage() {
         setTimeout(() => {
             if (productToEdit) {
                 // Update existing product
-                const updatedProduct: Product = {
-                    ...productToEdit,
-                    ...data,
-                    lots: data.lots.map(formLot => {
-                        const existingLot = productToEdit.lots.find(l => l.id === formLot.id);
-                        return { 
-                            ...formLot, 
-                            id: existingLot ? existingLot.id : uuidv4() 
+                const updatedProducts = products.map(p => {
+                    if (p.id === productToEdit.id) {
+                        return {
+                            ...p,
+                            ...data,
+                            lots: data.lots.map(formLot => {
+                                // Find the original lot to preserve file data if a new file isn't uploaded
+                                const originalLot = p.lots.find(l => l.id === formLot.id);
+                                return {
+                                    ...formLot,
+                                    id: formLot.id || uuidv4(),
+                                    file: formLot.file ? formLot.file : originalLot?.file ?? null,
+                                };
+                            })
                         };
-                    })
-                };
-                setProducts(products.map(p => p.id === productToEdit.id ? updatedProduct : p));
+                    }
+                    return p;
+                });
+                setProducts(updatedProducts);
                 toast({ title: "Product Updated", description: `"${data.name}" has been updated successfully.` });
             } else {
                 // Add new product
@@ -548,7 +574,7 @@ export default function InventoryPage() {
     };
 
     const handleDownloadFile = (lot: Lot) => {
-        if (lot.file) {
+        if (lot.file && lot.file.data) {
             const link = document.createElement('a');
             link.href = lot.file.data;
             link.download = lot.file.name;
@@ -789,10 +815,19 @@ export default function InventoryPage() {
                                                                                                 <TableCell>{lot.location}</TableCell>
                                                                                                 <TableCell>
                                                                                                     {lot.file ? (
-                                                                                                         <Button variant="link" size="sm" className="p-0 h-auto" onClick={() => handleDownloadFile(lot)}>
-                                                                                                            <FileText className="mr-2 h-4 w-4" />
-                                                                                                            <span className="truncate max-w-[150px]">{lot.file.name}</span>
-                                                                                                        </Button>
+                                                                                                        <Tooltip>
+                                                                                                            <TooltipTrigger asChild>
+                                                                                                                <Button variant="link" size="sm" className="p-0 h-auto" onClick={() => handleDownloadFile(lot)} disabled={!lot.file.data}>
+                                                                                                                    <FileText className="mr-2 h-4 w-4" />
+                                                                                                                    <span className="truncate max-w-[150px]">{lot.file.name}</span>
+                                                                                                                </Button>
+                                                                                                            </TooltipTrigger>
+                                                                                                            {!lot.file.data && (
+                                                                                                                <TooltipContent>
+                                                                                                                    <p>Download unavailable after page reload.</p>
+                                                                                                                </TooltipContent>
+                                                                                                            )}
+                                                                                                        </Tooltip>
                                                                                                     ) : (
                                                                                                         <span className="text-muted-foreground text-xs">No file</span>
                                                                                                     )}
