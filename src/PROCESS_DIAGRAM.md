@@ -13,48 +13,25 @@ start
 
 :View Inventory Dashboard;
 
-switch (Choose Action?)
-case (Manage Inventory)
+if (Manage Inventory?) then (yes)
   partition "Manage Inventory" {
-    if (Add New Product?) then (yes)
-      :Fill Form & Add Lots;
-    elseif (Edit Existing Product?) then (yes)
-      :Modify Details/Lots/Files;
-    elseif (Delete Product?) then (yes)
-      :Confirm Deletion;
-    endif
+    :Add/Edit/Delete Product;
   }
-case (Manage Requests)
+elseif (Manage Requests?) then (yes)
   partition "Manage Requests" {
-    :View Pending Requests;
-    if (Fulfill Request?) then (yes)
-      :Open Transaction Form;
-      :Record Dispense;
-      note right: Request Marked "Completed"
-    else (no)
-      :Reject Request;
-      :Confirm Rejection;
-      note right: Request Marked "Rejected"
-    endif
+    :View & Fulfill/Reject Requests;
   }
-case (Manage Transactions)
+elseif (Manage Transactions?) then (yes)
   partition "Manage Transactions" {
-    if (View History?) then (yes)
-      :View Transaction History;
-    elseif (Create Manual Transaction?) then (yes)
-      :Record Dispense;
-    elseif (Delete Transaction?) then (yes)
-      :Revert Stock Levels;
-    endif
+    :View History or Create/Delete Transactions;
   }
-case (Data Portability)
+elseif (Data Portability?) then (yes)
    partition "Data Portability" {
-    if (Import Products from CSV?) then (yes)
-    elseif (Export Inventory to CSV?) then (yes)
-    elseif (Export Transactions to CSV?) then (yes)
-    endif
+    :Import or Export CSV Data;
    }
-endswitch
+endif
+
+-> View Inventory Dashboard;
 
 stop
 @enduml
@@ -71,13 +48,13 @@ start
 
 :View Simplified Inventory List;
 
-switch (Choose Action?)
-case (Request a Product)
+if (Request a Product?) then (yes)
   :Click "Request Item" Button;
-  :Fill Out Request Form;
-  :Submit Form;
+  :Fill Out & Submit Form;
   note right: Request sent to Admin
-endswitch
+endif
+
+-> View Simplified Inventory List;
 
 stop
 @enduml
