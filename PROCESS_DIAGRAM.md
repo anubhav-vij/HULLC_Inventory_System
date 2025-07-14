@@ -9,62 +9,52 @@ This document outlines the primary user workflows for the StockPilot inventory m
 title Admin Workflow
 start
 
-:Login;
+'The user is assumed to be logged in as an Admin.
 
-if (Select Admin Role) then (yes)
-  repeat
-    :View Inventory Dashboard;
+:View Inventory Dashboard;
 
-    switch (Choose Action?)
-    case (Manage Inventory)
-      partition "Manage Inventory" {
-        if (Add New Product?) then (yes)
-          :Fill Form & Add Lots;
-        elseif (Edit Existing Product?) then (yes)
-          :Modify Details/Lots/Files;
-        elseif (Delete Product?) then (yes)
-          :Confirm Deletion;
-        endif
-      }
-    case (Manage Requests)
-      partition "Manage Requests" {
-        :View Pending Requests;
-        if (Fulfill Request?) then (yes)
-          :Open Transaction Form;
-          :Record Dispense;
-          note right: Request Marked "Completed"
-        else (no)
-          :Reject Request;
-          :Confirm Rejection;
-          note right: Request Marked "Rejected"
-        endif
-      }
-    case (Manage Transactions)
-      partition "Manage Transactions" {
-        if (View History?) then (yes)
-          :View Transaction History;
-        elseif (Create Manual Transaction?) then (yes)
-          :Record Dispense;
-        elseif (Delete Transaction?) then (yes)
-          :Revert Stock Levels;
-        endif
-      }
-    case (Data Portability)
-       partition "Data Portability" {
-        if (Import Products from CSV?) then (yes)
-        elseif (Export Inventory to CSV?) then (yes)
-        elseif (Export Transactions to CSV?) then (yes)
-        endif
-       }
-    case (Logout)
-      break
-    endswitch
-  repeat while (Action is not Logout)
-else (no)
-  stop
-endif
-
-:Logout;
+switch (Choose Action?)
+case (Manage Inventory)
+  partition "Manage Inventory" {
+    if (Add New Product?) then (yes)
+      :Fill Form & Add Lots;
+    elseif (Edit Existing Product?) then (yes)
+      :Modify Details/Lots/Files;
+    elseif (Delete Product?) then (yes)
+      :Confirm Deletion;
+    endif
+  }
+case (Manage Requests)
+  partition "Manage Requests" {
+    :View Pending Requests;
+    if (Fulfill Request?) then (yes)
+      :Open Transaction Form;
+      :Record Dispense;
+      note right: Request Marked "Completed"
+    else (no)
+      :Reject Request;
+      :Confirm Rejection;
+      note right: Request Marked "Rejected"
+    endif
+  }
+case (Manage Transactions)
+  partition "Manage Transactions" {
+    if (View History?) then (yes)
+      :View Transaction History;
+    elseif (Create Manual Transaction?) then (yes)
+      :Record Dispense;
+    elseif (Delete Transaction?) then (yes)
+      :Revert Stock Levels;
+    endif
+  }
+case (Data Portability)
+   partition "Data Portability" {
+    if (Import Products from CSV?) then (yes)
+    elseif (Export Inventory to CSV?) then (yes)
+    elseif (Export Transactions to CSV?) then (yes)
+    endif
+   }
+endswitch
 
 stop
 @enduml
@@ -77,27 +67,17 @@ stop
 title Staff Workflow
 start
 
-:Login;
+'The user is assumed to be logged in as Staff.
 
-if (Select Staff Role) then (yes)
-  repeat
-    :View Simplified Inventory List;
+:View Simplified Inventory List;
 
-    switch (Choose Action?)
-    case (Request a Product)
-      :Click "Request Item" Button;
-      :Fill Out Request Form;
-      :Submit Form;
-      note right: Request sent to Admin
-    case (Logout)
-      break
-    endswitch
-  repeat while (Action is not Logout)
-else (no)
-  stop
-endif
-
-:Logout;
+switch (Choose Action?)
+case (Request a Product)
+  :Click "Request Item" Button;
+  :Fill Out Request Form;
+  :Submit Form;
+  note right: Request sent to Admin
+endswitch
 
 stop
 @enduml
