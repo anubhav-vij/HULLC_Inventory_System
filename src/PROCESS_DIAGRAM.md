@@ -17,23 +17,25 @@ if (Manage Inventory?) then (yes)
   partition "Manage Inventory" {
     :Add/Edit/Delete Product;
   }
+  -> View Inventory Dashboard;
 elseif (Manage Requests?) then (yes)
   partition "Manage Requests" {
     :View & Fulfill/Reject Requests;
   }
+  -> View Inventory Dashboard;
 elseif (Manage Transactions?) then (yes)
   partition "Manage Transactions" {
     :View History or Create/Delete Transactions;
   }
+  -> View Inventory Dashboard;
 elseif (Data Portability?) then (yes)
    partition "Data Portability" {
     :Import or Export CSV Data;
    }
+   -> View Inventory Dashboard;
+else
+  stop
 endif
-
--> View Inventory Dashboard;
-
-stop
 @enduml
 ```
 
@@ -52,10 +54,9 @@ if (Request a Product?) then (yes)
   :Click "Request Item" Button;
   :Fill Out & Submit Form;
   note right: Request sent to Admin
+  -> View Simplified Inventory List;
+else
+  stop
 endif
-
--> View Simplified Inventory List;
-
-stop
 @enduml
 ```
