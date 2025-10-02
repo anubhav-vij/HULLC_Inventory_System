@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
-import { ChevronsUpDown, MoreHorizontal, Package, Pencil, PlusCircle, Warehouse, ArrowRightLeft, CloudUpload, Loader2, AlertTriangle, Download, Trash2, CheckCircle2, XCircle, Hourglass, FileText } from 'lucide-react';
+import { ChevronsUpDown, MoreHorizontal, Package, Pencil, PlusCircle, Warehouse, ArrowRightLeft, CloudUpload, Loader2, AlertTriangle, Download, Trash2, CheckCircle2, XCircle, Hourglass, FileText, Search } from 'lucide-react';
 import { ProductForm } from './product-form';
 import { TransactionForm } from './transaction-form';
 import { RequestForm } from './request-form';
@@ -22,6 +22,7 @@ import Papa from 'papaparse';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import { deleteFile, getFile } from '@/lib/file-store';
+import { Input } from '@/components/ui/input';
 
 
 const initialProducts: Product[] = [
@@ -76,8 +77,21 @@ export default function InventoryPage() {
     const [productToDelete, setProductToDelete] = useState<Product | null>(null);
     const [transactionToDelete, setTransactionToDelete] = useState<Transaction | null>(null);
     const [requestToReject, setRequestToReject] = useState<ProductRequest | null>(null);
+    const [searchQuery, setSearchQuery] = useState('');
 
     const { toast } = useToast();
+    
+    const filteredProducts = useMemo(() => {
+        if (!searchQuery) {
+            return products;
+        }
+        const lowercasedQuery = searchQuery.toLowerCase();
+        return products.filter(product =>
+            product.name.toLowerCase().includes(lowercasedQuery) ||
+            product.vendorPartNumber.toLowerCase().includes(lowercasedQuery) ||
+            product.id.toLowerCase().includes(lowercasedQuery)
+        );
+    }, [products, searchQuery]);
 
     const toggleProductCollapse = (productId: string) => {
         setOpenProductIds(prev => {
@@ -691,23 +705,35 @@ export default function InventoryPage() {
                             <Card>
                                 <CardHeader>
                                     <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                                        <div>
+                                        <div className="flex-1">
                                             <CardTitle>HULLC Inventory</CardTitle>
                                             <CardDescription>Manage your products and their stock.</CardDescription>
                                         </div>
-                                        {user.role === 'Admin' && (
-                                            <div className="flex gap-2">
-                                                <Button variant="outline" onClick={handleExportInventory}>
-                                                    <Download className="mr-2 h-4 w-4" /> Export CSV
-                                                </Button>
-                                                <Button variant="outline" onClick={() => setIsImportDialogOpen(true)}>
-                                                    <CloudUpload className="mr-2 h-4 w-4" /> Import CSV
-                                                </Button>
-                                                <Button onClick={handleAddNew}>
-                                                    <PlusCircle className="mr-2 h-4 w-4" /> Add Product
-                                                </Button>
+                                        <div className="flex flex-col sm:flex-row sm:justify-end gap-2 w-full sm:w-auto">
+                                            <div className="relative">
+                                                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                                                <Input
+                                                    type="search"
+                                                    placeholder="Search products..."
+                                                    className="pl-8 sm:w-[300px] w-full"
+                                                    value={searchQuery}
+                                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                                />
                                             </div>
-                                        )}
+                                            {user.role === 'Admin' && (
+                                                <div className="flex gap-2">
+                                                    <Button variant="outline" onClick={handleExportInventory}>
+                                                        <Download className="mr-2 h-4 w-4" /> <span className="hidden sm:inline">Export</span>
+                                                    </Button>
+                                                    <Button variant="outline" onClick={() => setIsImportDialogOpen(true)}>
+                                                        <CloudUpload className="mr-2 h-4 w-4" /> <span className="hidden sm:inline">Import</span>
+                                                    </Button>
+                                                    <Button onClick={handleAddNew}>
+                                                        <PlusCircle className="mr-2 h-4 w-4" /> Add Product
+                                                    </Button>
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
                                 </CardHeader>
                                 <CardContent>
@@ -728,8 +754,8 @@ export default function InventoryPage() {
                                                 </TableRow>
                                             </TableHeader>
                                             <TableBody>
-                                                {products.length > 0 ? (
-                                                    products.map(product => {
+                                                {filteredProducts.length > 0 ? (
+                                                    filteredProducts.map(product => {
                                                         const outOfStock = isProductOutOfStock(product);
                                                         const isExpiredFlag = !outOfStock && isProductExpired(product);
                                                         const isOpen = openProductIds.has(product.id);
@@ -843,7 +869,9 @@ export default function InventoryPage() {
                                                     })
                                                 ) : (
                                                     <TableRow>
-                                                        <TableCell colSpan={inventoryColSpan} className="h-24 text-center">No products found. Get started by adding a new product.</TableCell>
+                                                        <TableCell colSpan={inventoryColSpan} className="h-24 text-center">
+                                                            {searchQuery ? 'No products found for your search.' : 'No products found. Get started by adding a new product.'}
+                                                        </TableCell>
                                                     </TableRow>
                                                 )}
                                             </TableBody>
