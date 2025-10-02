@@ -998,7 +998,7 @@ export default function InventoryPage() {
             </TooltipProvider>
             
             <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
-                <DialogContent className="max-w-3xl">
+                <DialogContent className="max-w-3xl flex flex-col max-h-[90vh]">
                     <DialogHeader>
                         <DialogTitle>{productToEdit ? 'Edit Product' : 'Add New Product'}</DialogTitle>
                     </DialogHeader>
@@ -1142,3 +1142,5 @@ export default function InventoryPage() {
         </div>
     );
 }
+
+    
