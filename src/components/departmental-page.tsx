@@ -6,13 +6,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { Package, ArrowRightLeft, Loader2, Search, LogOut } from 'lucide-react';
+import { Package, ArrowRightLeft, Loader2, Search, LogOut, History } from 'lucide-react';
 import { type DepartmentalProduct, type DepartmentalTransaction, type User } from '@/lib/types';
 import { StockPilotLogo } from './icons';
 import { useToast } from '@/hooks/use-toast';
 import { v4 as uuidv4 } from 'uuid';
 import { Input } from '@/components/ui/input';
 import { Label } from './ui/label';
+import { format } from 'date-fns';
 
 const DEPT_PRODUCTS_STORAGE_KEY_PREFIX = 'stockpilot-dept-products';
 const DEPT_TRANSACTIONS_STORAGE_KEY_PREFIX = 'stockpilot-dept-transactions';
@@ -148,8 +149,8 @@ export function DepartmentalPage({ user, onLogout }: DepartmentalPageProps) {
     
     return (
         <div className="min-h-screen w-full bg-background flex flex-col items-center p-4 sm:p-6 lg:p-8">
-            <main className="w-full max-w-7xl mx-auto">
-                <div className="flex items-center gap-3 mb-8">
+            <main className="w-full max-w-7xl mx-auto space-y-8">
+                <div className="flex items-center gap-3">
                     <StockPilotLogo className="h-8 w-8 text-primary" />
                     <h1 className="text-3xl font-bold text-foreground">{department} Inventory</h1>
                     <div className="ml-auto flex items-center gap-4 text-sm">
@@ -216,6 +217,50 @@ export function DepartmentalPage({ user, onLogout }: DepartmentalPageProps) {
                                             <TableCell colSpan={4} className="h-24 text-center">
                                                 {searchQuery ? 'No products found.' : 'No inventory has been allocated to this department yet.'}
                                             </TableCell>
+                                        </TableRow>
+                                    )}
+                                </TableBody>
+                            </Table>
+                        </div>
+                    </CardContent>
+                </Card>
+
+                <Card>
+                    <CardHeader>
+                        <CardTitle>
+                            <div className="flex items-center gap-2">
+                                <History className="h-5 w-5" />
+                                Consumption History
+                            </div>
+                        </CardTitle>
+                         <CardDescription>A log of all items consumed by this department.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                         <div className="border rounded-lg overflow-hidden">
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>Product</TableHead>
+                                        <TableHead>Consumed By</TableHead>
+                                        <TableHead>Date</TableHead>
+                                        <TableHead>Quantity</TableHead>
+                                        <TableHead>Notes</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {transactions.length > 0 ? (
+                                        transactions.map(tx => (
+                                            <TableRow key={tx.id}>
+                                                <TableCell className="font-medium">{tx.productName} <span className="text-xs text-muted-foreground">({tx.productId})</span></TableCell>
+                                                <TableCell>{tx.consumedBy}</TableCell>
+                                                <TableCell>{format(tx.date, 'PPP')}</TableCell>
+                                                <TableCell><Badge variant="outline">-{tx.quantity}</Badge></TableCell>
+                                                <TableCell className="truncate max-w-xs">{tx.notes || 'N/A'}</TableCell>
+                                            </TableRow>
+                                        ))
+                                    ) : (
+                                        <TableRow>
+                                            <TableCell colSpan={5} className="h-24 text-center">No consumption has been recorded yet.</TableCell>
                                         </TableRow>
                                     )}
                                 </TableBody>
