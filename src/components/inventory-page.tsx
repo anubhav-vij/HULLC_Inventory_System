@@ -342,33 +342,40 @@ export default function InventoryPage() {
         if (!coreProduct) return;
     
         let deptProduct = deptProducts.find(p => p.id === transaction.productId);
-        let productExistsInDept = !!deptProduct;
     
-        if (!deptProduct) {
-            deptProduct = { ...coreProduct, lots: [] };
-        }
+        if (deptProduct) {
+            // Product exists in department, update lots
+            transaction.items.forEach(txItem => {
+                const coreLot = coreProduct.lots.find(l => l.id === txItem.lotId);
+                if (!coreLot) return;
     
-        transaction.items.forEach(txItem => {
-            const coreLot = coreProduct.lots.find(l => l.id === txItem.lotId);
-            if (!coreLot) return;
-    
-            let deptLot = deptProduct!.lots.find(l => l.lotNumber === coreLot.lotNumber);
-    
-            if (deptLot) {
-                deptLot.quantity += txItem.quantity;
-            } else {
-                deptProduct!.lots.push({ ...coreLot, quantity: txItem.quantity, id: uuidv4() });
-            }
-        });
-
-        let finalDeptProducts: Product[];
-        if (productExistsInDept) {
-            finalDeptProducts = deptProducts.map(p => p.id === deptProduct!.id ? deptProduct! : p);
+                const deptLotIndex = deptProduct!.lots.findIndex(l => l.lotNumber === coreLot.lotNumber);
+                if (deptLotIndex > -1) {
+                    deptProduct!.lots[deptLotIndex].quantity += txItem.quantity;
+                } else {
+                    deptProduct!.lots.push({ ...coreLot, quantity: txItem.quantity, id: uuidv4() });
+                }
+            });
+            deptProducts = deptProducts.map(p => p.id === deptProduct!.id ? deptProduct! : p);
         } else {
-            finalDeptProducts = [...deptProducts, deptProduct!];
+            // Product is new to the department
+            const newDeptProduct: Product = {
+                ...coreProduct,
+                lots: transaction.items.map(txItem => {
+                    const coreLot = coreProduct.lots.find(l => l.id === txItem.lotId);
+                    // This should always find a lot, but we check for safety
+                    if (!coreLot) throw new Error("Fulfilled lot not found in core product.");
+                    return {
+                        ...coreLot,
+                        quantity: txItem.quantity,
+                        id: uuidv4() // Assign a new unique ID for the department lot
+                    };
+                })
+            };
+            deptProducts.push(newDeptProduct);
         }
-
-        window.localStorage.setItem(deptKey, JSON.stringify(finalDeptProducts));
+    
+        window.localStorage.setItem(deptKey, JSON.stringify(deptProducts));
     };
 
     const handleSaveTransaction = (data: TransactionFormData) => {
