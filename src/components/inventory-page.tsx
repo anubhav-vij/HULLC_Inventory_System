@@ -341,29 +341,32 @@ export default function InventoryPage() {
         const coreProduct = products.find(p => p.id === transaction.productId);
         if (!coreProduct) return;
     
-        let deptProduct = deptProducts.find(p => p.id === transaction.productId);
+        let deptProductIndex = deptProducts.findIndex(p => p.id === transaction.productId);
     
-        if (deptProduct) {
-            // Product exists in department, update lots
+        if (deptProductIndex > -1) {
+            // Product exists, update its lots
+            let deptProduct = deptProducts[deptProductIndex];
+    
             transaction.items.forEach(txItem => {
                 const coreLot = coreProduct.lots.find(l => l.id === txItem.lotId);
-                if (!coreLot) return;
+                if (!coreLot) return; // Should not happen
     
-                const deptLotIndex = deptProduct!.lots.findIndex(l => l.lotNumber === coreLot.lotNumber);
+                const deptLotIndex = deptProduct.lots.findIndex(l => l.lotNumber === coreLot.lotNumber);
                 if (deptLotIndex > -1) {
-                    deptProduct!.lots[deptLotIndex].quantity += txItem.quantity;
+                    // Lot number exists, update quantity
+                    deptProduct.lots[deptLotIndex].quantity += txItem.quantity;
                 } else {
-                    deptProduct!.lots.push({ ...coreLot, quantity: txItem.quantity, id: uuidv4() });
+                    // This lot is new to the department for this product, add it
+                    deptProduct.lots.push({ ...coreLot, quantity: txItem.quantity, id: uuidv4() });
                 }
             });
-            deptProducts = deptProducts.map(p => p.id === deptProduct!.id ? deptProduct! : p);
+            deptProducts[deptProductIndex] = deptProduct;
         } else {
-            // Product is new to the department
+            // Product is new to the department, create it
             const newDeptProduct: Product = {
                 ...coreProduct,
                 lots: transaction.items.map(txItem => {
                     const coreLot = coreProduct.lots.find(l => l.id === txItem.lotId);
-                    // This should always find a lot, but we check for safety
                     if (!coreLot) throw new Error("Fulfilled lot not found in core product.");
                     return {
                         ...coreLot,
