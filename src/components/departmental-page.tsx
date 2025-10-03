@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -6,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { Package, ArrowRightLeft, Loader2, Search, LogOut, History, Warehouse } from 'lucide-react';
+import { Package, ArrowRightLeft, Loader2, Search, LogOut, History, Warehouse, Edit, Settings } from 'lucide-react';
 import { type DepartmentalProduct, type DepartmentalTransaction, type User } from '@/lib/types';
 import { StockPilotLogo } from './icons';
 import { useToast } from '@/hooks/use-toast';
@@ -15,6 +16,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from './ui/label';
 import { format } from 'date-fns';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { RadioGroup, RadioGroupItem } from './ui/radio-group';
+import { Textarea } from './ui/textarea';
 
 const DEPT_PRODUCTS_STORAGE_KEY_PREFIX = 'stockpilot-dept-products';
 const DEPT_TRANSACTIONS_STORAGE_KEY_PREFIX = 'stockpilot-dept-transactions';
@@ -29,10 +32,12 @@ export function DepartmentalPage({ user, onLogout }: DepartmentalPageProps) {
     const [transactions, setTransactions] = useState<DepartmentalTransaction[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isConsumptionFormOpen, setIsConsumptionFormOpen] = useState(false);
-    const [productForConsumption, setProductForConsumption] = useState<DepartmentalProduct | null>(null);
-    const [consumptionQuantity, setConsumptionQuantity] = useState(1);
+    const [isAdjustmentFormOpen, setIsAdjustmentFormOpen] = useState(false);
+    const [productForAction, setProductForAction] = useState<DepartmentalProduct | null>(null);
+    const [quantity, setQuantity] = useState(1);
     const [consumedBy, setConsumedBy] = useState('');
-    const [consumptionNotes, setConsumptionNotes] = useState('');
+    const [notes, setNotes] = useState('');
+    const [adjustmentType, setAdjustmentType] = useState<'add' | 'remove'>('add');
     const [isSaving, setIsSaving] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
     const { toast } = useToast();
@@ -40,6 +45,7 @@ export function DepartmentalPage({ user, onLogout }: DepartmentalPageProps) {
     const department = user.department;
     const productsStorageKey = `${DEPT_PRODUCTS_STORAGE_KEY_PREFIX}-${department}`;
     const transactionsStorageKey = `${DEPT_TRANSACTIONS_STORAGE_KEY_PREFIX}-${department}`;
+    const isAdmin = user.role === 'Admin';
 
     const filteredProducts = useMemo(() => {
         if (!searchQuery) return products;
@@ -85,15 +91,23 @@ export function DepartmentalPage({ user, onLogout }: DepartmentalPageProps) {
     }, [products, transactions, isLoading, productsStorageKey, transactionsStorageKey, toast]);
 
     const handleOpenConsumptionForm = (product: DepartmentalProduct) => {
-        setProductForConsumption(product);
-        setConsumptionQuantity(1);
+        setProductForAction(product);
+        setQuantity(1);
         setConsumedBy('');
-        setConsumptionNotes('');
+        setNotes('');
         setIsConsumptionFormOpen(true);
     };
 
+    const handleOpenAdjustmentForm = (product: DepartmentalProduct) => {
+        setProductForAction(product);
+        setQuantity(1);
+        setNotes('');
+        setAdjustmentType('add');
+        setIsAdjustmentFormOpen(true);
+    }
+
     const handleRecordConsumption = () => {
-        if (!productForConsumption || consumptionQuantity <= 0 || !consumedBy) {
+        if (!productForAction || quantity <= 0 || !consumedBy) {
             toast({
                 title: 'Invalid Input',
                 description: 'Please fill out all fields and enter a valid quantity.',
@@ -102,7 +116,7 @@ export function DepartmentalPage({ user, onLogout }: DepartmentalPageProps) {
             return;
         }
 
-        if (consumptionQuantity > productForConsumption.quantity) {
+        if (quantity > productForAction.quantity) {
              toast({
                 title: 'Insufficient Stock',
                 description: 'Consumption quantity cannot exceed available stock.',
@@ -114,31 +128,77 @@ export function DepartmentalPage({ user, onLogout }: DepartmentalPageProps) {
         setIsSaving(true);
 
         const updatedProduct = {
-            ...productForConsumption,
-            quantity: productForConsumption.quantity - consumptionQuantity,
+            ...productForAction,
+            quantity: productForAction.quantity - quantity,
         };
         
-        setProducts(
-            products.map(p => p.id === updatedProduct.id ? updatedProduct : p).filter(p => p.quantity > 0)
-        );
+        const updatedProducts = products.map(p => p.id === updatedProduct.id ? updatedProduct : p).filter(p => p.quantity > 0 || isAdmin);
+        setProducts(updatedProducts);
 
         const newTransaction: DepartmentalTransaction = {
             id: uuidv4(),
-            productId: productForConsumption.id,
-            productName: productForConsumption.name,
+            productId: productForAction.id,
+            productName: productForAction.name,
             date: new Date(),
-            notes: consumptionNotes,
-            quantity: consumptionQuantity,
+            notes: notes,
+            quantity: quantity,
             consumedBy: consumedBy,
+            type: 'Consumption'
         };
         setTransactions([newTransaction, ...transactions]);
 
-        toast({ title: "Consumption Recorded", description: `Recorded use of ${consumptionQuantity} of "${productForConsumption.name}".` });
+        toast({ title: "Consumption Recorded", description: `Recorded use of ${quantity} of "${productForAction.name}".` });
         
         setIsSaving(false);
         setIsConsumptionFormOpen(false);
-        setProductForConsumption(null);
+        setProductForAction(null);
     };
+    
+    const handleRecordAdjustment = () => {
+        if (!productForAction || quantity <= 0 || !notes) {
+            toast({
+                title: 'Invalid Input',
+                description: 'Please provide a valid quantity and reason for the adjustment.',
+                variant: 'destructive',
+            });
+            return;
+        }
+        
+        setIsSaving(true);
+
+        const newQuantity = adjustmentType === 'add'
+            ? productForAction.quantity + quantity
+            : productForAction.quantity - quantity;
+        
+        if (newQuantity < 0) {
+            toast({ title: 'Invalid Quantity', description: 'Adjustment cannot result in negative stock.', variant: 'destructive' });
+            setIsSaving(false);
+            return;
+        }
+
+        const updatedProduct = { ...productForAction, quantity: newQuantity };
+        setProducts(products.map(p => p.id === updatedProduct.id ? updatedProduct : p));
+
+        const newTransaction: DepartmentalTransaction = {
+            id: uuidv4(),
+            productId: productForAction.id,
+            productName: productForAction.name,
+            date: new Date(),
+            notes: notes,
+            quantity: quantity,
+            consumedBy: `Admin (${user.role})`,
+            type: 'Adjustment',
+            adjustmentType
+        };
+        setTransactions([newTransaction, ...transactions]);
+
+        toast({ title: "Stock Adjusted", description: `Adjusted stock for "${productForAction.name}".` });
+        
+        setIsSaving(false);
+        setIsAdjustmentFormOpen(false);
+        setProductForAction(null);
+    }
+
 
     if (isLoading) {
         return (
@@ -156,7 +216,7 @@ export function DepartmentalPage({ user, onLogout }: DepartmentalPageProps) {
                     <h1 className="text-3xl font-bold text-foreground">{department} Inventory</h1>
                     <div className="ml-auto flex items-center gap-4 text-sm">
                         <div className="text-right">
-                            <p className="font-semibold text-foreground">Department Staff</p>
+                            <p className="font-semibold text-foreground">{isAdmin ? 'Admin View' : 'Department Staff'}</p>
                             <p className="text-muted-foreground">{department} Department</p>
                         </div>
                         <Button variant="outline" size="sm" onClick={onLogout}>
@@ -177,7 +237,12 @@ export function DepartmentalPage({ user, onLogout }: DepartmentalPageProps) {
                                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                                     <div className="flex-1">
                                         <CardTitle>Available Stock</CardTitle>
-                                        <CardDescription>Record consumption of items allocated to your department.</CardDescription>
+                                        <CardDescription>
+                                            {isAdmin 
+                                                ? "View and adjust stock for this department."
+                                                : "Record consumption of items allocated to your department."
+                                            }
+                                        </CardDescription>
                                     </div>
                                     <div className="relative">
                                         <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -199,7 +264,7 @@ export function DepartmentalPage({ user, onLogout }: DepartmentalPageProps) {
                                                 <TableHead>Product</TableHead>
                                                 <TableHead>Vendor Part #</TableHead>
                                                 <TableHead>Total Quantity</TableHead>
-                                                <TableHead className="w-[180px] text-right">Action</TableHead>
+                                                <TableHead className="w-[200px] text-right">Action</TableHead>
                                             </TableRow>
                                         </TableHeader>
                                         <TableBody>
@@ -210,12 +275,19 @@ export function DepartmentalPage({ user, onLogout }: DepartmentalPageProps) {
                                                             <div className="flex items-center gap-3"><Package className="h-5 w-5 text-muted-foreground"/><div><div>{product.name}</div><div className="text-xs text-muted-foreground">{product.id}</div></div></div>
                                                         </TableCell>
                                                         <TableCell>{product.vendorPartNumber}</TableCell>
-                                                        <TableCell><Badge variant="secondary">{product.quantity}</Badge></TableCell>
+                                                        <TableCell><Badge variant={product.quantity === 0 ? "destructive" : "secondary"}>{product.quantity}</Badge></TableCell>
                                                         <TableCell className="text-right">
-                                                            <Button size="sm" onClick={() => handleOpenConsumptionForm(product)}>
-                                                                <ArrowRightLeft className="mr-2 h-4 w-4" />
-                                                                Record Consumption
-                                                            </Button>
+                                                            {isAdmin ? (
+                                                                <Button size="sm" variant="outline" onClick={() => handleOpenAdjustmentForm(product)}>
+                                                                    <Settings className="mr-2 h-4 w-4" />
+                                                                    Adjust Stock
+                                                                </Button>
+                                                            ) : (
+                                                                <Button size="sm" onClick={() => handleOpenConsumptionForm(product)} disabled={product.quantity === 0}>
+                                                                    <ArrowRightLeft className="mr-2 h-4 w-4" />
+                                                                    Record Consumption
+                                                                </Button>
+                                                            )}
                                                         </TableCell>
                                                     </TableRow>
                                                 ))
@@ -238,7 +310,7 @@ export function DepartmentalPage({ user, onLogout }: DepartmentalPageProps) {
                                 <CardTitle>
                                     Consumption History
                                 </CardTitle>
-                                <CardDescription>A log of all items consumed by this department.</CardDescription>
+                                <CardDescription>A log of all items consumed by or adjusted for this department.</CardDescription>
                             </CardHeader>
                             <CardContent>
                                 <div className="border rounded-lg overflow-hidden">
@@ -246,8 +318,9 @@ export function DepartmentalPage({ user, onLogout }: DepartmentalPageProps) {
                                         <TableHeader>
                                             <TableRow>
                                                 <TableHead>Product</TableHead>
-                                                <TableHead>Consumed By</TableHead>
+                                                <TableHead>User</TableHead>
                                                 <TableHead>Date</TableHead>
+                                                <TableHead>Type</TableHead>
                                                 <TableHead>Quantity</TableHead>
                                                 <TableHead>Notes</TableHead>
                                             </TableRow>
@@ -259,13 +332,20 @@ export function DepartmentalPage({ user, onLogout }: DepartmentalPageProps) {
                                                         <TableCell className="font-medium">{tx.productName} <span className="text-xs text-muted-foreground">({tx.productId})</span></TableCell>
                                                         <TableCell>{tx.consumedBy}</TableCell>
                                                         <TableCell>{format(tx.date, 'PPP')}</TableCell>
-                                                        <TableCell><Badge variant="outline">-{tx.quantity}</Badge></TableCell>
+                                                        <TableCell>
+                                                             <Badge variant={tx.type === 'Adjustment' ? 'default' : 'secondary'}>{tx.type}</Badge>
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            <Badge variant={tx.type === 'Adjustment' && tx.adjustmentType === 'add' ? 'default' : 'outline'}>
+                                                                {tx.type === 'Adjustment' && tx.adjustmentType === 'add' ? '+' : '-'}{tx.quantity}
+                                                            </Badge>
+                                                        </TableCell>
                                                         <TableCell className="truncate max-w-xs">{tx.notes || 'N/A'}</TableCell>
                                                     </TableRow>
                                                 ))
                                             ) : (
                                                 <TableRow>
-                                                    <TableCell colSpan={5} className="h-24 text-center">No consumption has been recorded yet.</TableCell>
+                                                    <TableCell colSpan={6} className="h-24 text-center">No consumption or adjustments have been recorded yet.</TableCell>
                                                 </TableRow>
                                             )}
                                         </TableBody>
@@ -280,7 +360,7 @@ export function DepartmentalPage({ user, onLogout }: DepartmentalPageProps) {
             <Dialog open={isConsumptionFormOpen} onOpenChange={setIsConsumptionFormOpen}>
                 <DialogContent className="max-w-md">
                     <DialogHeader>
-                        <DialogTitle>{`Record Consumption for ${productForConsumption?.name}`}</DialogTitle>
+                        <DialogTitle>{`Record Consumption for ${productForAction?.name}`}</DialogTitle>
                         <DialogDescription>Record the quantity of items consumed from local stock.</DialogDescription>
                     </DialogHeader>
                     <div className="space-y-4 py-4">
@@ -290,11 +370,11 @@ export function DepartmentalPage({ user, onLogout }: DepartmentalPageProps) {
                         </div>
                          <div className="space-y-2">
                              <Label htmlFor="quantity">Quantity Consumed</Label>
-                             <Input id="quantity" type="number" value={consumptionQuantity} min={1} max={productForConsumption?.quantity} onChange={(e) => setConsumptionQuantity(Number(e.target.value))} />
+                             <Input id="quantity" type="number" value={quantity} min={1} max={productForAction?.quantity} onChange={(e) => setQuantity(Number(e.target.value))} />
                         </div>
                          <div className="space-y-2">
                              <Label htmlFor="notes">Notes (Optional)</Label>
-                             <Input id="notes" value={consumptionNotes} onChange={(e) => setConsumptionNotes(e.target.value)} placeholder="e.g. For project X" />
+                             <Input id="notes" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="e.g. For project X" />
                         </div>
                     </div>
                     <DialogFooter>
@@ -302,6 +382,45 @@ export function DepartmentalPage({ user, onLogout }: DepartmentalPageProps) {
                          <Button onClick={handleRecordConsumption} disabled={isSaving}>
                              {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                              Record
+                         </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            <Dialog open={isAdjustmentFormOpen} onOpenChange={setIsAdjustmentFormOpen}>
+                <DialogContent className="max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>{`Adjust Stock for ${productForAction?.name}`}</DialogTitle>
+                        <DialogDescription>Manually add or remove stock from this department's inventory.</DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4 py-4">
+                         <div className="space-y-2">
+                            <Label>Adjustment Type</Label>
+                            <RadioGroup value={adjustmentType} onValueChange={(value) => setAdjustmentType(value as 'add' | 'remove')} className="flex gap-4">
+                                <div className="flex items-center space-x-2">
+                                    <RadioGroupItem value="add" id="add" />
+                                    <Label htmlFor="add">Add to Stock</Label>
+                                </div>
+                                <div className="flex items-center space-x-2">
+                                    <RadioGroupItem value="remove" id="remove" />
+                                    <Label htmlFor="remove">Remove from Stock</Label>
+                                </div>
+                            </RadioGroup>
+                        </div>
+                         <div className="space-y-2">
+                             <Label htmlFor="adj_quantity">Quantity to Adjust</Label>
+                             <Input id="adj_quantity" type="number" value={quantity} min={1} onChange={(e) => setQuantity(Number(e.target.value))} />
+                        </div>
+                         <div className="space-y-2">
+                             <Label htmlFor="adj_notes">Reason for Adjustment (Required)</Label>
+                             <Textarea id="adj_notes" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="e.g., Cycle count correction" />
+                        </div>
+                    </div>
+                    <DialogFooter>
+                         <Button variant="ghost" onClick={() => setIsAdjustmentFormOpen(false)} disabled={isSaving}>Cancel</Button>
+                         <Button onClick={handleRecordAdjustment} disabled={isSaving}>
+                             {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                             Save Adjustment
                          </Button>
                     </DialogFooter>
                 </DialogContent>

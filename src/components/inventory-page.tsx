@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
@@ -82,6 +83,7 @@ export default function InventoryPage() {
     const [searchQuery, setSearchQuery] = useState('');
     const [loginStep, setLoginStep] = useState<'role' | 'department'>('role');
     const [selectedRole, setSelectedRole] = useState<UserRole | null>(null);
+    const [adminView, setAdminView] = useState<'core' | 'departmental' | null>(null);
     
     const { toast } = useToast();
 
@@ -215,9 +217,13 @@ export default function InventoryPage() {
         return `P${(maxId + 1).toString().padStart(3, '0')}`;
     }, [products]);
     
-    const handleRoleSelect = (role: UserRole | 'Departmental Staff') => {
-        if (role === 'Admin' || role === 'Staff') {
+    const handleRoleSelect = (role: UserRole | 'Departmental Staff' | 'Admin Departmental View') => {
+        if (role === 'Staff') {
             setUser({ role, department: 'core' });
+            setAdminView(null);
+        } else if (role === 'Admin') {
+            setLoginStep('department');
+            setSelectedRole('Admin');
         } else { // Departmental Staff
             setSelectedRole('Staff');
             setLoginStep('department');
@@ -225,15 +231,22 @@ export default function InventoryPage() {
     };
 
     const handleDepartmentSelect = (department: string) => {
-        if (department) {
-            setUser({ role: 'Staff', department });
-            setLoginStep('role');
-            setSelectedRole(null);
+        if (department === 'core') {
+             setUser({ role: 'Admin', department: 'core' });
+             setAdminView('core');
+        } else if (selectedRole === 'Admin') {
+            setUser({ role: 'Admin', department });
+            setAdminView('departmental');
+        } else {
+             setUser({ role: 'Staff', department });
         }
+        setLoginStep('role');
+        setSelectedRole(null);
     };
 
     const handleLogout = () => {
         setUser(null);
+        setAdminView(null);
         window.localStorage.removeItem(USER_STORAGE_KEY);
         setProducts([]);
         setTransactions([]);
@@ -710,20 +723,28 @@ export default function InventoryPage() {
                         <CardHeader className="text-center">
                             <div className="flex justify-center items-center gap-3 mb-4">
                                 <StockPilotLogo className="h-8 w-8 text-primary" />
-                                <CardTitle className="text-2xl">Select Department</CardTitle>
+                                <CardTitle className="text-2xl">{selectedRole === 'Admin' ? 'Select System' : 'Select Department'}</CardTitle>
                             </div>
-                            <CardDescription>Choose your department to access its inventory.</CardDescription>
+                            <CardDescription>
+                                {selectedRole === 'Admin' 
+                                    ? "Choose the system you want to manage."
+                                    : "Choose your department to access its inventory."
+                                }
+                            </CardDescription>
                         </CardHeader>
                         <CardContent className="flex flex-col gap-4">
+                            {selectedRole === 'Admin' && (
+                                <Button size="lg" variant="secondary" onClick={() => handleDepartmentSelect('core')}>Core Inventory System</Button>
+                            )}
                              <Select onValueChange={handleDepartmentSelect}>
                                 <SelectTrigger>
-                                    <SelectValue placeholder="Select a department" />
+                                    <SelectValue placeholder={selectedRole === 'Admin' ? 'Select a Departmental System' : 'Select a department'} />
                                 </SelectTrigger>
                                 <SelectContent>
                                     {DEPARTMENTS.map(dept => <SelectItem key={dept} value={dept}>{dept}</SelectItem>)}
                                 </SelectContent>
                             </Select>
-                            <Button variant="link" onClick={() => setLoginStep('role')}>Back to role selection</Button>
+                            <Button variant="link" onClick={() => { setLoginStep('role'); setSelectedRole(null); }}>Back to role selection</Button>
                         </CardContent>
                     </Card>
                 </div>
@@ -740,8 +761,8 @@ export default function InventoryPage() {
                         <CardDescription>Select a role to sign in.</CardDescription>
                     </CardHeader>
                     <CardContent className="flex flex-col gap-4">
-                         <Button size="lg" onClick={() => handleRoleSelect('Admin')}>Admin (Core System)</Button>
-                         <Button size="lg" variant="secondary" onClick={() => handleRoleSelect('Staff')}>Staff (Request System)</Button>
+                         <Button size="lg" onClick={() => handleRoleSelect('Admin')}>Admin</Button>
+                         <Button size="lg" variant="secondary" onClick={() => handleRoleSelect('Staff')}>Staff (Request Only)</Button>
                          <Button size="lg" variant="outline" onClick={() => handleRoleSelect('Departmental Staff')}>Departmental Staff</Button>
                     </CardContent>
                 </Card>
@@ -749,7 +770,7 @@ export default function InventoryPage() {
         );
     }
 
-    if (user.department !== 'core') {
+    if (user.department !== 'core' || adminView === 'departmental') {
         return <DepartmentalPage user={user} onLogout={handleLogout} />;
     }
 

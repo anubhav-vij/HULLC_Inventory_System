@@ -1,3 +1,4 @@
+
 import { z } from 'zod';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -152,4 +153,6 @@ export type DepartmentalTransaction = {
     notes: string;
     quantity: number;
     consumedBy: string;
+    type: 'Consumption' | 'Adjustment';
+    adjustmentType?: 'add' | 'remove';
 }
