@@ -55,8 +55,6 @@ const TRANSACTIONS_STORAGE_KEY_PREFIX = 'stockpilot-transactions-data';
 const REQUESTS_STORAGE_KEY_PREFIX = 'stockpilot-requests-data';
 const USER_STORAGE_KEY = 'stockpilot-user-data';
 
-type AppSystem = 'Core' | 'Departmental';
-
 export default function InventoryPage() {
     const [products, setProducts] = useState<Product[]>([]);
     const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -85,7 +83,6 @@ export default function InventoryPage() {
     
     const { toast } = useToast();
 
-    // Use department from user session if available, otherwise default to 'core'
     const department = user?.department || 'core';
     const productsStorageKey = `${PRODUCTS_STORAGE_KEY_PREFIX}-${department}`;
     const transactionsStorageKey = `${TRANSACTIONS_STORAGE_KEY_PREFIX}-${department}`;
@@ -187,7 +184,7 @@ export default function InventoryPage() {
 
         loadData();
 
-    }, [user?.department]);
+    }, [user]);
 
     useEffect(() => {
         if (!isLoading && user) {
@@ -216,18 +213,18 @@ export default function InventoryPage() {
         return `P${(maxId + 1).toString().padStart(3, '0')}`;
     }, [products]);
     
-    const handleRoleSelect = (role: UserRole, system: AppSystem) => {
-        if (system === 'Core') {
+    const handleRoleSelect = (role: UserRole) => {
+        if (role === 'Admin' || role === 'Staff') {
             setUser({ role, department: 'core' });
-        } else {
-            setSelectedRole(role);
+        } else { // Departmental Staff
+            setSelectedRole('Staff');
             setLoginStep('department');
         }
     };
 
     const handleDepartmentSelect = (department: string) => {
-        if (selectedRole && department) {
-            setUser({ role: selectedRole, department });
+        if (department) {
+            setUser({ role: 'Staff', department });
             setLoginStep('role');
             setSelectedRole(null);
         }
@@ -339,16 +336,16 @@ export default function InventoryPage() {
     const addFulfilledItemsToDepartmentInventory = (request: ProductRequest, transaction: Transaction) => {
         const deptKey = `${PRODUCTS_STORAGE_KEY_PREFIX}-${request.department}`;
         const deptProductsRaw = window.localStorage.getItem(deptKey);
-        let deptProducts: Product[] = deptProductsRaw ? JSON.parse(deptProductsRaw) : [];
+        let deptProducts: Product[] = deptProductsRaw ? JSON.parse(deptProductsRaw).map((p: any) => ({...p, lots: p.lots.map((l:any) => ({...l, receiptDate: new Date(l.receiptDate), expirationDate: l.expirationDate ? new Date(l.expirationDate) : null}))})) : [];
     
         const coreProduct = products.find(p => p.id === transaction.productId);
         if (!coreProduct) return;
     
         let deptProduct = deptProducts.find(p => p.id === transaction.productId);
+        let productExistsInDept = !!deptProduct;
     
         if (!deptProduct) {
             deptProduct = { ...coreProduct, lots: [] };
-            deptProducts.push(deptProduct);
         }
     
         transaction.items.forEach(txItem => {
@@ -360,18 +357,18 @@ export default function InventoryPage() {
             if (deptLot) {
                 deptLot.quantity += txItem.quantity;
             } else {
-                deptProduct!.lots.push({ ...coreLot, quantity: txItem.quantity });
+                deptProduct!.lots.push({ ...coreLot, quantity: txItem.quantity, id: uuidv4() });
             }
         });
-        
-        deptProducts.forEach(p => {
-             if (p.id === deptProduct!.id) {
-                 return deptProduct;
-             }
-             return p;
-        });
 
-        window.localStorage.setItem(deptKey, JSON.stringify(deptProducts));
+        let finalDeptProducts: Product[];
+        if (productExistsInDept) {
+            finalDeptProducts = deptProducts.map(p => p.id === deptProduct!.id ? deptProduct! : p);
+        } else {
+            finalDeptProducts = [...deptProducts, deptProduct!];
+        }
+
+        window.localStorage.setItem(deptKey, JSON.stringify(finalDeptProducts));
     };
 
     const handleSaveTransaction = (data: TransactionFormData) => {
@@ -750,9 +747,9 @@ export default function InventoryPage() {
                         <CardDescription>Select a role to sign in.</CardDescription>
                     </CardHeader>
                     <CardContent className="flex flex-col gap-4">
-                         <Button size="lg" onClick={() => handleRoleSelect('Admin', 'Core')}>Admin (Core System)</Button>
-                         <Button size="lg" variant="secondary" onClick={() => handleRoleSelect('Staff', 'Core')}>Staff (Request System)</Button>
-                         <Button size="lg" variant="outline" onClick={() => handleRoleSelect('Staff', 'Departmental')}>Staff (Departmental Inventory)</Button>
+                         <Button size="lg" onClick={() => handleRoleSelect('Admin')}>Admin (Core System)</Button>
+                         <Button size="lg" variant="secondary" onClick={() => handleRoleSelect('Staff')}>Staff (Request System)</Button>
+                         <Button size="lg" variant="outline" onClick={() => handleRoleSelect('Departmental Staff' as any)}>Departmental Staff</Button>
                     </CardContent>
                 </Card>
             </div>
