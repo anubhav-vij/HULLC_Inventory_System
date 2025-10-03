@@ -135,3 +135,21 @@ export type User = {
   role: UserRole;
   department: (typeof DEPARTMENTS)[number] | 'core';
 };
+
+export type DepartmentalProduct = {
+    id: string;
+    name: string;
+    vendor: string;
+    vendorPartNumber: string;
+    quantity: number;
+};
+
+export type DepartmentalTransaction = {
+    id: string;
+    productId: string;
+    productName: string;
+    date: Date;
+    notes: string;
+    quantity: number;
+    consumedBy: string;
+}

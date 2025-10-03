@@ -13,7 +13,7 @@ import { ChevronsUpDown, MoreHorizontal, Package, Pencil, PlusCircle, Warehouse,
 import { ProductForm } from './product-form';
 import { TransactionForm } from './transaction-form';
 import { RequestForm } from './request-form';
-import { type Product, type Lot, type ProductFormData, type Transaction, type TransactionFormData, type User, type UserRole, type ProductRequest, type ProductRequestFormData, type ProductRequestStatus, DEPARTMENTS } from '@/lib/types';
+import { type Product, type Lot, type ProductFormData, type Transaction, type TransactionFormData, type User, type UserRole, type ProductRequest, type ProductRequestFormData, type ProductRequestStatus, DEPARTMENTS, type DepartmentalProduct } from '@/lib/types';
 import { StockPilotLogo } from './icons';
 import { useToast } from '@/hooks/use-toast';
 import { v4 as uuidv4 } from 'uuid';
@@ -54,6 +54,8 @@ const PRODUCTS_STORAGE_KEY_PREFIX = 'stockpilot-products-data';
 const TRANSACTIONS_STORAGE_KEY_PREFIX = 'stockpilot-transactions-data';
 const REQUESTS_STORAGE_KEY_PREFIX = 'stockpilot-requests-data';
 const USER_STORAGE_KEY = 'stockpilot-user-data';
+const DEPT_PRODUCTS_STORAGE_KEY_PREFIX = 'stockpilot-dept-products';
+
 
 export default function InventoryPage() {
     const [products, setProducts] = useState<Product[]>([]);
@@ -187,7 +189,7 @@ export default function InventoryPage() {
     }, [user]);
 
     useEffect(() => {
-        if (!isLoading && user) {
+        if (!isLoading && user && user.department === 'core') {
             try {
                 window.localStorage.setItem(productsStorageKey, JSON.stringify(products));
                 window.localStorage.setItem(transactionsStorageKey, JSON.stringify(transactions));
@@ -213,7 +215,7 @@ export default function InventoryPage() {
         return `P${(maxId + 1).toString().padStart(3, '0')}`;
     }, [products]);
     
-    const handleRoleSelect = (role: UserRole) => {
+    const handleRoleSelect = (role: UserRole | 'Departmental Staff') => {
         if (role === 'Admin' || role === 'Staff') {
             setUser({ role, department: 'core' });
         } else { // Departmental Staff
@@ -334,52 +336,33 @@ export default function InventoryPage() {
     };
     
     const addFulfilledItemsToDepartmentInventory = (request: ProductRequest, transaction: Transaction) => {
-        const deptKey = `${PRODUCTS_STORAGE_KEY_PREFIX}-${request.department}`;
+        const deptKey = `${DEPT_PRODUCTS_STORAGE_KEY_PREFIX}-${request.department}`;
         const deptProductsRaw = window.localStorage.getItem(deptKey);
-        let deptProducts: Product[] = deptProductsRaw ? JSON.parse(deptProductsRaw).map((p: any) => ({...p, lots: p.lots.map((l:any) => ({...l, receiptDate: new Date(l.receiptDate), expirationDate: l.expirationDate ? new Date(l.expirationDate) : null}))})) : [];
-    
+        let deptProducts: DepartmentalProduct[] = deptProductsRaw ? JSON.parse(deptProductsRaw) : [];
+        
         const coreProduct = products.find(p => p.id === transaction.productId);
         if (!coreProduct) return;
-    
-        let deptProductIndex = deptProducts.findIndex(p => p.id === transaction.productId);
-    
-        if (deptProductIndex > -1) {
-            // Product exists, update its lots
-            let deptProduct = deptProducts[deptProductIndex];
-    
-            transaction.items.forEach(txItem => {
-                const coreLot = coreProduct.lots.find(l => l.id === txItem.lotId);
-                if (!coreLot) return; // Should not happen
-    
-                const deptLotIndex = deptProduct.lots.findIndex(l => l.lotNumber === coreLot.lotNumber);
-                if (deptLotIndex > -1) {
-                    // Lot number exists, update quantity
-                    deptProduct.lots[deptLotIndex].quantity += txItem.quantity;
-                } else {
-                    // This lot is new to the department for this product, add it
-                    deptProduct.lots.push({ ...coreLot, quantity: txItem.quantity, id: uuidv4() });
-                }
-            });
-            deptProducts[deptProductIndex] = deptProduct;
+
+        let deptProduct = deptProducts.find(p => p.id === transaction.productId);
+
+        if (deptProduct) {
+            // Product exists, update its quantity
+            deptProduct.quantity += transaction.totalQuantity;
         } else {
             // Product is new to the department, create it
-            const newDeptProduct: Product = {
-                ...coreProduct,
-                lots: transaction.items.map(txItem => {
-                    const coreLot = coreProduct.lots.find(l => l.id === txItem.lotId);
-                    if (!coreLot) throw new Error("Fulfilled lot not found in core product.");
-                    return {
-                        ...coreLot,
-                        quantity: txItem.quantity,
-                        id: uuidv4() // Assign a new unique ID for the department lot
-                    };
-                })
+            deptProduct = {
+                id: coreProduct.id,
+                name: coreProduct.name,
+                vendor: coreProduct.vendor,
+                vendorPartNumber: coreProduct.vendorPartNumber,
+                quantity: transaction.totalQuantity,
             };
-            deptProducts.push(newDeptProduct);
+            deptProducts.push(deptProduct);
         }
-    
+        
         window.localStorage.setItem(deptKey, JSON.stringify(deptProducts));
     };
+
 
     const handleSaveTransaction = (data: TransactionFormData) => {
         if (!productForTransaction) return;
@@ -759,7 +742,7 @@ export default function InventoryPage() {
                     <CardContent className="flex flex-col gap-4">
                          <Button size="lg" onClick={() => handleRoleSelect('Admin')}>Admin (Core System)</Button>
                          <Button size="lg" variant="secondary" onClick={() => handleRoleSelect('Staff')}>Staff (Request System)</Button>
-                         <Button size="lg" variant="outline" onClick={() => handleRoleSelect('Departmental Staff' as any)}>Departmental Staff</Button>
+                         <Button size="lg" variant="outline" onClick={() => handleRoleSelect('Departmental Staff')}>Departmental Staff</Button>
                     </CardContent>
                 </Card>
             </div>

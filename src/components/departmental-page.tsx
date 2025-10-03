@@ -4,19 +4,18 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { Package, Warehouse, ArrowRightLeft, Loader2, Search, LogOut } from 'lucide-react';
-import { TransactionForm } from './transaction-form';
-import { type Product, type Lot, type Transaction, type TransactionFormData, type User } from '@/lib/types';
+import { Package, ArrowRightLeft, Loader2, Search, LogOut } from 'lucide-react';
+import { type DepartmentalProduct, type DepartmentalTransaction, type User } from '@/lib/types';
 import { StockPilotLogo } from './icons';
 import { useToast } from '@/hooks/use-toast';
 import { v4 as uuidv4 } from 'uuid';
-import { format } from 'date-fns';
 import { Input } from '@/components/ui/input';
+import { Label } from './ui/label';
 
-const PRODUCTS_STORAGE_KEY_PREFIX = 'stockpilot-products-data';
-const TRANSACTIONS_STORAGE_KEY_PREFIX = 'stockpilot-transactions-data';
+const DEPT_PRODUCTS_STORAGE_KEY_PREFIX = 'stockpilot-dept-products';
+const DEPT_TRANSACTIONS_STORAGE_KEY_PREFIX = 'stockpilot-dept-transactions';
 
 type DepartmentalPageProps = {
     user: User;
@@ -24,18 +23,21 @@ type DepartmentalPageProps = {
 };
 
 export function DepartmentalPage({ user, onLogout }: DepartmentalPageProps) {
-    const [products, setProducts] = useState<Product[]>([]);
-    const [transactions, setTransactions] = useState<Transaction[]>([]);
+    const [products, setProducts] = useState<DepartmentalProduct[]>([]);
+    const [transactions, setTransactions] = useState<DepartmentalTransaction[]>([]);
     const [isLoading, setIsLoading] = useState(true);
-    const [isTransactionFormOpen, setIsTransactionFormOpen] = useState(false);
-    const [productForTransaction, setProductForTransaction] = useState<Product | null>(null);
+    const [isConsumptionFormOpen, setIsConsumptionFormOpen] = useState(false);
+    const [productForConsumption, setProductForConsumption] = useState<DepartmentalProduct | null>(null);
+    const [consumptionQuantity, setConsumptionQuantity] = useState(1);
+    const [consumedBy, setConsumedBy] = useState('');
+    const [consumptionNotes, setConsumptionNotes] = useState('');
     const [isSaving, setIsSaving] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
     const { toast } = useToast();
 
     const department = user.department;
-    const productsStorageKey = `${PRODUCTS_STORAGE_KEY_PREFIX}-${department}`;
-    const transactionsStorageKey = `${TRANSACTIONS_STORAGE_KEY_PREFIX}-${department}`;
+    const productsStorageKey = `${DEPT_PRODUCTS_STORAGE_KEY_PREFIX}-${department}`;
+    const transactionsStorageKey = `${DEPT_TRANSACTIONS_STORAGE_KEY_PREFIX}-${department}`;
 
     const filteredProducts = useMemo(() => {
         if (!searchQuery) return products;
@@ -51,27 +53,11 @@ export function DepartmentalPage({ user, onLogout }: DepartmentalPageProps) {
         setIsLoading(true);
         try {
             const storedProductsItem = window.localStorage.getItem(productsStorageKey);
-            if (storedProductsItem) {
-                const loadedProducts = JSON.parse(storedProductsItem).map((product: any) => ({
-                    ...product,
-                    lots: product.lots.map((lot: any) => ({
-                        ...lot,
-                        receiptDate: new Date(lot.receiptDate),
-                        expirationDate: lot.expirationDate ? new Date(lot.expirationDate) : null,
-                    })),
-                }));
-                setProducts(loadedProducts);
-            } else {
-                setProducts([]);
-            }
+            setProducts(storedProductsItem ? JSON.parse(storedProductsItem) : []);
 
             const storedTransactionsItem = window.localStorage.getItem(transactionsStorageKey);
-            if (storedTransactionsItem) {
-                const loadedTransactions = JSON.parse(storedTransactionsItem).map((tx: any) => ({ ...tx, date: new Date(tx.date) }));
-                setTransactions(loadedTransactions);
-            } else {
-                setTransactions([]);
-            }
+            setTransactions(storedTransactionsItem ? JSON.parse(storedTransactionsItem).map((tx: any) => ({ ...tx, date: new Date(tx.date) })) : []);
+
         } catch (error) {
             console.error('Error loading departmental data', error);
             setProducts([]);
@@ -94,62 +80,62 @@ export function DepartmentalPage({ user, onLogout }: DepartmentalPageProps) {
                 });
             }
         }
-    }, [products, transactions, isLoading, department, productsStorageKey, transactionsStorageKey, toast]);
+    }, [products, transactions, isLoading, productsStorageKey, transactionsStorageKey, toast]);
 
-    const handleNewTransaction = (product: Product) => {
-        setProductForTransaction(product);
-        setIsTransactionFormOpen(true);
+    const handleOpenConsumptionForm = (product: DepartmentalProduct) => {
+        setProductForConsumption(product);
+        setConsumptionQuantity(1);
+        setConsumedBy('');
+        setConsumptionNotes('');
+        setIsConsumptionFormOpen(true);
     };
 
-    const handleSaveTransaction = (data: TransactionFormData) => {
-        if (!productForTransaction) return;
+    const handleRecordConsumption = () => {
+        if (!productForConsumption || consumptionQuantity <= 0 || !consumedBy) {
+            toast({
+                title: 'Invalid Input',
+                description: 'Please fill out all fields and enter a valid quantity.',
+                variant: 'destructive',
+            });
+            return;
+        }
+
+        if (consumptionQuantity > productForConsumption.quantity) {
+             toast({
+                title: 'Insufficient Stock',
+                description: 'Consumption quantity cannot exceed available stock.',
+                variant: 'destructive',
+            });
+            return;
+        }
+
         setIsSaving(true);
 
-        const finalLots = productForTransaction.lots.map(lot => {
-            const transactionItem = data.items.find(item => item.lotId === lot.id);
-            if (transactionItem) {
-                return { ...lot, quantity: lot.quantity - transactionItem.quantityTaken };
-            }
-            return lot;
-        });
+        const updatedProduct = {
+            ...productForConsumption,
+            quantity: productForConsumption.quantity - consumptionQuantity,
+        };
+        
+        setProducts(
+            products.map(p => p.id === updatedProduct.id ? updatedProduct : p).filter(p => p.quantity > 0)
+        );
 
-        const updatedProduct = { ...productForTransaction, lots: finalLots.filter(lot => lot.quantity > 0) };
-        setProducts(products.map(p => p.id === updatedProduct.id ? updatedProduct : p).filter(p => p.lots.length > 0));
-
-        const dispensedItems = data.items
-            .filter(item => item.quantityTaken > 0)
-            .map(item => {
-                const lot = productForTransaction.lots.find(l => l.id === item.lotId)!;
-                return { lotId: lot.id, lotNumber: lot.lotNumber, quantity: item.quantityTaken };
-            });
-        const totalQuantityDispensed = dispensedItems.reduce((sum, item) => sum + item.quantity, 0);
-
-        const newTransaction: Transaction = {
+        const newTransaction: DepartmentalTransaction = {
             id: uuidv4(),
-            productId: productForTransaction.id,
-            productName: productForTransaction.name,
-            date: data.date,
-            notes: data.notes,
-            items: dispensedItems,
-            totalQuantity: totalQuantityDispensed,
-            requestorName: 'N/A',
-            department: department,
+            productId: productForConsumption.id,
+            productName: productForConsumption.name,
+            date: new Date(),
+            notes: consumptionNotes,
+            quantity: consumptionQuantity,
+            consumedBy: consumedBy,
         };
         setTransactions([newTransaction, ...transactions]);
 
-        toast({ title: "Consumption Recorded", description: `Recorded use of ${totalQuantityDispensed} of "${productForTransaction.name}".` });
+        toast({ title: "Consumption Recorded", description: `Recorded use of ${consumptionQuantity} of "${productForConsumption.name}".` });
         
         setIsSaving(false);
-        setIsTransactionFormOpen(false);
-        setProductForTransaction(null);
-    };
-
-    const totalQuantity = (lots: Lot[]) => lots.reduce((sum, lot) => sum + lot.quantity, 0);
-    const getDisplayLocation = (lots: Lot[]) => {
-        if (!lots || lots.length === 0) return 'N/A';
-        const uniqueLocations = [...new Set(lots.map(lot => lot.location))];
-        if (uniqueLocations.length === 1) return uniqueLocations[0];
-        return "Multiple Locations";
+        setIsConsumptionFormOpen(false);
+        setProductForConsumption(null);
     };
 
     if (isLoading) {
@@ -205,7 +191,6 @@ export function DepartmentalPage({ user, onLogout }: DepartmentalPageProps) {
                                         <TableHead>Product</TableHead>
                                         <TableHead>Vendor Part #</TableHead>
                                         <TableHead>Total Quantity</TableHead>
-                                        <TableHead>Storage Location</TableHead>
                                         <TableHead className="w-[180px] text-right">Action</TableHead>
                                     </TableRow>
                                 </TableHeader>
@@ -217,10 +202,9 @@ export function DepartmentalPage({ user, onLogout }: DepartmentalPageProps) {
                                                     <div className="flex items-center gap-3"><Package className="h-5 w-5 text-muted-foreground"/><div><div>{product.name}</div><div className="text-xs text-muted-foreground">{product.id}</div></div></div>
                                                 </TableCell>
                                                 <TableCell>{product.vendorPartNumber}</TableCell>
-                                                <TableCell><Badge variant="secondary">{totalQuantity(product.lots)}</Badge></TableCell>
-                                                <TableCell><div className="flex items-center gap-2"><Warehouse className="h-4 w-4 text-muted-foreground"/>{getDisplayLocation(product.lots)}</div></TableCell>
+                                                <TableCell><Badge variant="secondary">{product.quantity}</Badge></TableCell>
                                                 <TableCell className="text-right">
-                                                    <Button size="sm" onClick={() => handleNewTransaction(product)}>
+                                                    <Button size="sm" onClick={() => handleOpenConsumptionForm(product)}>
                                                         <ArrowRightLeft className="mr-2 h-4 w-4" />
                                                         Record Consumption
                                                     </Button>
@@ -229,7 +213,7 @@ export function DepartmentalPage({ user, onLogout }: DepartmentalPageProps) {
                                         ))
                                     ) : (
                                         <TableRow>
-                                            <TableCell colSpan={5} className="h-24 text-center">
+                                            <TableCell colSpan={4} className="h-24 text-center">
                                                 {searchQuery ? 'No products found.' : 'No inventory has been allocated to this department yet.'}
                                             </TableCell>
                                         </TableRow>
@@ -241,20 +225,33 @@ export function DepartmentalPage({ user, onLogout }: DepartmentalPageProps) {
                 </Card>
             </main>
 
-            <Dialog open={isTransactionFormOpen} onOpenChange={setIsTransactionFormOpen}>
-                <DialogContent className="max-w-3xl">
+            <Dialog open={isConsumptionFormOpen} onOpenChange={setIsConsumptionFormOpen}>
+                <DialogContent className="max-w-md">
                     <DialogHeader>
-                        <DialogTitle>{`Record Consumption for ${productForTransaction?.name}`}</DialogTitle>
-                        <DialogDescription>Record the quantity of items consumed from each lot.</DialogDescription>
+                        <DialogTitle>{`Record Consumption for ${productForConsumption?.name}`}</DialogTitle>
+                        <DialogDescription>Record the quantity of items consumed from local stock.</DialogDescription>
                     </DialogHeader>
-                    {productForTransaction && (
-                        <TransactionForm
-                            product={productForTransaction}
-                            onSave={handleSaveTransaction}
-                            onCancel={() => setIsTransactionFormOpen(false)}
-                            isSaving={isSaving}
-                        />
-                    )}
+                    <div className="space-y-4 py-4">
+                        <div className="space-y-2">
+                             <Label htmlFor="consumedBy">Consumed By</Label>
+                             <Input id="consumedBy" value={consumedBy} onChange={(e) => setConsumedBy(e.target.value)} placeholder="Your Name" />
+                        </div>
+                         <div className="space-y-2">
+                             <Label htmlFor="quantity">Quantity Consumed</Label>
+                             <Input id="quantity" type="number" value={consumptionQuantity} min={1} max={productForConsumption?.quantity} onChange={(e) => setConsumptionQuantity(Number(e.target.value))} />
+                        </div>
+                         <div className="space-y-2">
+                             <Label htmlFor="notes">Notes (Optional)</Label>
+                             <Input id="notes" value={consumptionNotes} onChange={(e) => setConsumptionNotes(e.target.value)} placeholder="e.g. For project X" />
+                        </div>
+                    </div>
+                    <DialogFooter>
+                         <Button variant="ghost" onClick={() => setIsConsumptionFormOpen(false)} disabled={isSaving}>Cancel</Button>
+                         <Button onClick={handleRecordConsumption} disabled={isSaving}>
+                             {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                             Record
+                         </Button>
+                    </DialogFooter>
                 </DialogContent>
             </Dialog>
         </div>
