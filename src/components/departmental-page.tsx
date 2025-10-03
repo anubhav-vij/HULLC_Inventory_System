@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { Package, ArrowRightLeft, Loader2, Search, LogOut, History } from 'lucide-react';
+import { Package, ArrowRightLeft, Loader2, Search, LogOut, History, Warehouse } from 'lucide-react';
 import { type DepartmentalProduct, type DepartmentalTransaction, type User } from '@/lib/types';
 import { StockPilotLogo } from './icons';
 import { useToast } from '@/hooks/use-toast';
@@ -14,6 +14,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { Input } from '@/components/ui/input';
 import { Label } from './ui/label';
 import { format } from 'date-fns';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 const DEPT_PRODUCTS_STORAGE_KEY_PREFIX = 'stockpilot-dept-products';
 const DEPT_TRANSACTIONS_STORAGE_KEY_PREFIX = 'stockpilot-dept-transactions';
@@ -149,7 +150,7 @@ export function DepartmentalPage({ user, onLogout }: DepartmentalPageProps) {
     
     return (
         <div className="min-h-screen w-full bg-background flex flex-col items-center p-4 sm:p-6 lg:p-8">
-            <main className="w-full max-w-7xl mx-auto space-y-8">
+            <main className="w-full max-w-7xl mx-auto space-y-6">
                 <div className="flex items-center gap-3">
                     <StockPilotLogo className="h-8 w-8 text-primary" />
                     <h1 className="text-3xl font-bold text-foreground">{department} Inventory</h1>
@@ -165,109 +166,115 @@ export function DepartmentalPage({ user, onLogout }: DepartmentalPageProps) {
                     </div>
                 </div>
 
-                <Card>
-                    <CardHeader>
-                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                            <div className="flex-1">
-                                <CardTitle>Available Stock</CardTitle>
-                                <CardDescription>Record consumption of items allocated to your department.</CardDescription>
-                            </div>
-                            <div className="relative">
-                                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-                                <Input
-                                    type="search"
-                                    placeholder="Search products..."
-                                    className="pl-8 sm:w-[300px] w-full"
-                                    value={searchQuery}
-                                    onChange={(e) => setSearchQuery(e.target.value)}
-                                />
-                            </div>
-                        </div>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="border rounded-lg overflow-hidden">
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>Product</TableHead>
-                                        <TableHead>Vendor Part #</TableHead>
-                                        <TableHead>Total Quantity</TableHead>
-                                        <TableHead className="w-[180px] text-right">Action</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {filteredProducts.length > 0 ? (
-                                        filteredProducts.map(product => (
-                                            <TableRow key={product.id}>
-                                                <TableCell className="font-medium">
-                                                    <div className="flex items-center gap-3"><Package className="h-5 w-5 text-muted-foreground"/><div><div>{product.name}</div><div className="text-xs text-muted-foreground">{product.id}</div></div></div>
-                                                </TableCell>
-                                                <TableCell>{product.vendorPartNumber}</TableCell>
-                                                <TableCell><Badge variant="secondary">{product.quantity}</Badge></TableCell>
-                                                <TableCell className="text-right">
-                                                    <Button size="sm" onClick={() => handleOpenConsumptionForm(product)}>
-                                                        <ArrowRightLeft className="mr-2 h-4 w-4" />
-                                                        Record Consumption
-                                                    </Button>
-                                                </TableCell>
+                <Tabs defaultValue="stock">
+                    <TabsList>
+                        <TabsTrigger value="stock"><Warehouse className="mr-2 h-4 w-4" /> Available Stock</TabsTrigger>
+                        <TabsTrigger value="history"><History className="mr-2 h-4 w-4" /> Consumption History</TabsTrigger>
+                    </TabsList>
+                    <TabsContent value="stock">
+                        <Card>
+                            <CardHeader>
+                                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                                    <div className="flex-1">
+                                        <CardTitle>Available Stock</CardTitle>
+                                        <CardDescription>Record consumption of items allocated to your department.</CardDescription>
+                                    </div>
+                                    <div className="relative">
+                                        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                                        <Input
+                                            type="search"
+                                            placeholder="Search products..."
+                                            className="pl-8 sm:w-[300px] w-full"
+                                            value={searchQuery}
+                                            onChange={(e) => setSearchQuery(e.target.value)}
+                                        />
+                                    </div>
+                                </div>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="border rounded-lg overflow-hidden">
+                                    <Table>
+                                        <TableHeader>
+                                            <TableRow>
+                                                <TableHead>Product</TableHead>
+                                                <TableHead>Vendor Part #</TableHead>
+                                                <TableHead>Total Quantity</TableHead>
+                                                <TableHead className="w-[180px] text-right">Action</TableHead>
                                             </TableRow>
-                                        ))
-                                    ) : (
-                                        <TableRow>
-                                            <TableCell colSpan={4} className="h-24 text-center">
-                                                {searchQuery ? 'No products found.' : 'No inventory has been allocated to this department yet.'}
-                                            </TableCell>
-                                        </TableRow>
-                                    )}
-                                </TableBody>
-                            </Table>
-                        </div>
-                    </CardContent>
-                </Card>
-
-                <Card>
-                    <CardHeader>
-                        <CardTitle>
-                            <div className="flex items-center gap-2">
-                                <History className="h-5 w-5" />
-                                Consumption History
-                            </div>
-                        </CardTitle>
-                         <CardDescription>A log of all items consumed by this department.</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                         <div className="border rounded-lg overflow-hidden">
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>Product</TableHead>
-                                        <TableHead>Consumed By</TableHead>
-                                        <TableHead>Date</TableHead>
-                                        <TableHead>Quantity</TableHead>
-                                        <TableHead>Notes</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {transactions.length > 0 ? (
-                                        transactions.map(tx => (
-                                            <TableRow key={tx.id}>
-                                                <TableCell className="font-medium">{tx.productName} <span className="text-xs text-muted-foreground">({tx.productId})</span></TableCell>
-                                                <TableCell>{tx.consumedBy}</TableCell>
-                                                <TableCell>{format(tx.date, 'PPP')}</TableCell>
-                                                <TableCell><Badge variant="outline">-{tx.quantity}</Badge></TableCell>
-                                                <TableCell className="truncate max-w-xs">{tx.notes || 'N/A'}</TableCell>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {filteredProducts.length > 0 ? (
+                                                filteredProducts.map(product => (
+                                                    <TableRow key={product.id}>
+                                                        <TableCell className="font-medium">
+                                                            <div className="flex items-center gap-3"><Package className="h-5 w-5 text-muted-foreground"/><div><div>{product.name}</div><div className="text-xs text-muted-foreground">{product.id}</div></div></div>
+                                                        </TableCell>
+                                                        <TableCell>{product.vendorPartNumber}</TableCell>
+                                                        <TableCell><Badge variant="secondary">{product.quantity}</Badge></TableCell>
+                                                        <TableCell className="text-right">
+                                                            <Button size="sm" onClick={() => handleOpenConsumptionForm(product)}>
+                                                                <ArrowRightLeft className="mr-2 h-4 w-4" />
+                                                                Record Consumption
+                                                            </Button>
+                                                        </TableCell>
+                                                    </TableRow>
+                                                ))
+                                            ) : (
+                                                <TableRow>
+                                                    <TableCell colSpan={4} className="h-24 text-center">
+                                                        {searchQuery ? 'No products found.' : 'No inventory has been allocated to this department yet.'}
+                                                    </TableCell>
+                                                </TableRow>
+                                            )}
+                                        </TableBody>
+                                    </Table>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </TabsContent>
+                    <TabsContent value="history">
+                         <Card>
+                            <CardHeader>
+                                <CardTitle>
+                                    Consumption History
+                                </CardTitle>
+                                <CardDescription>A log of all items consumed by this department.</CardDescription>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="border rounded-lg overflow-hidden">
+                                    <Table>
+                                        <TableHeader>
+                                            <TableRow>
+                                                <TableHead>Product</TableHead>
+                                                <TableHead>Consumed By</TableHead>
+                                                <TableHead>Date</TableHead>
+                                                <TableHead>Quantity</TableHead>
+                                                <TableHead>Notes</TableHead>
                                             </TableRow>
-                                        ))
-                                    ) : (
-                                        <TableRow>
-                                            <TableCell colSpan={5} className="h-24 text-center">No consumption has been recorded yet.</TableCell>
-                                        </TableRow>
-                                    )}
-                                </TableBody>
-                            </Table>
-                        </div>
-                    </CardContent>
-                </Card>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {transactions.length > 0 ? (
+                                                transactions.map(tx => (
+                                                    <TableRow key={tx.id}>
+                                                        <TableCell className="font-medium">{tx.productName} <span className="text-xs text-muted-foreground">({tx.productId})</span></TableCell>
+                                                        <TableCell>{tx.consumedBy}</TableCell>
+                                                        <TableCell>{format(tx.date, 'PPP')}</TableCell>
+                                                        <TableCell><Badge variant="outline">-{tx.quantity}</Badge></TableCell>
+                                                        <TableCell className="truncate max-w-xs">{tx.notes || 'N/A'}</TableCell>
+                                                    </TableRow>
+                                                ))
+                                            ) : (
+                                                <TableRow>
+                                                    <TableCell colSpan={5} className="h-24 text-center">No consumption has been recorded yet.</TableCell>
+                                                </TableRow>
+                                            )}
+                                        </TableBody>
+                                    </Table>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </TabsContent>
+                </Tabs>
             </main>
 
             <Dialog open={isConsumptionFormOpen} onOpenChange={setIsConsumptionFormOpen}>
