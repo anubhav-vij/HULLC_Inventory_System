@@ -9,11 +9,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
-import { ChevronsUpDown, MoreHorizontal, Package, Pencil, PlusCircle, Warehouse, ArrowRightLeft, CloudUpload, Loader2, AlertTriangle, Download, Trash2, CheckCircle2, XCircle, Hourglass, FileText, Search } from 'lucide-react';
+import { ChevronsUpDown, MoreHorizontal, Package, Pencil, PlusCircle, Warehouse, ArrowRightLeft, CloudUpload, Loader2, AlertTriangle, Download, Trash2, CheckCircle2, XCircle, Hourglass, FileText, Search, LogOut } from 'lucide-react';
 import { ProductForm } from './product-form';
 import { TransactionForm } from './transaction-form';
 import { RequestForm } from './request-form';
-import { type Product, type Lot, type ProductFormData, type Transaction, type TransactionFormData, type User, type UserRole, type ProductRequest, type ProductRequestFormData, type ProductRequestStatus } from '@/lib/types';
+import { type Product, type Lot, type ProductFormData, type Transaction, type TransactionFormData, type User, type UserRole, type ProductRequest, type ProductRequestFormData, type ProductRequestStatus, DEPARTMENTS } from '@/lib/types';
 import { StockPilotLogo } from './icons';
 import { useToast } from '@/hooks/use-toast';
 import { v4 as uuidv4 } from 'uuid';
@@ -23,7 +23,8 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { cn } from '@/lib/utils';
 import { deleteFile, getFile } from '@/lib/file-store';
 import { Input } from '@/components/ui/input';
-
+import { DepartmentalPage } from './departmental-page';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 
 const initialProducts: Product[] = [
     {
@@ -49,11 +50,12 @@ const initialProducts: Product[] = [
     }
 ];
 
-const PRODUCTS_STORAGE_KEY = 'stockpilot-products-data';
-const TRANSACTIONS_STORAGE_KEY = 'stockpilot-transactions-data';
-const REQUESTS_STORAGE_KEY = 'stockpilot-requests-data';
+const PRODUCTS_STORAGE_KEY_PREFIX = 'stockpilot-products-data';
+const TRANSACTIONS_STORAGE_KEY_PREFIX = 'stockpilot-transactions-data';
+const REQUESTS_STORAGE_KEY_PREFIX = 'stockpilot-requests-data';
 const USER_STORAGE_KEY = 'stockpilot-user-data';
 
+type AppSystem = 'Core' | 'Departmental';
 
 export default function InventoryPage() {
     const [products, setProducts] = useState<Product[]>([]);
@@ -78,9 +80,17 @@ export default function InventoryPage() {
     const [transactionToDelete, setTransactionToDelete] = useState<Transaction | null>(null);
     const [requestToReject, setRequestToReject] = useState<ProductRequest | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
-
-    const { toast } = useToast();
+    const [loginStep, setLoginStep] = useState<'role' | 'department'>('role');
+    const [selectedRole, setSelectedRole] = useState<UserRole | null>(null);
     
+    const { toast } = useToast();
+
+    // Use department from user session if available, otherwise default to 'core'
+    const department = user?.department || 'core';
+    const productsStorageKey = `${PRODUCTS_STORAGE_KEY_PREFIX}-${department}`;
+    const transactionsStorageKey = `${TRANSACTIONS_STORAGE_KEY_PREFIX}-${department}`;
+    const requestsStorageKey = `${REQUESTS_STORAGE_KEY_PREFIX}-${department}`;
+
     const filteredProducts = useMemo(() => {
         if (!searchQuery) {
             return products;
@@ -123,64 +133,69 @@ export default function InventoryPage() {
             if (storedUserItem) {
                 setUser(JSON.parse(storedUserItem));
             }
-
-            const storedProductsItem = window.localStorage.getItem(PRODUCTS_STORAGE_KEY);
-            let loadedProducts: Product[];
-            if (storedProductsItem) {
-                 loadedProducts = JSON.parse(storedProductsItem).map((product: any) => ({
-                    ...product,
-                    reorderThreshold: product.reorderThreshold ?? null,
-                    lots: product.lots.map((lot: any) => ({
-                        ...lot,
-                        location: lot.location || '',
-                        receiptDate: new Date(lot.receiptDate),
-                        expirationDate: lot.expirationDate ? new Date(lot.expirationDate) : null,
-                        file: lot.file,
-                    })),
-                }));
-            } else {
-                loadedProducts = initialProducts;
-            }
-            setProducts(loadedProducts);
-
-            const storedTransactionsItem = window.localStorage.getItem(TRANSACTIONS_STORAGE_KEY);
-            if (storedTransactionsItem) {
-                const loadedTransactions = JSON.parse(storedTransactionsItem).map((tx: any) => ({
-                    ...tx,
-                    date: new Date(tx.date),
-                }));
-                setTransactions(loadedTransactions);
-            }
-            
-            const storedRequestsItem = window.localStorage.getItem(REQUESTS_STORAGE_KEY);
-            if (storedRequestsItem) {
-                const loadedRequests = JSON.parse(storedRequestsItem).map((req: any) => ({
-                    ...req,
-                    date: new Date(req.date),
-                }));
-                setProductRequests(loadedRequests);
-            }
-
-        } catch (error) {
-            console.error('Error reading from local storage', error);
-            setProducts(initialProducts);
-            setTransactions([]);
-            setProductRequests([]);
-        }
+        } catch (e) { console.error(e) }
         setIsLoading(false);
     }, []);
+    
+    useEffect(() => {
+        if (!user) {
+            setIsLoading(false);
+            return;
+        };
+
+        const loadData = () => {
+            setIsLoading(true);
+            try {
+                const isCoreSystem = user.department === 'core';
+                const pKey = `${PRODUCTS_STORAGE_KEY_PREFIX}-${user.department}`;
+                const tKey = `${TRANSACTIONS_STORAGE_KEY_PREFIX}-${user.department}`;
+                const rKey = `${REQUESTS_STORAGE_KEY_PREFIX}-${user.department}`;
+
+                const storedProductsItem = window.localStorage.getItem(pKey);
+                let loadedProducts: Product[];
+                if (storedProductsItem) {
+                    loadedProducts = JSON.parse(storedProductsItem).map((product: any) => ({
+                        ...product,
+                        reorderThreshold: product.reorderThreshold ?? null,
+                        lots: product.lots.map((lot: any) => ({
+                            ...lot,
+                            location: lot.location || '',
+                            receiptDate: new Date(lot.receiptDate),
+                            expirationDate: lot.expirationDate ? new Date(lot.expirationDate) : null,
+                            file: lot.file,
+                        })),
+                    }));
+                } else {
+                    loadedProducts = isCoreSystem ? initialProducts : [];
+                }
+                setProducts(loadedProducts);
+
+                const storedTransactionsItem = window.localStorage.getItem(tKey);
+                setTransactions(storedTransactionsItem ? JSON.parse(storedTransactionsItem).map((tx: any) => ({ ...tx, date: new Date(tx.date) })) : []);
+                
+                const storedRequestsItem = window.localStorage.getItem(rKey);
+                setProductRequests(storedRequestsItem ? JSON.parse(storedRequestsItem).map((req: any) => ({ ...req, date: new Date(req.date) })) : []);
+
+            } catch (error) {
+                console.error('Error reading from local storage', error);
+                setProducts(user.department === 'core' ? initialProducts : []);
+                setTransactions([]);
+                setProductRequests([]);
+            }
+            setIsLoading(false);
+        }
+
+        loadData();
+
+    }, [user?.department]);
 
     useEffect(() => {
-        if (!isLoading) {
+        if (!isLoading && user) {
             try {
-                window.localStorage.setItem(PRODUCTS_STORAGE_KEY, JSON.stringify(products));
-                window.localStorage.setItem(TRANSACTIONS_STORAGE_KEY, JSON.stringify(transactions));
-                window.localStorage.setItem(REQUESTS_STORAGE_KEY, JSON.stringify(productRequests));
-                if (user) {
-                    window.localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(user));
-                } else {
-                    window.localStorage.removeItem(USER_STORAGE_KEY);
-                }
+                window.localStorage.setItem(productsStorageKey, JSON.stringify(products));
+                window.localStorage.setItem(transactionsStorageKey, JSON.stringify(transactions));
+                window.localStorage.setItem(requestsStorageKey, JSON.stringify(productRequests));
+                window.localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(user));
             } catch (error) {
                 console.error("Failed to save to localStorage:", error);
                 toast({
@@ -190,7 +205,7 @@ export default function InventoryPage() {
                 });
             }
         }
-    }, [products, transactions, productRequests, user, isLoading, toast]);
+    }, [products, transactions, productRequests, user, isLoading, toast, productsStorageKey, transactionsStorageKey, requestsStorageKey]);
 
     const nextProductId = useMemo(() => {
         if (products.length === 0) return 'P001';
@@ -200,14 +215,30 @@ export default function InventoryPage() {
         }, 0);
         return `P${(maxId + 1).toString().padStart(3, '0')}`;
     }, [products]);
+    
+    const handleRoleSelect = (role: UserRole, system: AppSystem) => {
+        if (system === 'Core') {
+            setUser({ role, department: 'core' });
+        } else {
+            setSelectedRole(role);
+            setLoginStep('department');
+        }
+    };
 
-    const handleLogin = (role: UserRole) => {
-        const name = role === 'Admin' ? 'Admin User' : 'Staff User';
-        setUser({ name, role });
+    const handleDepartmentSelect = (department: string) => {
+        if (selectedRole && department) {
+            setUser({ role: selectedRole, department });
+            setLoginStep('role');
+            setSelectedRole(null);
+        }
     };
 
     const handleLogout = () => {
         setUser(null);
+        window.localStorage.removeItem(USER_STORAGE_KEY);
+        setProducts([]);
+        setTransactions([]);
+        setProductRequests([]);
     };
 
     const handleAddNew = () => {
@@ -237,7 +268,6 @@ export default function InventoryPage() {
     const handleConfirmDeleteProduct = async () => {
         if (!productToDelete) return;
 
-        // Delete associated files from IndexedDB
         for (const lot of productToDelete.lots) {
             if (lot.file?.id) {
                 await deleteFile(lot.file.id);
@@ -278,7 +308,6 @@ export default function InventoryPage() {
         setIsSaving(true);
         try {
             if (productToEdit) {
-                // Find lots that were removed and delete their files
                 const originalLotIds = new Set(productToEdit.lots.map(l => l.id));
                 const currentLotIds = new Set(data.lots.map(l => l.id));
                 for (const lotId of originalLotIds) {
@@ -289,19 +318,11 @@ export default function InventoryPage() {
                         }
                     }
                 }
-
-                const updatedProducts = products.map(p => 
-                    p.id === productToEdit.id ? { ...p, ...data } : p
-                );
+                const updatedProducts = products.map(p => p.id === productToEdit.id ? { ...p, ...data } : p);
                 setProducts(updatedProducts);
                 toast({ title: "Product Updated", description: `"${data.name}" has been updated successfully.` });
             } else {
-                // Add new product
-                const newProduct: Product = {
-                    id: nextProductId,
-                    ...data,
-                    lots: data.lots.map(lot => ({...lot, id: uuidv4()}))
-                };
+                const newProduct: Product = { id: nextProductId, ...data, lots: data.lots.map(lot => ({...lot, id: uuidv4()}))};
                 setProducts(prevProducts => [...prevProducts, newProduct]);
                 toast({ title: "Product Added", description: `"${newProduct.name}" has been added successfully.` });
             }
@@ -314,85 +335,120 @@ export default function InventoryPage() {
             setIsSaving(false);
         }
     };
+    
+    const addFulfilledItemsToDepartmentInventory = (request: ProductRequest, transaction: Transaction) => {
+        const deptKey = `${PRODUCTS_STORAGE_KEY_PREFIX}-${request.department}`;
+        const deptProductsRaw = window.localStorage.getItem(deptKey);
+        let deptProducts: Product[] = deptProductsRaw ? JSON.parse(deptProductsRaw) : [];
+    
+        const coreProduct = products.find(p => p.id === transaction.productId);
+        if (!coreProduct) return;
+    
+        let deptProduct = deptProducts.find(p => p.id === transaction.productId);
+    
+        if (!deptProduct) {
+            deptProduct = { ...coreProduct, lots: [] };
+            deptProducts.push(deptProduct);
+        }
+    
+        transaction.items.forEach(txItem => {
+            const coreLot = coreProduct.lots.find(l => l.id === txItem.lotId);
+            if (!coreLot) return;
+    
+            let deptLot = deptProduct!.lots.find(l => l.lotNumber === coreLot.lotNumber);
+    
+            if (deptLot) {
+                deptLot.quantity += txItem.quantity;
+            } else {
+                deptProduct!.lots.push({ ...coreLot, quantity: txItem.quantity });
+            }
+        });
+        
+        deptProducts.forEach(p => {
+             if (p.id === deptProduct!.id) {
+                 return deptProduct;
+             }
+             return p;
+        });
+
+        window.localStorage.setItem(deptKey, JSON.stringify(deptProducts));
+    };
 
     const handleSaveTransaction = (data: TransactionFormData) => {
         if (!productForTransaction) return;
         setIsSaving(true);
     
-        setTimeout(() => {
-            const finalLots = productForTransaction.lots.map(lot => {
-                const transactionItem = data.items.find(item => item.lotId === lot.id);
-                if (transactionItem) {
-                    return { ...lot, quantity: lot.quantity - transactionItem.quantityTaken };
-                }
-                return lot;
-            });
-    
-            const updatedProduct = { ...productForTransaction, lots: finalLots };
-            setProducts(products.map(p => p.id === updatedProduct.id ? updatedProduct : p));
-    
-            const dispensedItems = data.items
-                .filter(item => item.quantityTaken > 0)
-                .map(item => {
-                    const lot = productForTransaction.lots.find(l => l.id === item.lotId)!;
-                    return { lotId: lot.id, lotNumber: lot.lotNumber, quantity: item.quantityTaken };
-                });
-            const totalQuantityDispensed = dispensedItems.reduce((sum, item) => sum + item.quantity, 0);
-    
-            const newTransaction: Transaction = {
-                id: uuidv4(),
-                productId: productForTransaction.id,
-                productName: productForTransaction.name,
-                date: data.date,
-                notes: data.notes,
-                items: dispensedItems,
-                totalQuantity: totalQuantityDispensed,
-                ...(requestToFulfill && {
-                    requestorName: requestToFulfill.requestorName,
-                    department: requestToFulfill.department
-                })
-            };
-            setTransactions([newTransaction, ...transactions]);
-            
-            if (requestToFulfill) {
-                setProductRequests(productRequests.map(r => 
-                    r.id === requestToFulfill.id ? { ...r, status: 'Completed' } : r
-                ));
-                toast({ title: "Request Fulfilled", description: `Dispensed ${totalQuantityDispensed} of "${productForTransaction.name}".` });
-            } else {
-                toast({ title: "Transaction Saved", description: `Dispensed ${totalQuantityDispensed} of "${productForTransaction.name}".` });
+        const finalLots = productForTransaction.lots.map(lot => {
+            const transactionItem = data.items.find(item => item.lotId === lot.id);
+            if (transactionItem) {
+                return { ...lot, quantity: lot.quantity - transactionItem.quantityTaken };
             }
-            
-            setIsSaving(false);
-            setIsTransactionFormOpen(false);
-            setProductForTransaction(null);
-            setRequestToFulfill(null);
-        }, 500);
+            return lot;
+        });
+
+        const updatedProduct = { ...productForTransaction, lots: finalLots };
+        setProducts(products.map(p => p.id === updatedProduct.id ? updatedProduct : p));
+
+        const dispensedItems = data.items
+            .filter(item => item.quantityTaken > 0)
+            .map(item => {
+                const lot = productForTransaction.lots.find(l => l.id === item.lotId)!;
+                return { lotId: lot.id, lotNumber: lot.lotNumber, quantity: item.quantityTaken };
+            });
+        const totalQuantityDispensed = dispensedItems.reduce((sum, item) => sum + item.quantity, 0);
+
+        const newTransaction: Transaction = {
+            id: uuidv4(),
+            productId: productForTransaction.id,
+            productName: productForTransaction.name,
+            date: data.date,
+            notes: data.notes,
+            items: dispensedItems,
+            totalQuantity: totalQuantityDispensed,
+            ...(requestToFulfill && {
+                requestorName: requestToFulfill.requestorName,
+                department: requestToFulfill.department
+            })
+        };
+        setTransactions([newTransaction, ...transactions]);
+        
+        if (requestToFulfill) {
+            setProductRequests(productRequests.map(r => 
+                r.id === requestToFulfill.id ? { ...r, status: 'Completed' } : r
+            ));
+            addFulfilledItemsToDepartmentInventory(requestToFulfill, newTransaction);
+            toast({ title: "Request Fulfilled", description: `Dispensed ${totalQuantityDispensed} of "${productForTransaction.name}". Stock added to ${requestToFulfill.department} inventory.` });
+        } else {
+            toast({ title: "Transaction Saved", description: `Dispensed ${totalQuantityDispensed} of "${productForTransaction.name}".` });
+        }
+        
+        setIsSaving(false);
+        setIsTransactionFormOpen(false);
+        setProductForTransaction(null);
+        setRequestToFulfill(null);
     };
     
     const handleSaveRequest = (data: ProductRequestFormData) => {
         if (!productForRequest) return;
         setIsSaving(true);
     
-        setTimeout(() => {
-            const newRequest: ProductRequest = {
-                id: uuidv4(),
-                productId: productForRequest.id,
-                productName: productForRequest.name,
-                ...data,
-                date: new Date(),
-                status: 'Pending',
-            };
-            setProductRequests([newRequest, ...productRequests]);
+        const newRequest: ProductRequest = {
+            id: uuidv4(),
+            productId: productForRequest.id,
+            productName: productForRequest.name,
+            ...data,
+            date: new Date(),
+            status: 'Pending',
+        };
+        setProductRequests([newRequest, ...productRequests]);
 
-            toast({
-                title: "Request Submitted",
-                description: `Your request for ${data.quantity} of "${productForRequest.name}" has been sent for review.`
-            });
-            setIsSaving(false);
-            setIsRequestFormOpen(false);
-            setProductForRequest(null);
-        }, 500);
+        toast({
+            title: "Request Submitted",
+            description: `Your request for ${data.quantity} of "${productForRequest.name}" has been sent for review.`
+        });
+        setIsSaving(false);
+        setIsRequestFormOpen(false);
+        setProductForRequest(null);
     };
 
     const handleFulfillRequest = (request: ProductRequest) => {
@@ -647,8 +703,8 @@ export default function InventoryPage() {
             </Badge>
         );
     };
-
-    if (isLoading) {
+    
+    if (isLoading && !user) {
         return (
             <div className="flex items-center justify-center min-h-screen">
                 <Loader2 className="h-12 w-12 animate-spin text-primary" />
@@ -657,6 +713,32 @@ export default function InventoryPage() {
     }
     
     if (!user) {
+         if (loginStep === 'department') {
+            return (
+                <div className="flex items-center justify-center min-h-screen bg-background">
+                    <Card className="w-full max-w-sm">
+                        <CardHeader className="text-center">
+                            <div className="flex justify-center items-center gap-3 mb-4">
+                                <StockPilotLogo className="h-8 w-8 text-primary" />
+                                <CardTitle className="text-2xl">Select Department</CardTitle>
+                            </div>
+                            <CardDescription>Choose your department to access its inventory.</CardDescription>
+                        </CardHeader>
+                        <CardContent className="flex flex-col gap-4">
+                             <Select onValueChange={handleDepartmentSelect}>
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Select a department" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {DEPARTMENTS.map(dept => <SelectItem key={dept} value={dept}>{dept}</SelectItem>)}
+                                </SelectContent>
+                            </Select>
+                            <Button variant="link" onClick={() => setLoginStep('role')}>Back to role selection</Button>
+                        </CardContent>
+                    </Card>
+                </div>
+            )
+        }
         return (
             <div className="flex items-center justify-center min-h-screen bg-background">
                 <Card className="w-full max-w-sm">
@@ -668,12 +750,17 @@ export default function InventoryPage() {
                         <CardDescription>Select a role to sign in.</CardDescription>
                     </CardHeader>
                     <CardContent className="flex flex-col gap-4">
-                         <Button size="lg" onClick={() => handleLogin('Admin')}>Sign in as Admin</Button>
-                         <Button size="lg" variant="secondary" onClick={() => handleLogin('Staff')}>Sign in as Staff</Button>
+                         <Button size="lg" onClick={() => handleRoleSelect('Admin', 'Core')}>Admin (Core System)</Button>
+                         <Button size="lg" variant="secondary" onClick={() => handleRoleSelect('Staff', 'Core')}>Staff (Request System)</Button>
+                         <Button size="lg" variant="outline" onClick={() => handleRoleSelect('Staff', 'Departmental')}>Staff (Departmental Inventory)</Button>
                     </CardContent>
                 </Card>
             </div>
         );
+    }
+
+    if (user.department !== 'core') {
+        return <DepartmentalPage user={user} onLogout={handleLogout} />;
     }
 
     const inventoryColSpan = user.role === 'Admin' ? 7 : 4;
@@ -685,13 +772,16 @@ export default function InventoryPage() {
                 <main className="w-full max-w-7xl mx-auto">
                     <div className="flex items-center gap-3 mb-8">
                         <StockPilotLogo className="h-8 w-8 text-primary" />
-                        <h1 className="text-3xl font-bold text-foreground">Inventory Management</h1>
+                        <h1 className="text-3xl font-bold text-foreground">Core Inventory</h1>
                          <div className="ml-auto flex items-center gap-4 text-sm">
                             <div className="text-right">
-                                <p className="font-semibold text-foreground">{user.name}</p>
-                                <p className="text-muted-foreground">{user.role}</p>
+                                <p className="font-semibold text-foreground">{user.role} User</p>
+                                <p className="text-muted-foreground">Core System</p>
                             </div>
-                            <Button variant="outline" size="sm" onClick={handleLogout}>Logout</Button>
+                            <Button variant="outline" size="sm" onClick={handleLogout}>
+                                <LogOut className="mr-2 h-4 w-4" />
+                                Logout
+                            </Button>
                         </div>
                     </div>
 
@@ -706,8 +796,8 @@ export default function InventoryPage() {
                                 <CardHeader>
                                     <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                                         <div className="flex-1">
-                                            <CardTitle>HULLC Inventory</CardTitle>
-                                            <CardDescription>Manage your products and their stock.</CardDescription>
+                                            <CardTitle>Master Inventory</CardTitle>
+                                            <CardDescription>Manage all products and their stock.</CardDescription>
                                         </div>
                                         <div className="flex flex-col sm:flex-row sm:justify-end gap-2 w-full sm:w-auto">
                                             <div className="relative">
@@ -1170,5 +1260,3 @@ export default function InventoryPage() {
         </div>
     );
 }
-
-    

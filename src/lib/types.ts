@@ -88,7 +88,7 @@ export const TransactionSchema = z.object({
     department: z.string().optional(),
 });
 
-export const DEPARTMENTS = ["Cardiology", "Neurology", "Oncology", "Pediatrics", "Research & Development"] as const;
+export const DEPARTMENTS = ["HULLC", "Cardiology", "Neurology", "Oncology", "Pediatrics", "Research & Development"] as const;
 export const PROJECTS = ["Project Alpha", "Project Beta", "Clinical Trial Gamma", "Pre-clinical Study Delta"] as const;
 
 export const ProductRequestFormSchema = z.object({
@@ -132,6 +132,6 @@ export type ProductRequestStatus = z.infer<typeof ProductRequestStatusSchema>;
 export type UserRole = 'Admin' | 'Staff';
 
 export type User = {
-  name: string;
   role: UserRole;
+  department: (typeof DEPARTMENTS)[number] | 'core';
 };
