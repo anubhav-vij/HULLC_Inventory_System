@@ -143,7 +143,8 @@ export function DepartmentalPage({ user, onLogout }: DepartmentalPageProps) {
             notes: notes,
             quantity: quantity,
             consumedBy: consumedBy,
-            type: 'Consumption'
+            type: 'Consumption',
+            adjustmentType: 'remove',
         };
         setTransactions([newTransaction, ...transactions]);
 
@@ -337,7 +338,7 @@ export function DepartmentalPage({ user, onLogout }: DepartmentalPageProps) {
                                                         </TableCell>
                                                         <TableCell>
                                                             <Badge variant={tx.type === 'Adjustment' && tx.adjustmentType === 'add' ? 'default' : 'outline'}>
-                                                                {tx.type === 'Adjustment' && tx.adjustmentType === 'add' ? '+' : '-'}{tx.quantity}
+                                                                {tx.adjustmentType === 'add' ? '+' : '-'}{tx.quantity}
                                                             </Badge>
                                                         </TableCell>
                                                         <TableCell className="truncate max-w-xs">{tx.notes || 'N/A'}</TableCell>
@@ -428,3 +429,5 @@ export function DepartmentalPage({ user, onLogout }: DepartmentalPageProps) {
         </div>
     );
 }
+
+    
