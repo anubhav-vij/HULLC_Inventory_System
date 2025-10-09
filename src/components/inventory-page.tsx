@@ -352,25 +352,31 @@ export default function InventoryPage() {
         const deptKey = `${DEPT_PRODUCTS_STORAGE_KEY_PREFIX}-${request.department}`;
         const deptProductsRaw = window.localStorage.getItem(deptKey);
         let deptProducts: DepartmentalProduct[] = deptProductsRaw ? JSON.parse(deptProductsRaw) : [];
-        
+    
         const coreProduct = products.find(p => p.id === transaction.productId);
         if (!coreProduct) return;
-
-        let deptProduct = deptProducts.find(p => p.id === transaction.productId);
-
-        if (deptProduct) {
+    
+        const deptProductIndex = deptProducts.findIndex(p => p.id === transaction.productId);
+    
+        if (deptProductIndex > -1) {
             // Product exists, update its quantity
-            deptProduct.quantity += transaction.totalQuantity;
+            const updatedDeptProducts = deptProducts.map((p, index) => {
+                if (index === deptProductIndex) {
+                    return { ...p, quantity: p.quantity + transaction.totalQuantity };
+                }
+                return p;
+            });
+            deptProducts = updatedDeptProducts;
         } else {
             // Product is new to the department, create it
-            deptProduct = {
+            const newDeptProduct: DepartmentalProduct = {
                 id: coreProduct.id,
                 name: coreProduct.name,
                 vendor: coreProduct.vendor,
                 vendorPartNumber: coreProduct.vendorPartNumber,
                 quantity: transaction.totalQuantity,
             };
-            deptProducts.push(deptProduct);
+            deptProducts.push(newDeptProduct);
         }
         
         window.localStorage.setItem(deptKey, JSON.stringify(deptProducts));
@@ -1271,3 +1277,5 @@ export default function InventoryPage() {
         </div>
     );
 }
+
+    
