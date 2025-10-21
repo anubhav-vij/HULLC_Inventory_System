@@ -372,13 +372,11 @@ export default function InventoryPage() {
         const deptProductIndex = deptProducts.findIndex(p => p.id === productId);
     
         if (deptProductIndex > -1) {
-            const updatedDeptProducts = deptProducts.map((p, index) => {
-                if (index === deptProductIndex) {
-                    return { ...p, quantity: p.quantity + quantity };
-                }
-                return p;
-            });
-            deptProducts = updatedDeptProducts;
+            deptProducts = deptProducts.map((p, index) => 
+                index === deptProductIndex 
+                    ? { ...p, quantity: p.quantity + quantity }
+                    : p
+            );
         } else {
             const newDeptProduct: DepartmentalProduct = {
                 id: coreProduct.id,
@@ -482,7 +480,7 @@ export default function InventoryPage() {
             description: `Your request for ${data.quantity} of "${productForRequest.name}" has been sent for review.`
         });
         setIsSaving(false);
-setIsRequestFormOpen(false);
+        setIsRequestFormOpen(false);
         setProductForRequest(null);
     };
 
@@ -1394,3 +1392,4 @@ setIsRequestFormOpen(false);
     
 
     
+
