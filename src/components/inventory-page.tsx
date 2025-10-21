@@ -14,7 +14,7 @@ import { ChevronsUpDown, MoreHorizontal, Package, Pencil, PlusCircle, Warehouse,
 import { ProductForm } from './product-form';
 import { TransactionForm } from './transaction-form';
 import { RequestForm } from './request-form';
-import { type Product, type Lot, type ProductFormData, type Transaction, type TransactionFormData, type User, type UserRole, type ProductRequest, type ProductRequestFormData, type ProductRequestStatus, DEPARTMENTS, type DepartmentalProduct } from '@/lib/types';
+import { type Product, type Lot, type ProductFormData, type Transaction, type TransactionFormData, type User, type UserRole, type ProductRequest, type ProductRequestFormData, type ProductRequestStatus, DEPARTMENTS, type DepartmentalProduct, type Fulfillment } from '@/lib/types';
 import { StockPilotLogo } from './icons';
 import { useToast } from '@/hooks/use-toast';
 import { v4 as uuidv4 } from 'uuid';
@@ -56,6 +56,7 @@ const initialProducts: Product[] = [
 const PRODUCTS_STORAGE_KEY_PREFIX = 'stockpilot-products-data';
 const TRANSACTIONS_STORAGE_KEY_PREFIX = 'stockpilot-transactions-data';
 const REQUESTS_STORAGE_KEY_PREFIX = 'stockpilot-requests-data';
+const FULFILLMENTS_STORAGE_KEY_PREFIX = 'stockpilot-fulfillments-data';
 const USER_STORAGE_KEY = 'stockpilot-user-data';
 const DEPT_PRODUCTS_STORAGE_KEY_PREFIX = 'stockpilot-dept-products';
 
@@ -64,6 +65,7 @@ export default function InventoryPage() {
     const [products, setProducts] = useState<Product[]>([]);
     const [transactions, setTransactions] = useState<Transaction[]>([]);
     const [productRequests, setProductRequests] = useState<ProductRequest[]>([]);
+    const [fulfillments, setFulfillments] = useState<Fulfillment[]>([]);
     const [user, setUser] = useState<User | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [isFormOpen, setIsFormOpen] = useState(false);
@@ -72,7 +74,7 @@ export default function InventoryPage() {
     const [productToEdit, setProductToEdit] = useState<Product | null>(null);
     const [productForTransaction, setProductForTransaction] = useState<Product | null>(null);
     const [productForRequest, setProductForRequest] = useState<Product | null>(null);
-    const [requestToFulfill, setRequestToFulfill] = useState<ProductRequest | null>(null);
+    const [fulfillmentToUpdate, setFulfillmentToUpdate] = useState<Fulfillment | null>(null);
     const [isSaving, setIsSaving] = useState(false);
     const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
     const [isImporting, setIsImporting] = useState(false);
@@ -94,6 +96,7 @@ export default function InventoryPage() {
     const productsStorageKey = `${PRODUCTS_STORAGE_KEY_PREFIX}-${department}`;
     const transactionsStorageKey = `${TRANSACTIONS_STORAGE_KEY_PREFIX}-${department}`;
     const requestsStorageKey = `${REQUESTS_STORAGE_KEY_PREFIX}-${department}`;
+    const fulfillmentsStorageKey = `${FULFILLMENTS_STORAGE_KEY_PREFIX}-${department}`;
 
     const filteredProducts = useMemo(() => {
         if (!searchQuery) {
@@ -154,6 +157,7 @@ export default function InventoryPage() {
                 const pKey = `${PRODUCTS_STORAGE_KEY_PREFIX}-${user.department}`;
                 const tKey = `${TRANSACTIONS_STORAGE_KEY_PREFIX}-${user.department}`;
                 const rKey = `${REQUESTS_STORAGE_KEY_PREFIX}-${user.department}`;
+                const fKey = `${FULFILLMENTS_STORAGE_KEY_PREFIX}-${user.department}`;
 
                 const storedProductsItem = window.localStorage.getItem(pKey);
                 let loadedProducts: Product[];
@@ -180,12 +184,16 @@ export default function InventoryPage() {
                 
                 const storedRequestsItem = window.localStorage.getItem(rKey);
                 setProductRequests(storedRequestsItem ? JSON.parse(storedRequestsItem).map((req: any) => ({ ...req, date: new Date(req.date) })) : []);
+                
+                const storedFulfillmentsItem = window.localStorage.getItem(fKey);
+                setFulfillments(storedFulfillmentsItem ? JSON.parse(storedFulfillmentsItem).map((f: any) => ({ ...f, dispensedItems: f.dispensedItems.map((tx:any) => ({...tx, date: new Date(tx.date)})) })) : []);
 
             } catch (error) {
                 console.error('Error reading from local storage', error);
                 setProducts(user.department === 'core' ? [] : []);
                 setTransactions([]);
                 setProductRequests([]);
+                setFulfillments([]);
             }
             setIsLoading(false);
         }
@@ -200,6 +208,7 @@ export default function InventoryPage() {
                 window.localStorage.setItem(productsStorageKey, JSON.stringify(products));
                 window.localStorage.setItem(transactionsStorageKey, JSON.stringify(transactions));
                 window.localStorage.setItem(requestsStorageKey, JSON.stringify(productRequests));
+                window.localStorage.setItem(fulfillmentsStorageKey, JSON.stringify(fulfillments));
                 window.localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(user));
             } catch (error) {
                 console.error("Failed to save to localStorage:", error);
@@ -210,7 +219,7 @@ export default function InventoryPage() {
                 });
             }
         }
-    }, [products, transactions, productRequests, user, isLoading, toast, productsStorageKey, transactionsStorageKey, requestsStorageKey]);
+    }, [products, transactions, productRequests, fulfillments, user, isLoading, toast, productsStorageKey, transactionsStorageKey, requestsStorageKey, fulfillmentsStorageKey]);
 
     const nextProductId = useMemo(() => {
         if (products.length === 0) return 'P001';
@@ -352,33 +361,31 @@ export default function InventoryPage() {
         }
     };
     
-    const addFulfilledItemsToDepartmentInventory = (request: ProductRequest, transaction: Transaction) => {
-        const deptKey = `${DEPT_PRODUCTS_STORAGE_KEY_PREFIX}-${request.department}`;
+    const addFulfilledItemsToDepartmentInventory = (department: string, productId: string, quantity: number) => {
+        const deptKey = `${DEPT_PRODUCTS_STORAGE_KEY_PREFIX}-${department}`;
         const deptProductsRaw = window.localStorage.getItem(deptKey);
         let deptProducts: DepartmentalProduct[] = deptProductsRaw ? JSON.parse(deptProductsRaw) : [];
     
-        const coreProduct = products.find(p => p.id === transaction.productId);
+        const coreProduct = products.find(p => p.id === productId);
         if (!coreProduct) return;
     
-        const deptProductIndex = deptProducts.findIndex(p => p.id === transaction.productId);
+        const deptProductIndex = deptProducts.findIndex(p => p.id === productId);
     
         if (deptProductIndex > -1) {
-            // Product exists, update its quantity
             const updatedDeptProducts = deptProducts.map((p, index) => {
                 if (index === deptProductIndex) {
-                    return { ...p, quantity: p.quantity + transaction.totalQuantity };
+                    return { ...p, quantity: p.quantity + quantity };
                 }
                 return p;
             });
             deptProducts = updatedDeptProducts;
         } else {
-            // Product is new to the department, create it
             const newDeptProduct: DepartmentalProduct = {
                 id: coreProduct.id,
                 name: coreProduct.name,
                 vendor: coreProduct.vendor,
                 vendorPartNumber: coreProduct.vendorPartNumber,
-                quantity: transaction.totalQuantity,
+                quantity: quantity,
             };
             deptProducts.push(newDeptProduct);
         }
@@ -410,6 +417,8 @@ export default function InventoryPage() {
             });
         const totalQuantityDispensed = dispensedItems.reduce((sum, item) => sum + item.quantity, 0);
 
+        const request = productRequests.find(r => r.id === fulfillmentToUpdate?.requestId);
+
         const newTransaction: Transaction = {
             id: uuidv4(),
             productId: productForTransaction.id,
@@ -418,19 +427,31 @@ export default function InventoryPage() {
             notes: data.notes,
             items: dispensedItems,
             totalQuantity: totalQuantityDispensed,
-            ...(requestToFulfill && {
-                requestorName: requestToFulfill.requestorName,
-                department: requestToFulfill.department
-            })
+            ...(request && {
+                requestorName: request.requestorName,
+                department: request.department
+            }),
+            ...(fulfillmentToUpdate && { fulfillmentId: fulfillmentToUpdate.id })
         };
         setTransactions([newTransaction, ...transactions]);
         
-        if (requestToFulfill) {
-            setProductRequests(productRequests.map(r => 
-                r.id === requestToFulfill.id ? { ...r, status: 'Completed' } : r
-            ));
-            addFulfilledItemsToDepartmentInventory(requestToFulfill, newTransaction);
-            toast({ title: "Request Fulfilled", description: `Dispensed ${totalQuantityDispensed} of "${productForTransaction.name}". Stock added to ${requestToFulfill.department} inventory.` });
+        if (fulfillmentToUpdate && request) {
+            const updatedFulfillment: Fulfillment = {
+                ...fulfillmentToUpdate,
+                dispensedItems: [...fulfillmentToUpdate.dispensedItems, newTransaction]
+            };
+            const totalFulfilled = updatedFulfillment.dispensedItems.reduce((sum, tx) => sum + tx.totalQuantity, 0);
+
+            if(totalFulfilled >= updatedFulfillment.totalQuantityRequested) {
+                setProductRequests(productRequests.map(r => r.id === fulfillmentToUpdate.requestId ? { ...r, status: 'Completed' } : r));
+                setFulfillments(fulfillments.filter(f => f.id !== fulfillmentToUpdate.id));
+                toast({ title: "Fulfillment Completed", description: `Final dispensation of ${totalQuantityDispensed} of "${productForTransaction.name}" recorded.` });
+            } else {
+                setFulfillments(fulfillments.map(f => f.id === updatedFulfillment.id ? updatedFulfillment : f));
+                toast({ title: "Partial Dispensation Saved", description: `Dispensed ${totalQuantityDispensed} of "${productForTransaction.name}".` });
+            }
+            addFulfilledItemsToDepartmentInventory(request.department, productForTransaction.id, totalQuantityDispensed);
+
         } else {
             toast({ title: "Transaction Saved", description: `Dispensed ${totalQuantityDispensed} of "${productForTransaction.name}".` });
         }
@@ -438,7 +459,7 @@ export default function InventoryPage() {
         setIsSaving(false);
         setIsTransactionFormOpen(false);
         setProductForTransaction(null);
-        setRequestToFulfill(null);
+        setFulfillmentToUpdate(null);
     };
     
     const handleSaveRequest = (data: ProductRequestFormData) => {
@@ -461,18 +482,33 @@ export default function InventoryPage() {
             description: `Your request for ${data.quantity} of "${productForRequest.name}" has been sent for review.`
         });
         setIsSaving(false);
-        setIsRequestFormOpen(false);
+setIsRequestFormOpen(false);
         setProductForRequest(null);
     };
 
     const handleFulfillRequest = (request: ProductRequest) => {
-        const product = products.find(p => p.id === request.productId);
+        const newFulfillment: Fulfillment = {
+            id: uuidv4(),
+            requestId: request.id,
+            productId: request.productId,
+            productName: request.productName,
+            department: request.department,
+            totalQuantityRequested: request.quantity,
+            dispensedItems: []
+        };
+        setFulfillments([...fulfillments, newFulfillment]);
+        setProductRequests(productRequests.map(r => r.id === request.id ? {...r, status: 'In Progress'} : r));
+        toast({ title: "Request In Progress", description: `Request for "${request.productName}" is now being fulfilled.` });
+    };
+
+    const handleDispenseForFulfillment = (fulfillment: Fulfillment) => {
+        const product = products.find(p => p.id === fulfillment.productId);
         if (product) {
-            setRequestToFulfill(request);
+            setFulfillmentToUpdate(fulfillment);
             setProductForTransaction(product);
             setIsTransactionFormOpen(true);
         } else {
-            toast({ title: "Product Not Found", description: "The product for this request no longer exists.", variant: "destructive" });
+            toast({ title: "Product Not Found", description: "The product for this fulfillment no longer exists.", variant: "destructive" });
         }
     };
     
@@ -713,13 +749,14 @@ export default function InventoryPage() {
     const getStatusBadge = (status: ProductRequestStatus) => {
         const statusConfig = {
             'Pending': { color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200', icon: Hourglass },
+            'In Progress': { color: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200', icon: Loader2 },
             'Completed': { color: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200', icon: CheckCircle2 },
             'Rejected': { color: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200', icon: XCircle },
         };
         const Icon = statusConfig[status].icon;
         return (
-            <Badge className={cn('gap-1', statusConfig[status].color)}>
-                <Icon className="h-3 w-3" />
+            <Badge className={cn('gap-1', statusConfig[status].color, status === 'In Progress' && 'animate-pulse')}>
+                <Icon className={cn("h-3 w-3", status === 'In Progress' && 'animate-spin')} />
                 {status}
             </Badge>
         );
@@ -818,6 +855,7 @@ export default function InventoryPage() {
                         <TabsList className="mb-4">
                             <TabsTrigger value="inventory">Inventory</TabsTrigger>
                             {user.role === 'Admin' && <TabsTrigger value="requests">Product Requests <Badge className="ml-2 bg-primary/20 text-primary">{productRequests.filter(r => r.status === 'Pending').length}</Badge></TabsTrigger>}
+                            {user.role === 'Admin' && <TabsTrigger value="fulfillments">Fulfillments <Badge className="ml-2 bg-primary/20 text-primary">{fulfillments.length}</Badge></TabsTrigger>}
                             {user.role === 'Admin' && <TabsTrigger value="transactions">Transactions</TabsTrigger>}
                         </TabsList>
                         <TabsContent value="inventory">
@@ -1058,6 +1096,58 @@ export default function InventoryPage() {
                                 </Card>
                             </TabsContent>
                         }
+                        {user.role === 'Admin' && (
+                            <TabsContent value="fulfillments">
+                                <Card>
+                                    <CardHeader>
+                                        <CardTitle>In-Progress Fulfillments</CardTitle>
+                                        <CardDescription>Manage requests that are being partially dispensed over time.</CardDescription>
+                                    </CardHeader>
+                                    <CardContent>
+                                        <div className="border rounded-lg overflow-hidden">
+                                            <Table>
+                                                <TableHeader>
+                                                    <TableRow>
+                                                        <TableHead>Product</TableHead>
+                                                        <TableHead>Department</TableHead>
+                                                        <TableHead>Quantity</TableHead>
+                                                        <TableHead className="text-right">Actions</TableHead>
+                                                    </TableRow>
+                                                </TableHeader>
+                                                <TableBody>
+                                                    {fulfillments.length > 0 ? (
+                                                        fulfillments.map(f => {
+                                                            const dispensed = f.dispensedItems.reduce((sum, tx) => sum + tx.totalQuantity, 0);
+                                                            return (
+                                                                <TableRow key={f.id}>
+                                                                    <TableCell>
+                                                                        <div>{f.productName}</div>
+                                                                        <div className="text-xs text-muted-foreground">{f.productId}</div>
+                                                                    </TableCell>
+                                                                    <TableCell>{f.department}</TableCell>
+                                                                    <TableCell>
+                                                                        <Badge variant="outline">{dispensed} / {f.totalQuantityRequested}</Badge>
+                                                                    </TableCell>
+                                                                    <TableCell className="text-right">
+                                                                        <Button size="sm" onClick={() => handleDispenseForFulfillment(f)}>
+                                                                            Dispense Items
+                                                                        </Button>
+                                                                    </TableCell>
+                                                                </TableRow>
+                                                            )
+                                                        })
+                                                    ) : (
+                                                        <TableRow>
+                                                            <TableCell colSpan={4} className="h-24 text-center">No requests are currently in progress.</TableCell>
+                                                        </TableRow>
+                                                    )}
+                                                </TableBody>
+                                            </Table>
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            </TabsContent>
+                        )}
                         {user.role === 'Admin' && 
                             <TabsContent value="transactions">
                                 <Card>
@@ -1164,7 +1254,7 @@ export default function InventoryPage() {
                 if (!isOpen) {
                     setIsTransactionFormOpen(false);
                     setProductForTransaction(null);
-                    setRequestToFulfill(null);
+                    setFulfillmentToUpdate(null);
                 } else {
                     setIsTransactionFormOpen(true);
                 }
@@ -1181,7 +1271,7 @@ export default function InventoryPage() {
                             onCancel={() => {
                                 setIsTransactionFormOpen(false);
                                 setProductForTransaction(null);
-                                setRequestToFulfill(null);
+                                setFulfillmentToUpdate(null);
                             }}
                             isSaving={isSaving}
                         />
