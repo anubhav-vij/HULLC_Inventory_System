@@ -1,3 +1,4 @@
+
 "use client";
 
 import React from 'react';
@@ -16,6 +17,7 @@ import { type Product, ProductFormSchema, type ProductFormData, ProductFormCreat
 import { Separator } from "./ui/separator";
 import { deleteFile, storeFile } from '@/lib/file-store';
 import { useToast } from '@/hooks/use-toast';
+import { Textarea } from './ui/textarea';
 
 type ProductFormProps = {
   product?: Product | null;
@@ -38,13 +40,14 @@ export function ProductForm({ product, onSave, onCancel, isSaving }: ProductForm
         receiptDate: lot.receiptDate ? new Date(lot.receiptDate) : new Date(),
         expirationDate: lot.expirationDate ? new Date(lot.expirationDate) : null,
         file: lot.file,
+        notes: lot.notes || '',
       }))
     } : {
       name: "",
       vendor: "",
       vendorPartNumber: "",
       reorderThreshold: null,
-      lots: [{ lotNumber: "", quantity: 1, receiptDate: new Date(), expirationDate: null, location: "", file: null }],
+      lots: [{ lotNumber: "", quantity: 1, receiptDate: new Date(), expirationDate: null, location: "", file: null, notes: "" }],
     },
   });
 
@@ -247,7 +250,7 @@ export function ProductForm({ product, onSave, onCancel, isSaving }: ProductForm
                       name={`lots.${index}.expirationDate`}
                       render={({ field }) => (
                         <FormItem className="flex flex-col">
-                          <FormLabel>Expiration Date</FormLabel>
+                          <FormLabel>Expiration Date (Optional)</FormLabel>
                           <Popover>
                             <PopoverTrigger asChild>
                               <FormControl>
@@ -278,7 +281,7 @@ export function ProductForm({ product, onSave, onCancel, isSaving }: ProductForm
                         name={`lots.${index}.file`}
                         render={({ field }) => (
                           <FormItem>
-                              <FormLabel>Lot File</FormLabel>
+                              <FormLabel>Lot File (Optional)</FormLabel>
                               {field.value ? (
                                   <div className="flex items-center justify-between p-2 border rounded-md">
                                       <div className="flex items-center gap-2 truncate">
@@ -310,6 +313,17 @@ export function ProductForm({ product, onSave, onCancel, isSaving }: ProductForm
                         )}
                       />
                   </div>
+                   <FormField
+                      control={form.control}
+                      name={`lots.${index}.notes`}
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Notes (Optional)</FormLabel>
+                          <FormControl><Textarea placeholder="e.g., QC passed on..." {...field} /></FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
                   <Button
                       type="button"
                       variant="outline"
@@ -323,7 +337,7 @@ export function ProductForm({ product, onSave, onCancel, isSaving }: ProductForm
                 </div>
               ))}
               <div className="flex justify-start">
-                  <Button type="button" variant="secondary" onClick={() => append({ id: uuidv4(), lotNumber: '', quantity: 1, receiptDate: new Date(), expirationDate: null, location: '', file: null })}>
+                  <Button type="button" variant="secondary" onClick={() => append({ id: uuidv4(), lotNumber: '', quantity: 1, receiptDate: new Date(), expirationDate: null, location: '', file: null, notes: '' })}>
                       <PlusCircle className="mr-2 h-4 w-4" /> Add Another Lot
                   </Button>
               </div>
@@ -341,5 +355,7 @@ export function ProductForm({ product, onSave, onCancel, isSaving }: ProductForm
     </Form>
   );
 }
+
+    
 
     

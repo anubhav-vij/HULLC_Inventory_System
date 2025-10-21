@@ -26,6 +26,8 @@ import { deleteFile, getFile } from '@/lib/file-store';
 import { Input } from '@/components/ui/input';
 import { DepartmentalPage } from './departmental-page';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import { Textarea } from './ui/textarea';
+import { Label } from './ui/label';
 
 const initialProducts: Product[] = [
     {
@@ -35,8 +37,8 @@ const initialProducts: Product[] = [
         vendorPartNumber: "Part 001",
         reorderThreshold: 20,
         lots: [
-            { id: uuidv4(), lotNumber: "Lot 1", quantity: 100, receiptDate: new Date("2025-02-25"), expirationDate: new Date("2026-02-28"), location: "Room 1", file: null },
-            { id: uuidv4(), lotNumber: "Lot 2", quantity: 10, receiptDate: new Date("2025-02-02"), expirationDate: new Date("2025-03-03"), location: "Room 2", file: null },
+            { id: uuidv4(), lotNumber: "Lot 1", quantity: 100, receiptDate: new Date("2025-02-25"), expirationDate: new Date("2026-02-28"), location: "Room 1", file: null, notes: "Initial stock" },
+            { id: uuidv4(), lotNumber: "Lot 2", quantity: 10, receiptDate: new Date("2025-02-02"), expirationDate: new Date("2025-03-03"), location: "Room 2", file: null, notes: "" },
         ]
     },
     {
@@ -46,7 +48,7 @@ const initialProducts: Product[] = [
         vendorPartNumber: "Item-B-42",
         reorderThreshold: 100,
         lots: [
-            { id: uuidv4(), lotNumber: "Lot-XYZ", quantity: 500, receiptDate: new Date("2024-08-15"), expirationDate: new Date("2025-08-15"), location: "Warehouse 3", file: null },
+            { id: uuidv4(), lotNumber: "Lot-XYZ", quantity: 500, receiptDate: new Date("2024-08-15"), expirationDate: new Date("2025-08-15"), location: "Warehouse 3", file: null, notes: "Bulk order" },
         ]
     }
 ];
@@ -80,6 +82,7 @@ export default function InventoryPage() {
     const [productToDelete, setProductToDelete] = useState<Product | null>(null);
     const [transactionToDelete, setTransactionToDelete] = useState<Transaction | null>(null);
     const [requestToReject, setRequestToReject] = useState<ProductRequest | null>(null);
+    const [rejectionNote, setRejectionNote] = useState('');
     const [searchQuery, setSearchQuery] = useState('');
     const [loginStep, setLoginStep] = useState<'role' | 'department'>('role');
     const [selectedRole, setSelectedRole] = useState<UserRole | null>(null);
@@ -164,6 +167,7 @@ export default function InventoryPage() {
                             receiptDate: new Date(lot.receiptDate),
                             expirationDate: lot.expirationDate ? new Date(lot.expirationDate) : null,
                             file: lot.file,
+                            notes: lot.notes || '',
                         })),
                     }));
                 } else {
@@ -179,7 +183,7 @@ export default function InventoryPage() {
 
             } catch (error) {
                 console.error('Error reading from local storage', error);
-                setProducts(user.department === 'core' ? initialProducts : []);
+                setProducts(user.department === 'core' ? [] : []);
                 setTransactions([]);
                 setProductRequests([]);
             }
@@ -448,6 +452,7 @@ export default function InventoryPage() {
             ...data,
             date: new Date(),
             status: 'Pending',
+            rejectionNote: '',
         };
         setProductRequests([newRequest, ...productRequests]);
 
@@ -473,12 +478,17 @@ export default function InventoryPage() {
     
     const handleRejectRequest = (request: ProductRequest) => {
         setRequestToReject(request);
+        setRejectionNote('');
     };
     
     const handleConfirmRejectRequest = () => {
         if (!requestToReject) return;
+        if (!rejectionNote.trim()) {
+            toast({ title: "Note Required", description: "Please provide a reason for rejecting the request.", variant: "destructive" });
+            return;
+        }
         setProductRequests(productRequests.map(r => 
-            r.id === requestToReject.id ? { ...r, status: 'Rejected' } : r
+            r.id === requestToReject.id ? { ...r, status: 'Rejected', rejectionNote } : r
         ));
         toast({ title: "Request Rejected" });
         setRequestToReject(null);
@@ -500,7 +510,7 @@ export default function InventoryPage() {
                 try {
                     const requiredHeaders = [
                         'product_id', 'product_name', 'vendor', 'vendor_part_number', 'location', 
-                        'lot_number', 'quantity', 'receipt_date', 'expiration_date', 'reorder_threshold'
+                        'lot_number', 'quantity', 'receipt_date', 'expiration_date', 'reorder_threshold', 'notes'
                     ];
                     const headers = results.meta.fields || [];
                     if (!requiredHeaders.every(h => headers.includes(h))) {
@@ -512,7 +522,7 @@ export default function InventoryPage() {
                     for (const row of results.data) {
                         const {
                             product_id, product_name, vendor, vendor_part_number, location,
-                            lot_number, quantity, receipt_date, expiration_date, reorder_threshold
+                            lot_number, quantity, receipt_date, expiration_date, reorder_threshold, notes
                         } = row;
 
                         if (!product_id || !product_name || !lot_number) continue;
@@ -525,6 +535,7 @@ export default function InventoryPage() {
                             expirationDate: expiration_date ? new Date(expiration_date) : null,
                             location: location,
                             file: null,
+                            notes: notes || '',
                         };
 
                         if (importedProductsMap.has(product_id)) {
@@ -593,6 +604,7 @@ export default function InventoryPage() {
                 'expiration_date': lot.expirationDate && isValid(lot.expirationDate) ? format(lot.expirationDate, 'yyyy-MM-dd') : '',
                 'location': lot.location,
                 'file_name': lot.file?.name ?? '',
+                'notes': lot.notes ?? '',
             }))
         );
     
@@ -943,6 +955,7 @@ export default function InventoryPage() {
                                                                                             <TableHead>Expiration Date</TableHead>
                                                                                             <TableHead>Storage Location</TableHead>
                                                                                             <TableHead>File</TableHead>
+                                                                                            <TableHead>Notes</TableHead>
                                                                                         </TableRow>
                                                                                     </TableHeader>
                                                                                     <TableBody>
@@ -963,6 +976,7 @@ export default function InventoryPage() {
                                                                                                         <span className="text-muted-foreground text-xs">No file</span>
                                                                                                     )}
                                                                                                 </TableCell>
+                                                                                                <TableCell className="text-xs text-muted-foreground">{lot.notes || 'N/A'}</TableCell>
                                                                                             </TableRow>
                                                                                         ))}
                                                                                     </TableBody>
@@ -1214,7 +1228,7 @@ export default function InventoryPage() {
                     </DialogHeader>
                     <div className="text-sm bg-muted p-4 rounded-md overflow-x-auto">
                         <code className="font-mono whitespace-nowrap">
-                            product_id,product_name,vendor,vendor_part_number,location,lot_number,quantity,receipt_date,expiration_date,reorder_threshold
+                            product_id,product_name,vendor,vendor_part_number,location,lot_number,quantity,receipt_date,expiration_date,reorder_threshold,notes
                         </code>
                     </div>
                     <p className="text-sm text-muted-foreground">
@@ -1263,10 +1277,19 @@ export default function InventoryPage() {
             <AlertDialog open={!!requestToReject} onOpenChange={(open) => !open && setRequestToReject(null)}>
                 <AlertDialogContent>
                     <AlertDialogHeader>
-                        <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                        <AlertDialogTitle>Reject Request</AlertDialogTitle>
                         <AlertDialogDescription>
-                            This action will mark the request from {requestToReject?.requestorName} as 'Rejected'. This cannot be undone.
+                            Provide a mandatory reason for rejecting this request from {requestToReject?.requestorName}.
                         </AlertDialogDescription>
+                        <div className="space-y-2 pt-2">
+                             <Label htmlFor="rejection-note" className="sr-only">Rejection Note</Label>
+                             <Textarea
+                                id="rejection-note"
+                                placeholder="e.g., Request exceeds quarterly budget..."
+                                value={rejectionNote}
+                                onChange={(e) => setRejectionNote(e.target.value)}
+                             />
+                        </div>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                         <AlertDialogCancel onClick={() => setRequestToReject(null)}>Cancel</AlertDialogCancel>
@@ -1277,5 +1300,7 @@ export default function InventoryPage() {
         </div>
     );
 }
+
+    
 
     

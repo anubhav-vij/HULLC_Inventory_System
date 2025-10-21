@@ -1,3 +1,4 @@
+
 "use client";
 
 import React from 'react';
@@ -142,10 +143,13 @@ export function TransactionForm({ product, onSave, onCancel, isSaving }: Transac
             <Button type="button" variant="ghost" onClick={onCancel} disabled={isSaving}>Cancel</Button>
             <Button type="submit" disabled={isSaving || totalDispensed === 0}>
                 {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {isSaving ? 'Saving...' : 'Save Transaction'}
+                {isSaving ? 'Completing...' : 'Complete Transaction'}
             </Button>
         </div>
       </form>
     </Form>
   );
 }
+
+
+    

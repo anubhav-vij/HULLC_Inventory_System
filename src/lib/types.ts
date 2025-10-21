@@ -1,4 +1,5 @@
 
+
 import { z } from 'zod';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -16,6 +17,7 @@ export const LotSchema = z.object({
   expirationDate: z.date().nullable().default(null),
   location: z.string().min(1, "Storage location is required."),
   file: LotFileSchema.nullable().default(null),
+  notes: z.string().optional(),
 });
 
 export const NewLotSchema = LotSchema.extend({
@@ -112,6 +114,7 @@ export const ProductRequestSchema = ProductRequestFormSchema.extend({
     productName: z.string(),
     date: z.date(),
     status: ProductRequestStatusSchema,
+    rejectionNote: z.string().optional(),
 });
 
 
@@ -156,3 +159,5 @@ export type DepartmentalTransaction = {
     type: 'Consumption' | 'Adjustment';
     adjustmentType?: 'add' | 'remove';
 }
+
+    
