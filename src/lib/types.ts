@@ -89,6 +89,7 @@ export const TransactionSchema = z.object({
     totalQuantity: z.number(),
     requestorName: z.string().optional(),
     department: z.string().optional(),
+    fulfillmentId: z.string().optional(),
 });
 
 export const DEPARTMENTS = ["HULLC", "Cardiology", "Neurology", "Oncology", "Pediatrics", "Research & Development"] as const;
@@ -106,7 +107,7 @@ export const ProductRequestFormSchema = z.object({
   }),
 });
 
-export const ProductRequestStatusSchema = z.enum(['Pending', 'Completed', 'Rejected']);
+export const ProductRequestStatusSchema = z.enum(['Pending', 'In Progress', 'Completed', 'Rejected']);
 
 export const ProductRequestSchema = ProductRequestFormSchema.extend({
     id: z.string(),
@@ -115,6 +116,16 @@ export const ProductRequestSchema = ProductRequestFormSchema.extend({
     date: z.date(),
     status: ProductRequestStatusSchema,
     rejectionNote: z.string().optional(),
+});
+
+export const FulfillmentSchema = z.object({
+    id: z.string(),
+    requestId: z.string(),
+    productId: z.string(),
+    productName: z.string(),
+    department: z.string(),
+    totalQuantityRequested: z.number(),
+    dispensedItems: z.array(TransactionSchema),
 });
 
 
@@ -131,6 +142,7 @@ export type TransactionFormData = {
 export type ProductRequestFormData = z.infer<typeof ProductRequestFormSchema>;
 export type ProductRequest = z.infer<typeof ProductRequestSchema>;
 export type ProductRequestStatus = z.infer<typeof ProductRequestStatusSchema>;
+export type Fulfillment = z.infer<typeof FulfillmentSchema>;
 
 
 export type UserRole = 'Admin' | 'Staff';
@@ -159,5 +171,3 @@ export type DepartmentalTransaction = {
     type: 'Consumption' | 'Adjustment';
     adjustmentType?: 'add' | 'remove';
 }
-
-    
