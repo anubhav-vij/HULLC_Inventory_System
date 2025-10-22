@@ -98,6 +98,28 @@ export default function InventoryPage() {
     const requestsStorageKey = `${REQUESTS_STORAGE_KEY_PREFIX}-${department}`;
     const fulfillmentsStorageKey = `${FULFILLMENTS_STORAGE_KEY_PREFIX}-${department}`;
 
+    const totalQuantity = (lots: Lot[]) => lots.reduce((sum, lot) => sum + lot.quantity, 0);
+
+    const productDemand = useMemo(() => {
+        const demandMap = new Map<string, number>();
+
+        productRequests.forEach(req => {
+            if (req.status === 'Pending') {
+                demandMap.set(req.productId, (demandMap.get(req.productId) || 0) + req.quantity);
+            }
+        });
+
+        fulfillments.forEach(f => {
+            const dispensed = f.dispensedItems.reduce((sum, tx) => sum + tx.totalQuantity, 0);
+            const remainingToDispense = f.totalQuantityRequested - dispensed;
+            if (remainingToDispense > 0) {
+                demandMap.set(f.productId, (demandMap.get(f.productId) || 0) + remainingToDispense);
+            }
+        });
+
+        return demandMap;
+    }, [productRequests, fulfillments]);
+
     const filteredProducts = useMemo(() => {
         if (!searchQuery) {
             return products;
@@ -716,8 +738,6 @@ export default function InventoryPage() {
         }
     };
 
-    const totalQuantity = (lots: Lot[]) => lots.reduce((sum, lot) => sum + lot.quantity, 0);
-    
     const getDisplayLocation = (lots: Lot[]) => {
         if (!lots || lots.length === 0) return 'N/A';
         const uniqueLocations = [...new Set(lots.map(lot => lot.location))];
@@ -827,7 +847,7 @@ export default function InventoryPage() {
         return <DepartmentalPage user={user} onLogout={handleLogout} />;
     }
 
-    const inventoryColSpan = user.role === 'Admin' ? 7 : 4;
+    const inventoryColSpan = user.role === 'Admin' ? 8 : 4;
 
     return (
         <div className="min-h-screen w-full bg-background flex flex-col items-center p-4 sm:p-6 lg:p-8">
@@ -901,6 +921,7 @@ export default function InventoryPage() {
                                                     <TableHead>Vendor</TableHead>
                                                     <TableHead>Vendor Part #</TableHead>
                                                     {user.role === 'Admin' && <TableHead>Total Quantity</TableHead>}
+                                                    {user.role === 'Admin' && <TableHead>Needed</TableHead>}
                                                     {user.role === 'Admin' && <TableHead>Storage Location</TableHead>}
                                                     {user.role === 'Admin' ? 
                                                         <TableHead className="w-[100px] text-right">Actions</TableHead> :
@@ -914,6 +935,8 @@ export default function InventoryPage() {
                                                         const outOfStock = isProductOutOfStock(product);
                                                         const isExpiredFlag = !outOfStock && isProductExpired(product);
                                                         const isOpen = openProductIds.has(product.id);
+                                                        const demand = productDemand.get(product.id) || 0;
+                                                        const needed = Math.max(0, demand - totalQuantity(product.lots));
                                                         
                                                         return (
                                                             <React.Fragment key={product.id}>
@@ -952,6 +975,23 @@ export default function InventoryPage() {
                                                                                     </Tooltip>
                                                                                 )}
                                                                             </div>
+                                                                        </TableCell>
+                                                                    )}
+                                                                    {user.role === 'Admin' && (
+                                                                        <TableCell>
+                                                                            {needed > 0 ? (
+                                                                                <Tooltip>
+                                                                                    <TooltipTrigger className="flex items-center gap-2">
+                                                                                        <Badge variant="destructive">{needed}</Badge>
+                                                                                        <AlertTriangle className="h-4 w-4 text-destructive" />
+                                                                                    </TooltipTrigger>
+                                                                                    <TooltipContent>
+                                                                                        <p>{demand} items requested, only {totalQuantity(product.lots)} in stock.</p>
+                                                                                    </TooltipContent>
+                                                                                </Tooltip>
+                                                                            ) : (
+                                                                                <span className="text-muted-foreground">-</span>
+                                                                            )}
                                                                         </TableCell>
                                                                     )}
                                                                     {user.role === 'Admin' && (
