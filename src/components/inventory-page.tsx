@@ -84,6 +84,7 @@ export default function InventoryPage() {
     const [productToDelete, setProductToDelete] = useState<Product | null>(null);
     const [transactionToDelete, setTransactionToDelete] = useState<Transaction | null>(null);
     const [requestToReject, setRequestToReject] = useState<ProductRequest | null>(null);
+    const [fulfillmentToCancel, setFulfillmentToCancel] = useState<Fulfillment | null>(null);
     const [rejectionNote, setRejectionNote] = useState('');
     const [searchQuery, setSearchQuery] = useState('');
     const [loginStep, setLoginStep] = useState<'role' | 'department'>('role');
@@ -104,21 +105,13 @@ export default function InventoryPage() {
         const demandMap = new Map<string, number>();
 
         productRequests.forEach(req => {
-            if (req.status === 'Pending') {
+            if (req.status === 'Pending' || req.status === 'In Progress') {
                 demandMap.set(req.productId, (demandMap.get(req.productId) || 0) + req.quantity);
             }
         });
-
-        fulfillments.forEach(f => {
-            const dispensed = f.dispensedItems.reduce((sum, tx) => sum + tx.totalQuantity, 0);
-            const remainingToDispense = f.totalQuantityRequested - dispensed;
-            if (remainingToDispense > 0) {
-                demandMap.set(f.productId, (demandMap.get(f.productId) || 0) + remainingToDispense);
-            }
-        });
-
+        
         return demandMap;
-    }, [productRequests, fulfillments]);
+    }, [productRequests]);
 
     const filteredProducts = useMemo(() => {
         if (!searchQuery) {
@@ -548,6 +541,23 @@ export default function InventoryPage() {
         ));
         toast({ title: "Request Rejected" });
         setRequestToReject(null);
+    };
+
+    const handleCancelFulfillment = (fulfillment: Fulfillment) => {
+        setFulfillmentToCancel(fulfillment);
+    };
+    
+    const handleConfirmCancelFulfillment = () => {
+        if (!fulfillmentToCancel) return;
+        
+        setProductRequests(productRequests.map(r => 
+            r.id === fulfillmentToCancel.requestId ? { ...r, status: 'Completed' } : r
+        ));
+
+        setFulfillments(fulfillments.filter(f => f.id !== fulfillmentToCancel.id));
+        
+        toast({ title: "Fulfillment Cancelled", description: `The fulfillment for "${fulfillmentToCancel.productName}" has been cancelled.` });
+        setFulfillmentToCancel(null);
     };
 
     const handleImportClick = () => {
@@ -1167,9 +1177,14 @@ export default function InventoryPage() {
                                                                         <Badge variant="outline">{dispensed} / {f.totalQuantityRequested}</Badge>
                                                                     </TableCell>
                                                                     <TableCell className="text-right">
-                                                                        <Button size="sm" onClick={() => handleDispenseForFulfillment(f)}>
-                                                                            Dispense Items
-                                                                        </Button>
+                                                                        <div className="flex gap-2 justify-end">
+                                                                            <Button size="sm" variant="outline" onClick={() => handleCancelFulfillment(f)}>
+                                                                                Cancel
+                                                                            </Button>
+                                                                            <Button size="sm" onClick={() => handleDispenseForFulfillment(f)}>
+                                                                                Dispense Items
+                                                                            </Button>
+                                                                        </div>
                                                                     </TableCell>
                                                                 </TableRow>
                                                             )
@@ -1425,14 +1440,21 @@ export default function InventoryPage() {
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
+
+             <AlertDialog open={!!fulfillmentToCancel} onOpenChange={(open) => !open && setFulfillmentToCancel(null)}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            This will cancel the remainder of the fulfillment for "{fulfillmentToCancel?.productName}". The original request will be marked as completed based on items already dispensed. This action cannot be undone.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel onClick={() => setFulfillmentToCancel(null)}>Nevermind</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleConfirmCancelFulfillment}>Confirm Cancellation</AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
         </div>
     );
 }
-
-    
-
-    
-
-
-
-    
