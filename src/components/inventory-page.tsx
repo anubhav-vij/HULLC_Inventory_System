@@ -81,6 +81,7 @@ export default function InventoryPage() {
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [openProductIds, setOpenProductIds] = useState<Set<string>>(new Set());
     const [openTransactionIds, setOpenTransactionIds] = useState<Set<string>>(new Set());
+    const [openRequestIds, setOpenRequestIds] = useState<Set<string>>(new Set());
     const [productToDelete, setProductToDelete] = useState<Product | null>(null);
     const [transactionToDelete, setTransactionToDelete] = useState<Transaction | null>(null);
     const [requestToReject, setRequestToReject] = useState<ProductRequest | null>(null);
@@ -144,6 +145,18 @@ export default function InventoryPage() {
                 newSet.delete(transactionId);
             } else {
                 newSet.add(transactionId);
+            }
+            return newSet;
+        });
+    };
+
+    const toggleRequestCollapse = (requestId: string) => {
+        setOpenRequestIds(prev => {
+            const newSet = new Set(prev);
+            if (newSet.has(requestId)) {
+                newSet.delete(requestId);
+            } else {
+                newSet.add(requestId);
             }
             return newSet;
         });
@@ -858,6 +871,7 @@ export default function InventoryPage() {
     }
 
     const inventoryColSpan = user.role === 'Admin' ? 8 : 4;
+    const requestsColSpan = 7;
 
     return (
         <div className="min-h-screen w-full bg-background flex flex-col items-center p-4 sm:p-6 lg:p-8">
@@ -1099,6 +1113,7 @@ export default function InventoryPage() {
                                         <Table>
                                             <TableHeader>
                                                 <TableRow>
+                                                    <TableHead className="w-[50px]"></TableHead>
                                                     <TableHead>Requestor</TableHead>
                                                     <TableHead>Product</TableHead>
                                                     <TableHead>Qty Req.</TableHead>
@@ -1109,32 +1124,65 @@ export default function InventoryPage() {
                                             </TableHeader>
                                             <TableBody>
                                                 {productRequests.length > 0 ? (
-                                                    productRequests.map(req => (
-                                                        <TableRow key={req.id}>
-                                                            <TableCell>
-                                                                <div>{req.requestorName}</div>
-                                                                <div className="text-xs text-muted-foreground">{req.department}</div>
-                                                            </TableCell>
-                                                            <TableCell>
-                                                                <div>{req.productName}</div>
-                                                                <div className="text-xs text-muted-foreground">{req.productId}</div>
-                                                            </TableCell>
-                                                            <TableCell>{req.quantity}</TableCell>
-                                                            <TableCell>{format(req.date, 'PPP')}</TableCell>
-                                                            <TableCell>{getStatusBadge(req.status)}</TableCell>
-                                                            <TableCell className="text-right">
-                                                                {req.status === 'Pending' && (
-                                                                    <div className="flex gap-2 justify-end">
-                                                                        <Button size="sm" variant="outline" onClick={() => handleRejectRequest(req)}>Reject</Button>
-                                                                        <Button size="sm" onClick={() => handleFulfillRequest(req)}>Fulfill</Button>
-                                                                    </div>
+                                                    productRequests.map(req => {
+                                                         const isOpen = openRequestIds.has(req.id);
+                                                         return (
+                                                            <React.Fragment key={req.id}>
+                                                                <TableRow data-state={isOpen ? 'open' : 'closed'}>
+                                                                    <TableCell>
+                                                                        <Button variant="ghost" size="sm" className="w-9 p-0 data-[state=open]:rotate-90" onClick={() => toggleRequestCollapse(req.id)} data-state={isOpen ? 'open' : 'closed'}>
+                                                                            <ChevronsUpDown className="h-4 w-4" />
+                                                                            <span className="sr-only">Toggle</span>
+                                                                        </Button>
+                                                                    </TableCell>
+                                                                    <TableCell>
+                                                                        <div>{req.requestorName}</div>
+                                                                        <div className="text-xs text-muted-foreground">{req.department}</div>
+                                                                    </TableCell>
+                                                                    <TableCell>
+                                                                        <div>{req.productName}</div>
+                                                                        <div className="text-xs text-muted-foreground">{req.productId}</div>
+                                                                    </TableCell>
+                                                                    <TableCell>{req.quantity}</TableCell>
+                                                                    <TableCell>{format(req.date, 'PPP')}</TableCell>
+                                                                    <TableCell>{getStatusBadge(req.status)}</TableCell>
+                                                                    <TableCell className="text-right">
+                                                                        {req.status === 'Pending' && (
+                                                                            <div className="flex gap-2 justify-end">
+                                                                                <Button size="sm" variant="outline" onClick={() => handleRejectRequest(req)}>Reject</Button>
+                                                                                <Button size="sm" onClick={() => handleFulfillRequest(req)}>Fulfill</Button>
+                                                                            </div>
+                                                                        )}
+                                                                    </TableCell>
+                                                                </TableRow>
+                                                                {isOpen && (
+                                                                    <TableRow className="bg-muted/50 hover:bg-muted/50">
+                                                                        <TableCell colSpan={requestsColSpan} className="p-4">
+                                                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-2">
+                                                                                <div>
+                                                                                    <h4 className="font-semibold text-xs mb-1">Project</h4>
+                                                                                    <p className="text-sm">{req.project}</p>
+                                                                                </div>
+                                                                                 <div>
+                                                                                    <h4 className="font-semibold text-xs mb-1">Justification</h4>
+                                                                                    <p className="text-sm text-muted-foreground">{req.justification}</p>
+                                                                                </div>
+                                                                                 {req.status === 'Rejected' && req.rejectionNote && (
+                                                                                     <div className="col-span-2">
+                                                                                         <h4 className="font-semibold text-xs mb-1 text-destructive">Rejection Note</h4>
+                                                                                         <p className="text-sm text-destructive/80">{req.rejectionNote}</p>
+                                                                                     </div>
+                                                                                 )}
+                                                                            </div>
+                                                                        </TableCell>
+                                                                    </TableRow>
                                                                 )}
-                                                            </TableCell>
-                                                        </TableRow>
-                                                    ))
+                                                            </React.Fragment>
+                                                        )
+                                                    })
                                                 ) : (
                                                     <TableRow>
-                                                        <TableCell colSpan={6} className="h-24 text-center">No product requests have been submitted yet.</TableCell>
+                                                        <TableCell colSpan={requestsColSpan} className="h-24 text-center">No product requests have been submitted yet.</TableCell>
                                                     </TableRow>
                                                 )}
                                             </TableBody>
