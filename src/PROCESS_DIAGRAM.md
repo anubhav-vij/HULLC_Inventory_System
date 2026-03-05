@@ -1,6 +1,6 @@
-# StockPilot Process Diagram
+# HULLC Inventory Management System Process Diagram
 
-This document outlines the primary user workflows for the StockPilot inventory management system, separated by user role, using PlantUML syntax.
+This document outlines the primary user workflows for the HULLC Inventory Management System, separated by user role, using PlantUML syntax.
 
 ## Admin Workflow
 

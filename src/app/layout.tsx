@@ -3,8 +3,8 @@ import './globals.css';
 import { Toaster } from "@/components/ui/toaster"
 
 export const metadata: Metadata = {
-  title: 'StockPilot',
-  description: 'Inventory Management System',
+  title: 'HULLC Inventory Management System',
+  description: 'HULLC Inventory Management System',
 };
 
 export default function RootLayout({

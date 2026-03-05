@@ -15,7 +15,7 @@ import { ProductForm } from './product-form';
 import { TransactionForm } from './transaction-form';
 import { RequestForm } from './request-form';
 import { type Product, type Lot, type ProductFormData, type Transaction, type TransactionFormData, type User, type UserRole, type ProductRequest, type ProductRequestFormData, type ProductRequestStatus, DEPARTMENTS, type DepartmentalProduct, type Fulfillment } from '@/lib/types';
-import { StockPilotLogo } from './icons';
+import { HullcLogo } from './icons';
 import { useToast } from '@/hooks/use-toast';
 import { v4 as uuidv4 } from 'uuid';
 import { format, isValid } from 'date-fns';
@@ -53,12 +53,12 @@ const initialProducts: Product[] = [
     }
 ];
 
-const PRODUCTS_STORAGE_KEY_PREFIX = 'stockpilot-products-data';
-const TRANSACTIONS_STORAGE_KEY_PREFIX = 'stockpilot-transactions-data';
-const REQUESTS_STORAGE_KEY_PREFIX = 'stockpilot-requests-data';
-const FULFILLMENTS_STORAGE_KEY_PREFIX = 'stockpilot-fulfillments-data';
-const USER_STORAGE_KEY = 'stockpilot-user-data';
-const DEPT_PRODUCTS_STORAGE_KEY_PREFIX = 'stockpilot-dept-products';
+const PRODUCTS_STORAGE_KEY_PREFIX = 'hullc-products-data';
+const TRANSACTIONS_STORAGE_KEY_PREFIX = 'hullc-transactions-data';
+const REQUESTS_STORAGE_KEY_PREFIX = 'hullc-requests-data';
+const FULFILLMENTS_STORAGE_KEY_PREFIX = 'hullc-fulfillments-data';
+const USER_STORAGE_KEY = 'hullc-user-data';
+const DEPT_PRODUCTS_STORAGE_KEY_PREFIX = 'hullc-dept-products';
 
 
 export default function InventoryPage() {
@@ -818,7 +818,7 @@ export default function InventoryPage() {
                     <Card className="w-full max-w-sm">
                         <CardHeader className="text-center">
                             <div className="flex justify-center items-center gap-3 mb-4">
-                                <StockPilotLogo className="h-8 w-8 text-primary" />
+                                <HullcLogo className="h-8 w-8 text-primary" />
                                 <CardTitle className="text-2xl">{selectedRole === 'Admin' ? 'Select System' : 'Select Department'}</CardTitle>
                             </div>
                             <CardDescription>
@@ -851,8 +851,8 @@ export default function InventoryPage() {
                 <Card className="w-full max-w-sm">
                     <CardHeader className="text-center">
                         <div className="flex justify-center items-center gap-3 mb-4">
-                            <StockPilotLogo className="h-8 w-8 text-primary" />
-                            <CardTitle className="text-2xl">StockPilot</CardTitle>
+                            <HullcLogo className="h-8 w-8 text-primary" />
+                            <CardTitle className="text-2xl">HULLC Inventory Management System</CardTitle>
                         </div>
                         <CardDescription>Select a role to sign in.</CardDescription>
                     </CardHeader>
@@ -879,7 +879,7 @@ export default function InventoryPage() {
             <TooltipProvider>
                 <main className="w-full max-w-7xl mx-auto">
                     <div className="flex items-center gap-3 mb-8">
-                        <StockPilotLogo className="h-8 w-8 text-primary" />
+                        <HullcLogo className="h-8 w-8 text-primary" />
                         <h1 className="text-3xl font-bold text-foreground">Core Inventory</h1>
                          <div className="ml-auto flex items-center gap-4 text-sm">
                             <div className="text-right">

@@ -1,4 +1,4 @@
-# Product Requirements Document: StockPilot Inventory Management System
+# Product Requirements Document: HULLC Inventory Management System
 
 **Version:** 1.0
 **Status:** Live
@@ -7,7 +7,7 @@
 
 ### 1. Overview
 
-StockPilot is a specialized web-based inventory management system designed to provide streamlined tracking of products and their associated lots. The application is built around a role-based access control system, offering distinct functionalities for administrators who manage the inventory and staff members who request materials. Key features include detailed lot-level tracking with file attachments, visual status alerts for stock levels and expirations, a formal product request workflow, and robust data management capabilities for administrators.
+HULLC Inventory Management System is a specialized web-based inventory management system designed to provide streamlined tracking of products and their associated lots. The application is built around a role-based access control system, offering distinct functionalities for administrators who manage the inventory and staff members who request materials. Key features include detailed lot-level tracking with file attachments, visual status alerts for stock levels and expirations, a formal product request workflow, and robust data management capabilities for administrators.
 
 ### 2. User Roles & Permissions
 

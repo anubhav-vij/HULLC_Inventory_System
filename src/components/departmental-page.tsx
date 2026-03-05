@@ -9,7 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Badge } from '@/components/ui/badge';
 import { Package, ArrowRightLeft, Loader2, Search, LogOut, History, Warehouse, Edit, Settings } from 'lucide-react';
 import { type DepartmentalProduct, type DepartmentalTransaction, type User } from '@/lib/types';
-import { StockPilotLogo } from './icons';
+import { HullcLogo } from './icons';
 import { useToast } from '@/hooks/use-toast';
 import { v4 as uuidv4 } from 'uuid';
 import { Input } from '@/components/ui/input';
@@ -19,8 +19,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { RadioGroup, RadioGroupItem } from './ui/radio-group';
 import { Textarea } from './ui/textarea';
 
-const DEPT_PRODUCTS_STORAGE_KEY_PREFIX = 'stockpilot-dept-products';
-const DEPT_TRANSACTIONS_STORAGE_KEY_PREFIX = 'stockpilot-dept-transactions';
+const DEPT_PRODUCTS_STORAGE_KEY_PREFIX = 'hullc-dept-products';
+const DEPT_TRANSACTIONS_STORAGE_KEY_PREFIX = 'hullc-dept-transactions';
 
 type DepartmentalPageProps = {
     user: User;
@@ -213,7 +213,7 @@ export function DepartmentalPage({ user, onLogout }: DepartmentalPageProps) {
         <div className="min-h-screen w-full bg-background flex flex-col items-center p-4 sm:p-6 lg:p-8">
             <main className="w-full max-w-7xl mx-auto space-y-6">
                 <div className="flex items-center gap-3">
-                    <StockPilotLogo className="h-8 w-8 text-primary" />
+                    <HullcLogo className="h-8 w-8 text-primary" />
                     <h1 className="text-3xl font-bold text-foreground">{department} Inventory</h1>
                     <div className="ml-auto flex items-center gap-4 text-sm">
                         <div className="text-right">

@@ -1,7 +1,7 @@
 
-# StockPilot E2E Test Plan
+# HULLC Inventory Management System E2E Test Plan
 
-This document outlines the manual end-to-end test cases for the StockPilot inventory management application.
+This document outlines the manual end-to-end test cases for the HULLC Inventory Management System application.
 
 ---
 
