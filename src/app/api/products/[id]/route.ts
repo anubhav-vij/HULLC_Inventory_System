@@ -206,17 +206,19 @@ export async function DELETE(_request: Request, { params }: RouteContext) {
   } catch (error) {
     console.error(`[api/products/${id}] DELETE error:`, error);
 
-    // PostgreSQL error code 23503 = foreign_key_violation
-    // Thrown when a transaction record still references this product (RESTRICT)
-    if (
-      error instanceof Error &&
-      (error as NodeJS.ErrnoException & { code?: string }).code === '23503'
-    ) {
+    // PostgreSQL error code 23503 = foreign_key_violation.
+    // pg DatabaseError exposes the SQLSTATE as .code; fall back to the message
+    // text in case the error is wrapped or the property is inaccessible.
+    const pgCode = (error as Record<string, unknown>)?.['code'];
+    const isFKViolation =
+      pgCode === '23503' ||
+      (error instanceof Error && error.message.includes('foreign key constraint'));
+    if (isFKViolation) {
       return NextResponse.json(
         {
           error:
-            'Cannot delete a product that has transaction history. ' +
-            'Delete the associated transactions first.',
+            'Cannot delete this product because other records still reference it ' +
+            '(transactions, requests, or fulfillments). Remove those first.',
         },
         { status: 409 }
       );
