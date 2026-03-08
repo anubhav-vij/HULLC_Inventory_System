@@ -62,6 +62,70 @@ The UI components and all React hooks still use localStorage. The database layer
 
 ---
 
+## Session 3 — 2026-03-07
+
+### What was accomplished
+
+**inventory-page.tsx fully migrated from localStorage to real API calls.**
+
+All 14 mutating handlers and the data-loading effect now use `fetch()` against the REST API:
+
+| Handler | API call |
+|---------|----------|
+| Data load on login | `Promise.all([GET /api/products, GET /api/transactions, GET /api/requests, GET /api/fulfillments])` |
+| handleSaveProduct (add) | `POST /api/products` |
+| handleSaveProduct (edit) | `PUT /api/products/:id` |
+| handleConfirmDeleteProduct | `DELETE /api/products/:id` |
+| handleSaveTransaction (standalone) | `POST /api/transactions` |
+| handleSaveTransaction (fulfillment) | `PUT /api/fulfillments/:id` |
+| handleConfirmDeleteTransaction | `DELETE /api/transactions/:id` |
+| handleSaveRequest | `POST /api/requests` |
+| handleFulfillRequest | `POST /api/fulfillments` |
+| handleConfirmRejectRequest | `PUT /api/requests/:id` |
+| handleConfirmCancelFulfillment | `DELETE /api/fulfillments/:id` |
+| handleFileImport (CSV) | PUT for existing IDs, POST for new products |
+
+**Removed:**
+- `initialProducts` seed data (server returns real DB rows now)
+- Auto-save `useEffect` (API mutations replace it)
+- `nextProductId` useMemo (server generates sequential P-IDs)
+- Per-department localStorage key variables
+
+**Intentionally kept:**
+- User session in `localStorage` — auth migration is deferred
+- `addFulfilledItemsToDepartmentInventory` localStorage — departmental system is excluded from migration (still used by departmental-page.tsx)
+
+**Bug fixed:**
+- Pre-existing TypeScript error in `handleDepartmentSelect`: `User.department` was typed as a strict union but `department: string` parameter was passed directly; fixed with `as User['department']` cast.
+
+**Behavioral change from localStorage version:**
+- Fulfillment dispense via `PUT /api/fulfillments/:id` always marks the request `Completed` immediately. The old UI had partial-fulfillment logic (accumulate multiple dispenses until totalFulfilled ≥ totalQuantityRequested). The API is single-shot by design — one call completes the fulfillment.
+
+### Current state of the codebase
+
+    src/app/api/health/route.ts                     GET /api/health
+    src/app/api/products/route.ts                   GET /api/products, POST /api/products
+    src/app/api/products/[id]/route.ts              GET, PUT, DELETE /api/products/:id
+    src/app/api/transactions/route.ts               GET /api/transactions, POST /api/transactions
+    src/app/api/transactions/[id]/route.ts          DELETE /api/transactions/:id
+    src/app/api/requests/route.ts                   GET /api/requests, POST /api/requests
+    src/app/api/requests/[id]/route.ts              GET, PUT, DELETE /api/requests/:id
+    src/app/api/fulfillments/route.ts               GET /api/fulfillments, POST /api/fulfillments
+    src/app/api/fulfillments/[id]/route.ts          PUT, DELETE /api/fulfillments/:id
+    src/components/inventory-page.tsx               ✅ fully migrated to API (no product/tx/request/fulfillment localStorage)
+    src/components/departmental-page.tsx            still uses localStorage (excluded from migration)
+
+### Next steps in order
+
+1. **End-to-end smoke test** — start the dev server (`npm run dev`), log in as Admin → Core, verify products load from DB, add/edit/delete a product, dispense a transaction, submit and fulfill a request
+2. **departmental-page.tsx** — decide if/when to migrate (currently excluded per project scope)
+3. **useUser hook / auth** — replace pick-a-role login with NIH SSO (SAML/OIDC via login.nih.gov); wire users table
+4. **Object storage** — S3 on personal AWS for lot file binaries; upload/download/delete API routes
+5. **Seed script** — migrate any existing localStorage data to PostgreSQL
+6. **Staging deploy** — personal AWS with DATABASE_URL and DATABASE_SSL env vars
+
+---
+
 ### Database state
 
 - **Provider**: PostgreSQL via DATABASE_URL environment variable
