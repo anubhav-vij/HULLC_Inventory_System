@@ -51,27 +51,27 @@ each phase sequentially, marking `[~]` while in progress and `[x]` when complete
 
 > First priority. Establishes real user accounts, roles, and functional groups that all later phases depend on. Replaces the current role-select dropdown with proper email + password login.
 
-- [ ] Create DB migration: add `functional_groups` table (id, name, is_active, created_at, updated_at)
-- [ ] Create DB migration: update `users` table with full_name, email, password_hash, functional_group_id, is_active, created_at, updated_at
-- [ ] Seed `functional_groups`: Cell Line Development, Cell Culture Development, Scientific Operations, Downstream Process Development, Formulation Development, Analytical Development, Program Management
-- [ ] Add API: `GET /api/functional-groups` — list all active groups
-- [ ] Add API: `POST /api/functional-groups` — create group (Admin only)
-- [ ] Add API: `PUT /api/functional-groups/[id]` — rename or deactivate group (Admin only)
-- [ ] Add API: `GET /api/users` — list all users (Admin only)
-- [ ] Add API: `POST /api/users` — create user with hashed password (Admin only)
-- [ ] Add API: `PUT /api/users/[id]` — edit user details, role, functional group (Admin only)
-- [ ] Add API: `PUT /api/users/[id]/status` — activate or deactivate user (Admin only)
-- [ ] Add User Management tab to UI (Admin only)
-- [ ] User table: shows name, email, role, functional group, active status
-- [ ] Add user form: full name, email, temporary password, role (Staff / Director / ProjectManager / Chief / Admin), functional group
-- [ ] Edit user form: same fields, all editable
-- [ ] Activate/deactivate toggle per user row (no hard deletes)
-- [ ] Functional Groups management section inside User Management tab (Admin only)
-- [ ] Admins can add, rename, and deactivate functional groups from the UI
-- [ ] Deactivating a group does not affect existing users already assigned to it
-- [ ] Enforce one Director per functional group — UI warning + API validation
-- [ ] Replace login screen role dropdown with email + password fields
-- [ ] On login, load full user profile (name, email, role, functional group) into session
+- [x] Create DB migration: add `functional_groups` table (id, name, is_active, created_at, updated_at)
+- [x] Create DB migration: update `users` table with full_name, email, password_hash, functional_group_id, is_active, created_at, updated_at
+- [x] Seed `functional_groups`: Cell Line Development, Cell Culture Development, Scientific Operations, Downstream Process Development, Formulation Development, Analytical Development, Program Management
+- [x] Add API: `GET /api/functional-groups` — list all active groups
+- [x] Add API: `POST /api/functional-groups` — create group (Admin only)
+- [x] Add API: `PUT /api/functional-groups/[id]` — rename or deactivate group (Admin only)
+- [x] Add API: `GET /api/users` — list all users (Admin only)
+- [x] Add API: `POST /api/users` — create user with hashed password (Admin only)
+- [x] Add API: `PUT /api/users/[id]` — edit user details, role, functional group (Admin only)
+- [x] Add API: `PUT /api/users/[id]/status` — activate or deactivate user (Admin only)
+- [x] Add User Management tab to UI (Admin only)
+- [x] User table: shows name, email, role, functional group, active status
+- [x] Add user form: full name, email, temporary password, role (Staff / Director / ProjectManager / Chief / Admin), functional group
+- [x] Edit user form: same fields, all editable
+- [x] Activate/deactivate toggle per user row (no hard deletes)
+- [x] Functional Groups management section inside User Management tab (Admin only)
+- [x] Admins can add, rename, and deactivate functional groups from the UI
+- [x] Deactivating a group does not affect existing users already assigned to it
+- [x] Enforce one Director per functional group — UI warning + API validation
+- [x] Replace login screen role dropdown with email + password fields
+- [x] On login, load full user profile (name, email, role, functional group) into session
 - [ ] Add audit fields to all tables: created_by, updated_by (reference users.id) where applicable
 
 ---

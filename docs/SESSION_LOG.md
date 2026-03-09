@@ -62,6 +62,74 @@ The UI components and all React hooks still use localStorage. The database layer
 
 ---
 
+## Session 4 — 2026-03-09
+
+### What was accomplished
+
+**Phase 1 — User Management fully implemented.**
+
+#### Database
+- Applied `001_add_functional_groups.sql` — creates `functional_groups` table (id UUID, name TEXT UNIQUE, is_active, timestamps + trigger)
+- Applied `002_update_users.sql` — adds `Director`, `ProjectManager`, `Chief` to `user_role` enum; adds `full_name`, `email TEXT UNIQUE`, `password_hash`, `functional_group_id` (FK → functional_groups), `is_active` columns to `users`
+- Created `src/lib/db/migrate.ts` — migration runner that reads all `.sql` files from `src/lib/db/migrations/` in order, runs each statement in autocommit mode (required for `ALTER TYPE ADD VALUE`), and records applied files in `schema_migrations`
+- Created `src/lib/db/seed.ts` — seeds 7 HULLC functional groups and an initial Admin user (`admin@hullc.nih.gov` / `Admin1234!`) idempotently
+
+#### API Routes
+| Route | Purpose |
+|-------|---------|
+| `GET /api/functional-groups` | List groups (`?active=false` includes inactive) |
+| `POST /api/functional-groups` | Create group (Admin only) |
+| `PUT /api/functional-groups/[id]` | Rename or activate/deactivate group (Admin only) |
+| `GET /api/users` | List all users with functional group name (Admin only) |
+| `POST /api/users` | Create user with bcrypt-hashed password (Admin only) |
+| `PUT /api/users/[id]` | Edit name, email, role, functional group (Admin only) |
+| `PUT /api/users/[id]/status` | Activate or deactivate user (Admin only) |
+| `POST /api/auth/login` | Verify email + password, return full user profile |
+
+- Admin-only routes use a `x-user-role: Admin` request header (placeholder; full auth in Phase 15)
+- One Director per functional group enforced at API level (POST and PUT /api/users check existing active directors for the group; returns 409 on violation)
+- Password hashing uses `bcryptjs` (cost factor 12)
+- Login uses generic error message to prevent email enumeration
+
+#### Frontend
+- Replaced role-dropdown login with email + password form — posts to `/api/auth/login`, stores full user profile in localStorage
+- localStorage restore now requires `id` field — old placeholder sessions are cleared automatically on first load
+- Header updated to show user's full name and role
+- Added **User Management** tab (Admin only):
+  - User table: name, email, role, functional group, active/inactive badge, edit and toggle-status buttons
+  - Functional Groups table: name, active/inactive badge, rename and toggle-status buttons
+  - Add/Edit User dialog: full name, email, temporary password (create only), role select (all 5 roles), functional group select (active groups only), Director warning label
+  - Add/Edit Group dialog: group name field
+- `src/lib/types.ts` updated: `UserRole` expanded to 5 values, `USER_ROLES` constant added, `FunctionalGroup` and `SystemUser` types added, `User` type extended with optional profile fields
+
+#### Packages installed
+- `bcryptjs@3.0.3` + `@types/bcryptjs`
+
+### First-time setup instructions (after pulling this session's changes)
+```bash
+npx tsx --env-file=.env.local src/lib/db/migrate.ts   # apply DB migrations
+npx tsx --env-file=.env.local src/lib/db/seed.ts       # seed groups + admin user
+npm run dev                                              # start dev server on port 9002
+```
+Login: `admin@hullc.nih.gov` / `Admin1234!`
+
+### Current state of the codebase
+
+    src/lib/db/migrations/001_add_functional_groups.sql   ✅ applied
+    src/lib/db/migrations/002_update_users.sql             ✅ applied
+    src/lib/db/migrate.ts                                  migration runner
+    src/lib/db/seed.ts                                     seed script (functional groups + admin)
+    src/app/api/functional-groups/route.ts                 GET, POST
+    src/app/api/functional-groups/[id]/route.ts            PUT
+    src/app/api/users/route.ts                             GET, POST
+    src/app/api/users/[id]/route.ts                        PUT
+    src/app/api/users/[id]/status/route.ts                 PUT
+    src/app/api/auth/login/route.ts                        POST
+    src/components/inventory-page.tsx                      ✅ email+password login, User Management tab
+    src/lib/types.ts                                       ✅ UserRole (5 values), SystemUser, FunctionalGroup
+
+---
+
 ## Session 3 — 2026-03-07
 
 ### What was accomplished

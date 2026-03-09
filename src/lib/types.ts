@@ -145,11 +145,36 @@ export type ProductRequestStatus = z.infer<typeof ProductRequestStatusSchema>;
 export type Fulfillment = z.infer<typeof FulfillmentSchema>;
 
 
-export type UserRole = 'Admin' | 'Staff';
+export type UserRole = 'Admin' | 'Staff' | 'Director' | 'ProjectManager' | 'Chief';
+
+export const USER_ROLES: UserRole[] = ['Admin', 'Staff', 'Director', 'ProjectManager', 'Chief'];
+
+export type FunctionalGroup = {
+  id: string;
+  name: string;
+  isActive: boolean;
+};
+
+export type SystemUser = {
+  id: string;
+  role: UserRole;
+  department: string;
+  fullName: string;
+  email: string;
+  functionalGroupId?: string;
+  functionalGroupName?: string;
+  isActive: boolean;
+};
 
 export type User = {
+  id?: string;
   role: UserRole;
   department: (typeof DEPARTMENTS)[number] | 'core';
+  fullName?: string;
+  email?: string;
+  functionalGroupId?: string;
+  functionalGroupName?: string;
+  isActive?: boolean;
 };
 
 export type DepartmentalProduct = {

@@ -10,11 +10,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
-import { ChevronsUpDown, MoreHorizontal, Package, Pencil, PlusCircle, Warehouse, ArrowRightLeft, CloudUpload, Loader2, AlertTriangle, Download, Trash2, CheckCircle2, XCircle, Hourglass, FileText, Search, LogOut } from 'lucide-react';
+import { ChevronsUpDown, MoreHorizontal, Package, Pencil, PlusCircle, Warehouse, ArrowRightLeft, CloudUpload, Loader2, AlertTriangle, Download, Trash2, CheckCircle2, XCircle, Hourglass, FileText, Search, LogOut, Users, Building2, UserCog, ShieldAlert } from 'lucide-react';
 import { ProductForm } from './product-form';
 import { TransactionForm } from './transaction-form';
 import { RequestForm } from './request-form';
-import { type Product, type Lot, type ProductFormData, type Transaction, type TransactionFormData, type User, type UserRole, type ProductRequest, type ProductRequestFormData, type ProductRequestStatus, DEPARTMENTS, type DepartmentalProduct, type Fulfillment } from '@/lib/types';
+import { type Product, type Lot, type ProductFormData, type Transaction, type TransactionFormData, type User, type UserRole, USER_ROLES, type SystemUser, type FunctionalGroup, type ProductRequest, type ProductRequestFormData, type ProductRequestStatus, DEPARTMENTS, type DepartmentalProduct, type Fulfillment } from '@/lib/types';
 import { HullcLogo } from './icons';
 import { useToast } from '@/hooks/use-toast';
 import { v4 as uuidv4 } from 'uuid';
@@ -71,9 +71,22 @@ export default function InventoryPage() {
     const [fulfillmentToCancel, setFulfillmentToCancel] = useState<Fulfillment | null>(null);
     const [rejectionNote, setRejectionNote] = useState('');
     const [searchQuery, setSearchQuery] = useState('');
-    const [loginStep, setLoginStep] = useState<'role' | 'department'>('role');
-    const [selectedRole, setSelectedRole] = useState<UserRole | null>(null);
-    const [adminView, setAdminView] = useState<'core' | 'departmental' | null>(null);
+
+    // Login form state
+    const [loginEmail, setLoginEmail] = useState('');
+    const [loginPassword, setLoginPassword] = useState('');
+    const [loginError, setLoginError] = useState('');
+    const [isLoginLoading, setIsLoginLoading] = useState(false);
+
+    // User Management state
+    const [appUsers, setAppUsers] = useState<SystemUser[]>([]);
+    const [functionalGroups, setFunctionalGroups] = useState<FunctionalGroup[]>([]);
+    const [isUserFormOpen, setIsUserFormOpen] = useState(false);
+    const [userToEdit, setUserToEdit] = useState<SystemUser | null>(null);
+    const [userFormData, setUserFormData] = useState({ fullName: '', email: '', password: '', role: 'Staff' as UserRole, functionalGroupId: '' });
+    const [isGroupFormOpen, setIsGroupFormOpen] = useState(false);
+    const [groupToEdit, setGroupToEdit] = useState<FunctionalGroup | null>(null);
+    const [groupFormName, setGroupFormName] = useState('');
 
     const { toast } = useToast();
 
@@ -143,7 +156,14 @@ export default function InventoryPage() {
         try {
             const storedUserItem = window.localStorage.getItem(USER_STORAGE_KEY);
             if (storedUserItem) {
-                setUser(JSON.parse(storedUserItem));
+                const parsed = JSON.parse(storedUserItem);
+                // Only restore sessions that came from the new login flow (have an id)
+                if (parsed && parsed.id) {
+                    setUser(parsed);
+                } else {
+                    // Clear old-format placeholder sessions
+                    window.localStorage.removeItem(USER_STORAGE_KEY);
+                }
             }
         } catch (e) { console.error(e) }
         setIsLoading(false);
@@ -158,6 +178,7 @@ export default function InventoryPage() {
         const loadData = async () => {
             setIsLoading(true);
             try {
+                const adminHeaders = { 'x-user-role': user.role };
                 const [pRes, tRes, rRes, fRes] = await Promise.all([
                     fetch('/api/products'),
                     fetch('/api/transactions'),
@@ -178,6 +199,16 @@ export default function InventoryPage() {
                     ...f,
                     dispensedItems: (f.dispensedItems ?? []).map((tx: any) => ({ ...tx, date: new Date(tx.date) })),
                 })));
+
+                // Load user management data for Admin
+                if (user.role === 'Admin') {
+                    const [usersRes, groupsRes] = await Promise.all([
+                        fetch('/api/users', { headers: adminHeaders }),
+                        fetch('/api/functional-groups?active=false'),
+                    ]);
+                    if (usersRes.ok) setAppUsers(await usersRes.json());
+                    if (groupsRes.ok) setFunctionalGroups(await groupsRes.json());
+                }
             } catch (error: any) {
                 console.error('Error loading data', error);
                 toast({ title: 'Load Error', description: error.message || 'Could not load inventory data.', variant: 'destructive' });
@@ -194,41 +225,164 @@ export default function InventoryPage() {
 
 
     
-    const handleRoleSelect = (role: UserRole | 'Departmental Staff' | 'Admin Departmental View') => {
-        if (role === 'Staff') {
-            setUser({ role, department: 'core' });
-            setAdminView(null);
-        } else if (role === 'Admin') {
-            setLoginStep('department');
-            setSelectedRole('Admin');
-        } else { // Departmental Staff
-            setSelectedRole('Staff');
-            setLoginStep('department');
+    const handleLogin = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setIsLoginLoading(true);
+        setLoginError('');
+        try {
+            const res = await fetch('/api/auth/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: loginEmail, password: loginPassword }),
+            });
+            const data = await res.json();
+            if (!res.ok) {
+                setLoginError(data.error || 'Login failed');
+                return;
+            }
+            const loggedInUser: User = {
+                id: data.id,
+                role: data.role,
+                department: data.department ?? 'core',
+                fullName: data.fullName,
+                email: data.email,
+                functionalGroupId: data.functionalGroupId,
+                functionalGroupName: data.functionalGroupName,
+                isActive: data.isActive,
+            };
+            setUser(loggedInUser);
+            window.localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(loggedInUser));
+        } catch {
+            setLoginError('Network error. Please try again.');
+        } finally {
+            setIsLoginLoading(false);
         }
-    };
-
-    const handleDepartmentSelect = (department: string) => {
-        if (department === 'core') {
-             setUser({ role: 'Admin', department: 'core' });
-             setAdminView('core');
-        } else if (selectedRole === 'Admin') {
-            setUser({ role: 'Admin', department: department as User['department'] });
-            setAdminView('departmental');
-        } else {
-             setUser({ role: 'Staff', department: department as User['department'] });
-        }
-        setLoginStep('role');
-        setSelectedRole(null);
     };
 
     const handleLogout = () => {
         setUser(null);
-        setAdminView(null);
         window.localStorage.removeItem(USER_STORAGE_KEY);
         setProducts([]);
         setTransactions([]);
         setProductRequests([]);
+        setAppUsers([]);
+        setFunctionalGroups([]);
+        setLoginEmail('');
+        setLoginPassword('');
+        setLoginError('');
     };
+
+    // ─── User Management handlers ────────────────────────────────────────────
+
+    const adminHeaders = () => ({ 'Content-Type': 'application/json', 'x-user-role': user?.role ?? '' });
+
+    const handleOpenUserForm = (u: SystemUser | null) => {
+        setUserToEdit(u);
+        setUserFormData(u
+            ? { fullName: u.fullName, email: u.email, password: '', role: u.role, functionalGroupId: u.functionalGroupId ?? '' }
+            : { fullName: '', email: '', password: '', role: 'Staff', functionalGroupId: '' }
+        );
+        setIsUserFormOpen(true);
+    };
+
+    const handleSaveUser = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setIsSaving(true);
+        try {
+            const body: any = {
+                fullName: userFormData.fullName,
+                email: userFormData.email,
+                role: userFormData.role,
+                functionalGroupId: userFormData.functionalGroupId || null,
+                department: 'core',
+            };
+            if (!userToEdit) body.password = userFormData.password;
+
+            const url = userToEdit ? `/api/users/${userToEdit.id}` : '/api/users';
+            const method = userToEdit ? 'PUT' : 'POST';
+            const res = await fetch(url, { method, headers: adminHeaders(), body: JSON.stringify(body) });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Failed to save user');
+
+            if (userToEdit) {
+                setAppUsers(prev => prev.map(u => u.id === data.id ? data : u));
+                toast({ title: 'User Updated', description: `${data.fullName} has been updated.` });
+            } else {
+                setAppUsers(prev => [...prev, data]);
+                toast({ title: 'User Created', description: `${data.fullName} has been added.` });
+            }
+            setIsUserFormOpen(false);
+        } catch (error: any) {
+            toast({ title: 'Save Failed', description: error.message, variant: 'destructive' });
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    const handleToggleUserStatus = async (u: SystemUser) => {
+        try {
+            const res = await fetch(`/api/users/${u.id}/status`, {
+                method: 'PUT',
+                headers: adminHeaders(),
+                body: JSON.stringify({ isActive: !u.isActive }),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Failed to update status');
+            setAppUsers(prev => prev.map(su => su.id === u.id ? { ...su, isActive: data.isActive } : su));
+            toast({ title: u.isActive ? 'User Deactivated' : 'User Activated', description: `${u.fullName} is now ${data.isActive ? 'active' : 'inactive'}.` });
+        } catch (error: any) {
+            toast({ title: 'Update Failed', description: error.message, variant: 'destructive' });
+        }
+    };
+
+    const handleOpenGroupForm = (g: FunctionalGroup | null) => {
+        setGroupToEdit(g);
+        setGroupFormName(g?.name ?? '');
+        setIsGroupFormOpen(true);
+    };
+
+    const handleSaveGroup = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setIsSaving(true);
+        try {
+            const url = groupToEdit ? `/api/functional-groups/${groupToEdit.id}` : '/api/functional-groups';
+            const method = groupToEdit ? 'PUT' : 'POST';
+            const res = await fetch(url, { method, headers: adminHeaders(), body: JSON.stringify({ name: groupFormName }) });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Failed to save group');
+
+            if (groupToEdit) {
+                setFunctionalGroups(prev => prev.map(g => g.id === data.id ? data : g));
+                toast({ title: 'Group Updated', description: `"${data.name}" has been updated.` });
+            } else {
+                setFunctionalGroups(prev => [...prev, data]);
+                toast({ title: 'Group Created', description: `"${data.name}" has been added.` });
+            }
+            setIsGroupFormOpen(false);
+        } catch (error: any) {
+            toast({ title: 'Save Failed', description: error.message, variant: 'destructive' });
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    const handleToggleGroupStatus = async (g: FunctionalGroup) => {
+        try {
+            const res = await fetch(`/api/functional-groups/${g.id}`, {
+                method: 'PUT',
+                headers: adminHeaders(),
+                body: JSON.stringify({ isActive: !g.isActive }),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Failed to update group');
+            setFunctionalGroups(prev => prev.map(fg => fg.id === g.id ? data : fg));
+            toast({ title: g.isActive ? 'Group Deactivated' : 'Group Activated', description: `"${g.name}" is now ${data.isActive ? 'active' : 'inactive'}.` });
+        } catch (error: any) {
+            toast({ title: 'Update Failed', description: error.message, variant: 'destructive' });
+        }
+    };
+
+    // ─── Product handlers ────────────────────────────────────────────────────
 
     const handleAddNew = () => {
         setProductToEdit(null);
@@ -853,40 +1007,6 @@ export default function InventoryPage() {
     }
 
     if (!user) {
-         if (loginStep === 'department') {
-            return (
-                <div className="flex items-center justify-center min-h-screen bg-background">
-                    <Card className="w-full max-w-sm">
-                        <CardHeader className="text-center">
-                            <div className="flex justify-center items-center gap-3 mb-4">
-                                <HullcLogo className="h-8 w-8 text-primary" />
-                                <CardTitle className="text-2xl">{selectedRole === 'Admin' ? 'Select System' : 'Select Department'}</CardTitle>
-                            </div>
-                            <CardDescription>
-                                {selectedRole === 'Admin'
-                                    ? "Choose the system you want to manage."
-                                    : "Choose your department to access its inventory."
-                                }
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent className="flex flex-col gap-4">
-                            {selectedRole === 'Admin' && (
-                                <Button size="lg" variant="secondary" onClick={() => handleDepartmentSelect('core')}>Core Inventory System</Button>
-                            )}
-                             <Select onValueChange={handleDepartmentSelect}>
-                                <SelectTrigger>
-                                    <SelectValue placeholder={selectedRole === 'Admin' ? 'Select a Departmental System' : 'Select a department'} />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {DEPARTMENTS.map(dept => <SelectItem key={dept} value={dept}>{dept}</SelectItem>)}
-                                </SelectContent>
-                            </Select>
-                            <Button variant="link" onClick={() => { setLoginStep('role'); setSelectedRole(null); }}>Back to role selection</Button>
-                        </CardContent>
-                    </Card>
-                </div>
-            )
-        }
         return (
             <div className="flex items-center justify-center min-h-screen bg-background">
                 <Card className="w-full max-w-sm">
@@ -895,19 +1015,54 @@ export default function InventoryPage() {
                             <HullcLogo className="h-8 w-8 text-primary" />
                             <CardTitle className="text-2xl">HULLC Inventory Management System</CardTitle>
                         </div>
-                        <CardDescription>Select a role to sign in.</CardDescription>
+                        <CardDescription>Sign in with your HULLC account.</CardDescription>
                     </CardHeader>
-                    <CardContent className="flex flex-col gap-4">
-                         <Button size="lg" onClick={() => handleRoleSelect('Admin')}>Admin</Button>
-                         <Button size="lg" variant="secondary" onClick={() => handleRoleSelect('Staff')}>Staff (Request Only)</Button>
-                         <Button size="lg" variant="outline" onClick={() => handleRoleSelect('Departmental Staff')}>Departmental Staff</Button>
+                    <CardContent>
+                        <form onSubmit={handleLogin} className="flex flex-col gap-4">
+                            <div className="flex flex-col gap-1.5">
+                                <Label htmlFor="login-email">Email</Label>
+                                <Input
+                                    id="login-email"
+                                    type="email"
+                                    placeholder="your@nih.gov"
+                                    value={loginEmail}
+                                    onChange={e => setLoginEmail(e.target.value)}
+                                    required
+                                    disabled={isLoginLoading}
+                                    autoComplete="email"
+                                />
+                            </div>
+                            <div className="flex flex-col gap-1.5">
+                                <Label htmlFor="login-password">Password</Label>
+                                <Input
+                                    id="login-password"
+                                    type="password"
+                                    placeholder="••••••••"
+                                    value={loginPassword}
+                                    onChange={e => setLoginPassword(e.target.value)}
+                                    required
+                                    disabled={isLoginLoading}
+                                    autoComplete="current-password"
+                                />
+                            </div>
+                            {loginError && (
+                                <p className="text-sm text-destructive flex items-center gap-1.5">
+                                    <ShieldAlert className="h-4 w-4 shrink-0" />
+                                    {loginError}
+                                </p>
+                            )}
+                            <Button type="submit" disabled={isLoginLoading} className="w-full">
+                                {isLoginLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                Sign In
+                            </Button>
+                        </form>
                     </CardContent>
                 </Card>
             </div>
         );
     }
 
-    if (user.department !== 'core' || adminView === 'departmental') {
+    if (user.department !== 'core') {
         return <DepartmentalPage user={user} onLogout={handleLogout} />;
     }
 
@@ -924,8 +1079,8 @@ export default function InventoryPage() {
                         <h1 className="text-3xl font-bold text-foreground">Core Inventory</h1>
                          <div className="ml-auto flex items-center gap-4 text-sm">
                             <div className="text-right">
-                                <p className="font-semibold text-foreground">{user.role} User</p>
-                                <p className="text-muted-foreground">Core System</p>
+                                <p className="font-semibold text-foreground">{user.fullName || user.role}</p>
+                                <p className="text-muted-foreground">{user.role} · Core System</p>
                             </div>
                             <Button variant="outline" size="sm" onClick={handleLogout}>
                                 <LogOut className="mr-2 h-4 w-4" />
@@ -940,6 +1095,7 @@ export default function InventoryPage() {
                             {user.role === 'Admin' && <TabsTrigger value="requests">Product Requests <Badge className="ml-2 bg-primary/20 text-primary">{productRequests.filter(r => r.status === 'Pending').length}</Badge></TabsTrigger>}
                             {user.role === 'Admin' && <TabsTrigger value="fulfillments">Fulfillments <Badge className="ml-2 bg-primary/20 text-primary">{fulfillments.length}</Badge></TabsTrigger>}
                             {user.role === 'Admin' && <TabsTrigger value="transactions">Transactions</TabsTrigger>}
+                            {user.role === 'Admin' && <TabsTrigger value="user-management"><Users className="mr-1.5 h-4 w-4" />User Management</TabsTrigger>}
                         </TabsList>
                         <TabsContent value="inventory">
                             <Card>
@@ -1374,9 +1530,228 @@ export default function InventoryPage() {
                                 </Card>
                             </TabsContent>
                         }
+
+                        {/* ── User Management Tab ───────────────────────────── */}
+                        {user.role === 'Admin' && (
+                            <TabsContent value="user-management">
+                                <div className="space-y-6">
+                                    {/* Users table */}
+                                    <Card>
+                                        <CardHeader>
+                                            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                                                <div>
+                                                    <CardTitle className="flex items-center gap-2"><UserCog className="h-5 w-5" /> Users</CardTitle>
+                                                    <CardDescription>Manage system users, roles, and functional group assignments.</CardDescription>
+                                                </div>
+                                                <Button onClick={() => handleOpenUserForm(null)}>
+                                                    <PlusCircle className="mr-2 h-4 w-4" /> Add User
+                                                </Button>
+                                            </div>
+                                        </CardHeader>
+                                        <CardContent>
+                                            <Table>
+                                                <TableHeader>
+                                                    <TableRow>
+                                                        <TableHead>Name</TableHead>
+                                                        <TableHead>Email</TableHead>
+                                                        <TableHead>Role</TableHead>
+                                                        <TableHead>Functional Group</TableHead>
+                                                        <TableHead>Status</TableHead>
+                                                        <TableHead className="text-right">Actions</TableHead>
+                                                    </TableRow>
+                                                </TableHeader>
+                                                <TableBody>
+                                                    {appUsers.length === 0 && (
+                                                        <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">No users found.</TableCell></TableRow>
+                                                    )}
+                                                    {appUsers.map(u => (
+                                                        <TableRow key={u.id}>
+                                                            <TableCell className="font-medium">{u.fullName}</TableCell>
+                                                            <TableCell className="text-muted-foreground">{u.email}</TableCell>
+                                                            <TableCell><Badge variant="outline">{u.role}</Badge></TableCell>
+                                                            <TableCell>{u.functionalGroupName ?? <span className="text-muted-foreground">—</span>}</TableCell>
+                                                            <TableCell>
+                                                                <Badge className={u.isActive ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400'}>
+                                                                    {u.isActive ? <CheckCircle2 className="mr-1 h-3 w-3" /> : <XCircle className="mr-1 h-3 w-3" />}
+                                                                    {u.isActive ? 'Active' : 'Inactive'}
+                                                                </Badge>
+                                                            </TableCell>
+                                                            <TableCell className="text-right">
+                                                                <div className="flex justify-end gap-1">
+                                                                    <Tooltip>
+                                                                        <TooltipTrigger asChild>
+                                                                            <Button size="sm" variant="ghost" onClick={() => handleOpenUserForm(u)}>
+                                                                                <Pencil className="h-4 w-4" />
+                                                                            </Button>
+                                                                        </TooltipTrigger>
+                                                                        <TooltipContent>Edit user</TooltipContent>
+                                                                    </Tooltip>
+                                                                    <Tooltip>
+                                                                        <TooltipTrigger asChild>
+                                                                            <Button size="sm" variant="ghost" onClick={() => handleToggleUserStatus(u)}>
+                                                                                {u.isActive ? <XCircle className="h-4 w-4 text-destructive" /> : <CheckCircle2 className="h-4 w-4 text-green-600" />}
+                                                                            </Button>
+                                                                        </TooltipTrigger>
+                                                                        <TooltipContent>{u.isActive ? 'Deactivate user' : 'Activate user'}</TooltipContent>
+                                                                    </Tooltip>
+                                                                </div>
+                                                            </TableCell>
+                                                        </TableRow>
+                                                    ))}
+                                                </TableBody>
+                                            </Table>
+                                        </CardContent>
+                                    </Card>
+
+                                    {/* Functional Groups table */}
+                                    <Card>
+                                        <CardHeader>
+                                            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                                                <div>
+                                                    <CardTitle className="flex items-center gap-2"><Building2 className="h-5 w-5" /> Functional Groups</CardTitle>
+                                                    <CardDescription>Manage HULLC functional groups. Deactivating a group does not remove existing user assignments.</CardDescription>
+                                                </div>
+                                                <Button onClick={() => handleOpenGroupForm(null)}>
+                                                    <PlusCircle className="mr-2 h-4 w-4" /> Add Group
+                                                </Button>
+                                            </div>
+                                        </CardHeader>
+                                        <CardContent>
+                                            <Table>
+                                                <TableHeader>
+                                                    <TableRow>
+                                                        <TableHead>Group Name</TableHead>
+                                                        <TableHead>Status</TableHead>
+                                                        <TableHead className="text-right">Actions</TableHead>
+                                                    </TableRow>
+                                                </TableHeader>
+                                                <TableBody>
+                                                    {functionalGroups.length === 0 && (
+                                                        <TableRow><TableCell colSpan={3} className="text-center text-muted-foreground py-8">No functional groups found.</TableCell></TableRow>
+                                                    )}
+                                                    {functionalGroups.map(g => (
+                                                        <TableRow key={g.id}>
+                                                            <TableCell className="font-medium">{g.name}</TableCell>
+                                                            <TableCell>
+                                                                <Badge className={g.isActive ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400'}>
+                                                                    {g.isActive ? <CheckCircle2 className="mr-1 h-3 w-3" /> : <XCircle className="mr-1 h-3 w-3" />}
+                                                                    {g.isActive ? 'Active' : 'Inactive'}
+                                                                </Badge>
+                                                            </TableCell>
+                                                            <TableCell className="text-right">
+                                                                <div className="flex justify-end gap-1">
+                                                                    <Tooltip>
+                                                                        <TooltipTrigger asChild>
+                                                                            <Button size="sm" variant="ghost" onClick={() => handleOpenGroupForm(g)}>
+                                                                                <Pencil className="h-4 w-4" />
+                                                                            </Button>
+                                                                        </TooltipTrigger>
+                                                                        <TooltipContent>Rename group</TooltipContent>
+                                                                    </Tooltip>
+                                                                    <Tooltip>
+                                                                        <TooltipTrigger asChild>
+                                                                            <Button size="sm" variant="ghost" onClick={() => handleToggleGroupStatus(g)}>
+                                                                                {g.isActive ? <XCircle className="h-4 w-4 text-destructive" /> : <CheckCircle2 className="h-4 w-4 text-green-600" />}
+                                                                            </Button>
+                                                                        </TooltipTrigger>
+                                                                        <TooltipContent>{g.isActive ? 'Deactivate group' : 'Activate group'}</TooltipContent>
+                                                                    </Tooltip>
+                                                                </div>
+                                                            </TableCell>
+                                                        </TableRow>
+                                                    ))}
+                                                </TableBody>
+                                            </Table>
+                                        </CardContent>
+                                    </Card>
+                                </div>
+                            </TabsContent>
+                        )}
                     </Tabs>
                 </main>
             </TooltipProvider>
+
+            {/* ── User Form Dialog ─────────────────────────────────────── */}
+            <Dialog open={isUserFormOpen} onOpenChange={setIsUserFormOpen}>
+                <DialogContent className="max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>{userToEdit ? 'Edit User' : 'Add User'}</DialogTitle>
+                        <DialogDescription>
+                            {userToEdit ? 'Update user details, role, or functional group.' : 'Create a new user account. They can log in immediately.'}
+                        </DialogDescription>
+                    </DialogHeader>
+                    <form onSubmit={handleSaveUser} className="flex flex-col gap-4 pt-2">
+                        <div className="flex flex-col gap-1.5">
+                            <Label htmlFor="uf-fullname">Full Name</Label>
+                            <Input id="uf-fullname" value={userFormData.fullName} onChange={e => setUserFormData(p => ({ ...p, fullName: e.target.value }))} required placeholder="Jane Smith" />
+                        </div>
+                        <div className="flex flex-col gap-1.5">
+                            <Label htmlFor="uf-email">Email</Label>
+                            <Input id="uf-email" type="email" value={userFormData.email} onChange={e => setUserFormData(p => ({ ...p, email: e.target.value }))} required placeholder="jane@nih.gov" />
+                        </div>
+                        {!userToEdit && (
+                            <div className="flex flex-col gap-1.5">
+                                <Label htmlFor="uf-password">Temporary Password</Label>
+                                <Input id="uf-password" type="password" value={userFormData.password} onChange={e => setUserFormData(p => ({ ...p, password: e.target.value }))} required minLength={8} placeholder="Min. 8 characters" />
+                            </div>
+                        )}
+                        <div className="flex flex-col gap-1.5">
+                            <Label htmlFor="uf-role">Role</Label>
+                            <Select value={userFormData.role} onValueChange={v => setUserFormData(p => ({ ...p, role: v as UserRole }))}>
+                                <SelectTrigger id="uf-role"><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                    {USER_ROLES.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="flex flex-col gap-1.5">
+                            <Label htmlFor="uf-group">Functional Group</Label>
+                            {userFormData.role === 'Director' && (
+                                <p className="text-xs text-amber-600 flex items-center gap-1"><ShieldAlert className="h-3 w-3" /> Only one active Director is allowed per group.</p>
+                            )}
+                            <Select value={userFormData.functionalGroupId || 'none'} onValueChange={v => setUserFormData(p => ({ ...p, functionalGroupId: v === 'none' ? '' : v }))}>
+                                <SelectTrigger id="uf-group"><SelectValue placeholder="None" /></SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="none">None</SelectItem>
+                                    {functionalGroups.filter(g => g.isActive).map(g => <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>)}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="flex justify-end gap-2 pt-2">
+                            <Button type="button" variant="outline" onClick={() => setIsUserFormOpen(false)}>Cancel</Button>
+                            <Button type="submit" disabled={isSaving}>
+                                {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                {userToEdit ? 'Save Changes' : 'Create User'}
+                            </Button>
+                        </div>
+                    </form>
+                </DialogContent>
+            </Dialog>
+
+            {/* ── Functional Group Form Dialog ─────────────────────────── */}
+            <Dialog open={isGroupFormOpen} onOpenChange={setIsGroupFormOpen}>
+                <DialogContent className="max-w-sm">
+                    <DialogHeader>
+                        <DialogTitle>{groupToEdit ? 'Rename Group' : 'Add Functional Group'}</DialogTitle>
+                        <DialogDescription>
+                            {groupToEdit ? 'Update the name of this functional group.' : 'Add a new functional group to the system.'}
+                        </DialogDescription>
+                    </DialogHeader>
+                    <form onSubmit={handleSaveGroup} className="flex flex-col gap-4 pt-2">
+                        <div className="flex flex-col gap-1.5">
+                            <Label htmlFor="gf-name">Group Name</Label>
+                            <Input id="gf-name" value={groupFormName} onChange={e => setGroupFormName(e.target.value)} required placeholder="e.g., Formulation Development" />
+                        </div>
+                        <div className="flex justify-end gap-2">
+                            <Button type="button" variant="outline" onClick={() => setIsGroupFormOpen(false)}>Cancel</Button>
+                            <Button type="submit" disabled={isSaving}>
+                                {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                {groupToEdit ? 'Save Changes' : 'Create Group'}
+                            </Button>
+                        </div>
+                    </form>
+                </DialogContent>
+            </Dialog>
 
             <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
                 <DialogContent className="max-w-3xl flex flex-col max-h-[90vh]">
