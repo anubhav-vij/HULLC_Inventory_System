@@ -238,4 +238,147 @@ each phase sequentially, marking `[~]` while in progress and `[x]` when complete
 - [ ] Report includes: product details, all lots with current quantities, full transaction history (newest first)
 - [ ] Render as isolated print view via React `createPortal` (same pattern as Lab Inventory Tracker)
 - [ ] Include HULLC header, generation date, generated-by user name, and page numbers
--
+- [ ] Print CSS: collapse app layout, show only report content
+- [ ] Add confidential footer on every page
+
+---
+
+## Phase 13 — Metrics Dashboard
+
+> Gives Admins statistical insight into inventory activity over time.
+
+- [ ] Add Metrics tab (Admin and Chief only)
+- [ ] Global date range picker — all charts filter to selected range; show all-time when no range set
+- [ ] Chart: transactions per day for last 30 days (line chart)
+- [ ] Chart: transactions per week for last 12 weeks (bar chart)
+- [ ] Chart: requests by functional group (bar chart)
+- [ ] Chart: requests by status — Pending Approval / Approved / In Progress / Completed / Rejected (donut chart)
+- [ ] Chart: products added over time — cumulative (line chart)
+- [ ] Export metrics summary to Excel
+
+---
+
+## Phase 14 — Mobile Responsiveness
+
+> Ensures the application is usable on tablets and mobile devices for lab staff away from their desks.
+
+- [ ] Build mobile card list view for Inventory table (shown on small screens, full table on desktop)
+- [ ] Make product detail/lot view responsive (stack fields vertically on mobile)
+- [ ] Add horizontal overflow scroll to main tab bar on small screens
+- [ ] Test request submission flow on mobile screen size
+- [ ] Verify all forms are usable on touch screens (input sizes, spacing)
+
+---
+
+## Phase 15 — NIH SSO Authentication
+
+> Final phase before NIH/NIAID handoff. Replaces placeholder login with NIH SSO via AWS Cognito.
+> Do not start until NIH AWS team meeting has taken place.
+
+### Confirmed Decisions
+- NIH SSO is the required authentication method (no other option)
+- Roles stay in the PostgreSQL users table — Admin assigns roles through the app
+- If authenticated email is not in users table: show "Access denied — contact your admin"
+- Only `@nih.gov` email addresses permitted
+- Sessions expire when browser is closed
+- Force re-authentication after 4 hours of inactivity
+- No MFA required (unless NIH IT mandates it)
+- Admin creates user records manually; NIH IT manages actual NIH account creation
+
+### Pending NIH AWS Team Answers
+- [ ] NIH SSO protocol: SAML or OIDC?
+- [ ] Who to contact to register the app with NIH SSO
+- [ ] Which AWS account owns the Cognito User Pool (personal vs NIAID-managed)
+- [ ] Does NIAID already have a Cognito User Pool connected to NIH SSO that we can reuse?
+- [ ] Who sets up the Cognito-to-NIH-SSO federation — us or NIH IT?
+- [ ] What attribute in the NIH SSO token contains the user's email
+- [ ] DNS setup for the application URL — what do we provide to NIH IT?
+- [ ] NIH/NIAID security and compliance requirements (FISMA level, session rules, audit logging)
+
+### After NIH AWS Team Meeting
+- [ ] Confirm NIH SSO protocol and document it
+- [ ] Submit application registration request to NIH SSO team
+- [ ] Confirm which AWS account Cognito will live in
+- [ ] Confirm DNS setup process with NIH IT
+
+### Cognito Setup
+- [ ] Configure Cognito User Pool: `@nih.gov` domain restriction, session expiry on browser close, 4-hour inactivity timeout
+- [ ] Configure NIH SSO as federated identity provider in Cognito (SAML or OIDC)
+- [ ] Register application callback URL with NIH SSO team
+- [ ] Map NIH SSO email attribute to Cognito user pool attribute
+
+### Code Changes
+- [ ] Replace placeholder login with Cognito-managed session
+- [ ] Add Sign Out button — calls Cognito sign out and redirects to NIH login page
+- [ ] Add unauthenticated route guard — redirect to Cognito login if no active session
+- [ ] Add "Access Denied" screen for authenticated NIH users with no users table record
+- [ ] Verify all audit fields (created_by, updated_by) populate correctly from Cognito user
+- [ ] Remove placeholder login screen entirely
+
+### Bootstrap & Testing
+- [ ] Manually insert first Admin user record into users table
+- [ ] Test full login flow: visit URL → redirect to NIH login → authenticate → land in app with correct role
+- [ ] Test access denied flow: authenticated NIH user with no users record sees contact message
+- [ ] Test role enforcement: Staff cannot add/edit/delete; Admin can
+- [ ] Test session expiry: browser close clears session; 4-hour inactivity forces re-login
+
+---
+
+## Phase 16 — NIH/NIAID AWS Infrastructure Migration
+
+> Migrate all AWS resources from personal AWS account to NIAID-managed AWS infrastructure.
+> Coordinate with NIH AWS team. Execute after Phase 15 authentication is confirmed.
+
+### Pre-Migration Planning
+- [ ] Obtain NIAID AWS account ID and confirm access credentials
+- [ ] Inventory all current AWS resources in personal account (RDS, S3, Amplify)
+- [ ] Confirm with NIH AWS team: will Amplify be re-initialized or transferred?
+- [ ] Confirm S3 bucket naming conventions required by NIAID
+- [ ] Confirm RDS instance type and PostgreSQL version required by NIAID
+- [ ] Confirm AWS region (currently `us-east-1` — verify this is acceptable)
+- [ ] Request DNS setup from NIH IT for application URL
+- [ ] Schedule maintenance window for cutover — notify all users in advance
+
+### Resources to Migrate
+- [ ] Export all data from RDS PostgreSQL (pg_dump of hullc production database)
+- [ ] Re-create RDS instance in NIAID AWS account and restore from dump
+- [ ] Verify record counts match between old and new database
+- [ ] Copy all S3 objects to new NIAID S3 bucket (`aws s3 sync`)
+- [ ] Verify all file download links work after bucket migration
+- [ ] Re-initialize Amplify in NIAID AWS account and reconnect GitHub repository
+- [ ] Configure custom domain in new Amplify app
+- [ ] Verify SSL certificate is issued for the new domain
+- [ ] Update all environment variables with new NIAID resource identifiers
+
+### Post-Migration Verification
+- [ ] Open application URL and confirm it loads
+- [ ] Log in and confirm full functionality end-to-end
+- [ ] Spot-check 10–20 product records to confirm data migrated correctly
+- [ ] Spot-check transactions and requests to confirm history is intact
+- [ ] Create a test product, transaction, and request — confirm writes work
+- [ ] Verify file downloads work from new S3 bucket
+- [ ] Verify Metrics tab shows correct totals matching old system
+
+### Cutover & Decommission
+- [ ] Send communication to all users with new URL before cutover
+- [ ] Set old Amplify app to display "system has moved" message
+- [ ] Monitor new environment for 2 weeks before decommissioning old resources
+- [ ] After confirmation: delete old Amplify app, RDS instance, S3 bucket from personal account
+- [ ] Set zero-spend budget alert in NIAID AWS account
+
+---
+
+## Backlog — Future Improvements
+
+- [ ] Low-quantity alert threshold per product — flag when quantity falls below a user-set minimum (separate from reorder threshold)
+- [ ] Bulk-edit capability for products (update vendor or storage location across multiple records at once)
+- [ ] Add export button on Metrics tab (export charts summary to Excel or PDF)
+- [ ] Role-based visibility for Metrics tab — confirm if ProjectManager should see metrics
+- [ ] Real-time inventory updates via server-sent events if multiple users edit simultaneously
+- [ ] Email notification digest — daily summary email to Admin of pending requests
+- [ ] Confirm NIH Blue hex in print reports (`#002F87` vs `#003087`) — verify with NIH branding guidelines
+
+---
+
+*Built for laboratory inventory management at NIH/NIAID — HULLC.*
+````"*
