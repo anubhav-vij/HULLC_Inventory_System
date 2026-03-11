@@ -129,13 +129,13 @@ export default function MetricsReceivedPage() {
   if (!user) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <Loader2 className="h-8 w-8 animate-spin" style={{ color: "#1a7070" }} />
+        <Loader2 className="h-8 w-8 animate-spin" style={{ color: "#1e40af" }} />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen w-full" style={{ backgroundColor: "#f0f4f4" }}>
+    <div className="min-h-screen w-full" style={{ backgroundColor: "#eef2f7" }}>
       <Sidebar
         activeView="metrics-received"
         onNavigate={(view) => {
@@ -163,7 +163,7 @@ export default function MetricsReceivedPage() {
               <ChevronLeft className="h-5 w-5" style={{ color: "#64748b" }} />
             </button>
             <div>
-              <h1 className="text-lg font-semibold" style={{ color: "#0f2a2a" }}>
+              <h1 className="text-lg font-semibold" style={{ color: "#0f172a" }}>
                 Inventory Received
               </h1>
               <p className="text-xs" style={{ color: "#64748b" }}>
@@ -171,7 +171,7 @@ export default function MetricsReceivedPage() {
               </p>
             </div>
           </div>
-          <Badge variant="outline" className="text-xs font-medium" style={{ color: "#1a7070", borderColor: "#1a7070" }}>
+          <Badge variant="outline" className="text-xs font-medium" style={{ color: "#1e40af", borderColor: "#1e40af" }}>
             {user.role}
           </Badge>
         </div>
@@ -205,7 +205,7 @@ export default function MetricsReceivedPage() {
                     style={{ borderColor: "#e2e8f0" }}
                   />
                 </div>
-                <Button onClick={handleApply} style={{ backgroundColor: "#1a7070" }}>
+                <Button onClick={handleApply} style={{ backgroundColor: "#1e40af" }}>
                   Apply
                 </Button>
                 <div className="flex-1" />
@@ -219,7 +219,7 @@ export default function MetricsReceivedPage() {
             <div className="px-6 pb-6 pt-4">
               {isLoading ? (
                 <div className="flex items-center justify-center py-16">
-                  <Loader2 className="h-6 w-6 animate-spin" style={{ color: "#1a7070" }} />
+                  <Loader2 className="h-6 w-6 animate-spin" style={{ color: "#1e40af" }} />
                 </div>
               ) : data.length === 0 ? (
                 <div className="flex items-center justify-center py-16">
@@ -281,10 +281,10 @@ export default function MetricsReceivedPage() {
                   {/* Summary */}
                   <div className="flex gap-6 mt-4 px-2">
                     <p className="text-sm" style={{ color: "#64748b" }}>
-                      <span className="font-semibold" style={{ color: "#0f2a2a" }}>{totalLots}</span> lots received
+                      <span className="font-semibold" style={{ color: "#0f172a" }}>{totalLots}</span> lots received
                     </p>
                     <p className="text-sm" style={{ color: "#64748b" }}>
-                      <span className="font-semibold" style={{ color: "#0f2a2a" }}>{totalQuantity}</span> total quantity
+                      <span className="font-semibold" style={{ color: "#0f172a" }}>{totalQuantity}</span> total quantity
                     </p>
                   </div>
                 </>

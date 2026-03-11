@@ -4,31 +4,33 @@
 
 @layer base {
   :root {
-    --background: 174 25% 95%;        /* #f0f4f4 teal-tinted page background */
-    --foreground: 174 71% 10%;        /* #0f2a2a near-black teal text */
-    --card: 0 0% 100%;                /* white cards */
-    --card-foreground: 174 71% 10%;
+    /* Steel Lab — Navy/Indigo, Cool Slate */
+    --background: 214 32% 95%;        /* cool slate gray background */
+    --foreground: 224 71% 10%;        /* near-black navy text */
+    --card: 0 0% 100%;                /* pure white cards */
+    --card-foreground: 224 71% 10%;
     --popover: 0 0% 100%;
-    --popover-foreground: 174 71% 10%;
-    --primary: 174 62% 27%;           /* #1a7070 teal primary */
-    --primary-foreground: 0 0% 100%;
-    --secondary: 174 25% 91%;         /* #e6f7f7 teal light */
-    --secondary-foreground: 174 71% 20%;
-    --muted: 174 20% 91%;
-    --muted-foreground: 215 16% 47%;  /* #64748b slate gray */
-    --accent: 174 62% 27%;            /* #1a7070 */
-    --accent-foreground: 0 0% 100%;
-    --destructive: 0 72% 51%;
-    --destructive-foreground: 0 0% 100%;
-    --border: 214 32% 89%;            /* #e2e8f0 */
-    --input: 214 32% 89%;
-    --ring: 174 62% 27%;
+    --popover-foreground: 224 71% 10%;
+    --primary: 226 71% 40%;           /* deep navy/indigo */
+    --primary-foreground: 210 40% 98%;
+    --secondary: 214 32% 91%;         /* light cool gray */
+    --secondary-foreground: 224 71% 20%;
+    --muted: 214 32% 91%;
+    --muted-foreground: 215 25% 45%;  /* slate gray text */
+    --accent: 221 83% 53%;            /* brighter blue accent */
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 72% 51%;         /* strong red */
+    --destructive-foreground: 210 40% 98%;
+    --border: 214 32% 86%;            /* subtle cool gray border */
+    --input: 214 32% 86%;
+    --ring: 226 71% 40%;
     --radius: 0.75rem;
-    --chart-1: 174 62% 27%;
-    --chart-2: 174 45% 40%;
+    --chart-1: 226 71% 40%;
+    --chart-2: 221 83% 53%;
     --chart-3: 160 84% 39%;
     --chart-4: 43 74% 66%;
     --chart-5: 27 87% 67%;
+    /* Sidebar keeps teal identity */
     --sidebar-background: 174 75% 15%;  /* #0d3d3d */
     --sidebar-foreground: 0 0% 98%;
     --sidebar-primary: 174 62% 27%;     /* #1a7070 */
@@ -37,6 +39,37 @@
     --sidebar-accent-foreground: 0 0% 98%;
     --sidebar-border: 174 40% 18%;
     --sidebar-ring: 174 62% 27%;
+  }
+
+  .dark {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 217.2 91.2% 59.8%;
+    --primary-foreground: 222.2 47% 11.2%;
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 224.3 76.3% 48%;
+    /* Sidebar stays teal in dark mode too */
+    --sidebar-background: 174 75% 10%;
+    --sidebar-foreground: 0 0% 98%;
+    --sidebar-primary: 174 62% 35%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 174 50% 15%;
+    --sidebar-accent-foreground: 0 0% 98%;
+    --sidebar-border: 174 40% 12%;
+    --sidebar-ring: 174 62% 35%;
   }
 }
 
@@ -70,6 +103,26 @@ select:focus,
 textarea:focus,
 [role="combobox"]:focus {
   outline: none;
-  box-shadow: 0 0 0 2px #1a7070;
-  border-color: #1a7070 !important;
+  box-shadow: 0 0 0 2px #1e40af;
+  border-color: #1e40af !important;
+}
+
+/* ── Print Styles ─────────────────────── */
+#transfer-sheet-print-root { display: none; }
+#material-audit-print-root { display: none; }
+
+@media print {
+  body > * { display: none !important; }
+  body > #transfer-sheet-print-root { display: block !important; position: static !important; width: 100%; }
+  body > #material-audit-print-root { display: block !important; position: static !important; width: 100%; }
+
+  @page {
+    margin: 1.5cm;
+    @bottom-center {
+      content: "Page " counter(page) " of " counter(pages);
+      font-size: 9pt;
+      font-family: Arial, sans-serif;
+      color: #444;
+    }
+  }
 }

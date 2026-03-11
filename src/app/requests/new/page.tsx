@@ -202,13 +202,13 @@ function NewRequestForm() {
   if (!user || !product) return null;
 
   return (
-    <div className="min-h-screen w-full content-with-sidebar" style={{ backgroundColor: '#f0f4f4' }}>
+    <div className="min-h-screen w-full content-with-sidebar" style={{ backgroundColor: '#eef2f7' }}>
       {/* Top bar */}
       <div className="sticky top-0 z-30 flex items-center px-8" style={{ height: 60, backgroundColor: '#fff', borderBottom: '1px solid #e2e8f0' }}>
         <div className="flex items-center gap-2 text-sm">
-          <button onClick={() => router.push('/')} className="hover:underline" style={{ color: '#1a7070' }}>Product Requests</button>
+          <button onClick={() => router.push('/')} className="hover:underline" style={{ color: '#1e40af' }}>Product Requests</button>
           <ChevronRight className="h-4 w-4" style={{ color: '#64748b' }} />
-          <span style={{ color: '#0f2a2a' }} className="font-medium">New Request</span>
+          <span style={{ color: '#0f172a' }} className="font-medium">New Request</span>
         </div>
       </div>
 
@@ -221,7 +221,7 @@ function NewRequestForm() {
             {/* Product Info */}
             <div style={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: 12 }}>
               <div style={{ backgroundColor: '#f1f5f9', borderBottom: '1px solid #e2e8f0', borderRadius: '12px 12px 0 0', padding: '14px 16px' }}>
-                <h3 style={{ color: '#0f2a2a', fontSize: '15px', fontWeight: 700, margin: 0 }}>Product</h3>
+                <h3 style={{ color: '#0f172a', fontSize: '15px', fontWeight: 700, margin: 0 }}>Product</h3>
               </div>
               <div style={{ backgroundColor: '#f8fafc', padding: 20, borderRadius: '0 0 12px 12px' }} className="flex flex-col gap-4">
                 <div className="flex flex-col gap-1.5">
@@ -244,7 +244,7 @@ function NewRequestForm() {
             {/* Requestor Info */}
             <div style={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: 12 }}>
               <div style={{ backgroundColor: '#f1f5f9', borderBottom: '1px solid #e2e8f0', borderRadius: '12px 12px 0 0', padding: '14px 16px' }}>
-                <h3 style={{ color: '#0f2a2a', fontSize: '15px', fontWeight: 700, margin: 0 }}>Requestor Information</h3>
+                <h3 style={{ color: '#0f172a', fontSize: '15px', fontWeight: 700, margin: 0 }}>Requestor Information</h3>
               </div>
               <div style={{ backgroundColor: '#f8fafc', padding: 20, borderRadius: '0 0 12px 12px' }} className="flex flex-col gap-4">
                 <div className="flex flex-col gap-1.5">
@@ -265,7 +265,7 @@ function NewRequestForm() {
             {/* Request Details */}
             <div style={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: 12 }}>
               <div style={{ backgroundColor: '#f1f5f9', borderBottom: '1px solid #e2e8f0', borderRadius: '12px 12px 0 0', padding: '14px 16px' }}>
-                <h3 style={{ color: '#0f2a2a', fontSize: '15px', fontWeight: 700, margin: 0 }}>Request Details</h3>
+                <h3 style={{ color: '#0f172a', fontSize: '15px', fontWeight: 700, margin: 0 }}>Request Details</h3>
               </div>
               <div style={{ backgroundColor: '#f8fafc', padding: 20, borderRadius: '0 0 12px 12px' }} className="flex flex-col gap-4">
                 <div className="flex flex-col gap-1.5">
@@ -314,7 +314,7 @@ function NewRequestForm() {
             <div style={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: 12 }}>
                 <div style={{ backgroundColor: '#f1f5f9', borderBottom: '1px solid #e2e8f0', borderRadius: '12px 12px 0 0', padding: '14px 16px' }} className="flex justify-between items-center">
                   <div>
-                    <h3 style={{ color: '#0f2a2a', fontSize: '15px', fontWeight: 700, margin: 0 }}>Requested Quantities</h3>
+                    <h3 style={{ color: '#0f172a', fontSize: '15px', fontWeight: 700, margin: 0 }}>Requested Quantities</h3>
                     <p style={{ color: '#64748b', fontSize: '13px', marginTop: 2 }}>Add one row per date you need items delivered.</p>
                   </div>
                   <Button type="button" variant="outline" size="sm" onClick={addLineItem}>
@@ -384,7 +384,7 @@ function NewRequestForm() {
               <Button type="button" variant="outline" onClick={() => router.push('/')} disabled={isSaving}>
                 Cancel
               </Button>
-              <Button type="submit" disabled={isSaving} style={{ backgroundColor: '#1a7070' }}>
+              <Button type="submit" disabled={isSaving} style={{ backgroundColor: '#1e40af' }}>
                 {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Submit Request
               </Button>

@@ -1398,10 +1398,10 @@ export default function InventoryPage() {
 
     if (!user) {
         return (
-            <div className="flex items-center justify-center min-h-screen" style={{ backgroundColor: '#f0f4f4' }}>
+            <div className="flex items-center justify-center min-h-screen" style={{ backgroundColor: '#eef2f7' }}>
                 <div className="w-full max-w-sm" style={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: 12 }}>
                     <div className="p-6 pb-2 text-center">
-                        <h1 className="text-2xl font-bold mb-1" style={{ color: '#0f2a2a' }}>HULLC Inventory</h1>
+                        <h1 className="text-2xl font-bold mb-1" style={{ color: '#0f172a' }}>HULLC Inventory</h1>
                         <p className="text-xs mb-1" style={{ color: '#64748b' }}>High Use Long Lead Consumables</p>
                         <p className="text-sm mt-3" style={{ color: '#64748b' }}>Sign in with your HULLC account.</p>
                     </div>
@@ -1439,7 +1439,7 @@ export default function InventoryPage() {
                                     {loginError}
                                 </p>
                             )}
-                            <Button type="submit" disabled={isLoginLoading} className="w-full" style={{ backgroundColor: '#1a7070' }}>
+                            <Button type="submit" disabled={isLoginLoading} className="w-full" style={{ backgroundColor: '#1e40af' }}>
                                 {isLoginLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                                 Sign In
                             </Button>
@@ -1472,7 +1472,7 @@ export default function InventoryPage() {
     const currentPage = pageTitle[activeView] ?? pageTitle.inventory;
 
     return (
-        <div className="min-h-screen w-full" style={{ backgroundColor: '#f0f4f4' }}>
+        <div className="min-h-screen w-full" style={{ backgroundColor: '#eef2f7' }}>
             <input type="file" ref={fileInputRef} onChange={handleFileImport} style={{ display: 'none' }} accept=".xlsx,.xls,.csv" />
             <Sidebar activeView={activeView} onNavigate={(view) => {
                 if (view === 'metrics-received') { router.push('/metrics/received'); return; }
@@ -1483,10 +1483,10 @@ export default function InventoryPage() {
                 {/* Top bar */}
                 <div className="sticky top-0 z-30 flex items-center justify-between px-8" style={{ height: 60, backgroundColor: '#fff', borderBottom: '1px solid #e2e8f0' }}>
                     <div>
-                        <h1 className="text-lg font-semibold" style={{ color: '#0f2a2a' }}>{currentPage.title}</h1>
+                        <h1 className="text-lg font-semibold" style={{ color: '#0f172a' }}>{currentPage.title}</h1>
                         {currentPage.subtitle && <p className="text-xs" style={{ color: '#64748b' }}>{currentPage.subtitle}</p>}
                     </div>
-                    <Badge variant="outline" className="text-xs font-medium" style={{ color: '#1a7070', borderColor: '#1a7070' }}>{user.role}</Badge>
+                    <Badge variant="outline" className="text-xs font-medium" style={{ color: '#1e40af', borderColor: '#1e40af' }}>{user.role}</Badge>
                 </div>
 
             <TooltipProvider>
@@ -1528,7 +1528,7 @@ export default function InventoryPage() {
                     const cardStyle = { backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: 12 };
                     const clickableCardStyle = { ...cardStyle, cursor: 'pointer' as const, transition: 'box-shadow 0.15s' };
                     const labelStyle = { color: '#64748b' };
-                    const valueStyle = { color: '#0f2a2a' };
+                    const valueStyle = { color: '#0f172a' };
 
                     return (
                     <div className="space-y-6">
@@ -1548,7 +1548,7 @@ export default function InventoryPage() {
                             >
                                 <p className="text-xs font-medium uppercase tracking-wider" style={labelStyle}>Added This Week</p>
                                 <p className="text-3xl font-bold mt-2" style={valueStyle}>{recentProducts.length}</p>
-                                <p className="text-xs mt-1" style={{ color: '#1a7070' }}>Click to view inventory</p>
+                                <p className="text-xs mt-1" style={{ color: '#1e40af' }}>Click to view inventory</p>
                             </div>
 
                             {/* Transactions today */}
@@ -1559,7 +1559,7 @@ export default function InventoryPage() {
                             >
                                 <p className="text-xs font-medium uppercase tracking-wider" style={labelStyle}>Transactions Today</p>
                                 <p className="text-3xl font-bold mt-2" style={valueStyle}>{todayTransactions.length}</p>
-                                <p className="text-xs mt-1" style={{ color: '#1a7070' }}>Click to view transactions</p>
+                                <p className="text-xs mt-1" style={{ color: '#1e40af' }}>Click to view transactions</p>
                             </div>
 
                             {/* Pending items — role-aware */}
@@ -1574,7 +1574,7 @@ export default function InventoryPage() {
                             >
                                 <p className="text-xs font-medium uppercase tracking-wider" style={labelStyle}>{pendingLabel}</p>
                                 <p className="text-3xl font-bold mt-2" style={pendingCount > 0 ? { color: '#ea580c' } : valueStyle}>{pendingCount}</p>
-                                <p className="text-xs mt-1" style={{ color: '#1a7070' }}>Click to view</p>
+                                <p className="text-xs mt-1" style={{ color: '#1e40af' }}>Click to view</p>
                             </div>
 
                             {/* Products at/below reorder threshold */}
@@ -1593,7 +1593,7 @@ export default function InventoryPage() {
                         {lowStockProducts.length > 0 && (
                             <div style={cardStyle}>
                                 <div className="px-6 py-4" style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: '#f8fafc', borderRadius: '12px 12px 0 0' }}>
-                                    <h3 className="text-sm font-semibold" style={{ color: '#0f2a2a' }}>Low Stock Products</h3>
+                                    <h3 className="text-sm font-semibold" style={{ color: '#0f172a' }}>Low Stock Products</h3>
                                 </div>
                                 <div className="overflow-x-auto">
                                     <table className="w-full">
@@ -1608,7 +1608,7 @@ export default function InventoryPage() {
                                         <tbody>
                                             {lowStockProducts.map(p => (
                                                 <tr key={p.id} className="border-t" style={{ borderColor: '#e2e8f0' }}>
-                                                    <td className="px-6 py-3 text-sm" style={{ color: '#1a7070' }}>{p.id}</td>
+                                                    <td className="px-6 py-3 text-sm" style={{ color: '#1e40af' }}>{p.id}</td>
                                                     <td className="px-6 py-3 text-sm font-medium" style={valueStyle}>{p.name}</td>
                                                     <td className="px-6 py-3 text-sm text-right font-semibold" style={{ color: '#dc2626' }}>{totalQuantity(p.lots)}</td>
                                                     <td className="px-6 py-3 text-sm text-right" style={labelStyle}>{p.reorderThreshold}</td>
@@ -1629,7 +1629,7 @@ export default function InventoryPage() {
                                 <div className="p-6 pb-4">
                                     <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                                         <div className="flex-1">
-                                            <h2 className="text-lg font-semibold" style={{ color: '#0f2a2a' }}>Master Inventory</h2>
+                                            <h2 className="text-lg font-semibold" style={{ color: '#0f172a' }}>Master Inventory</h2>
                                             <p className="text-sm" style={{ color: '#64748b' }}>Manage all products and their stock.</p>
                                         </div>
                                         <div className="flex flex-col sm:flex-row sm:justify-end gap-2 w-full sm:w-auto">
@@ -1842,7 +1842,7 @@ export default function InventoryPage() {
                                     <div className="p-6 pb-4">
                                         <div className="flex flex-col gap-4">
                                             <div>
-                                                <h2 className="text-lg font-semibold" style={{ color: '#0f2a2a' }}>Product Requests</h2>
+                                                <h2 className="text-lg font-semibold" style={{ color: '#0f172a' }}>Product Requests</h2>
                                                 <p className="text-sm" style={{ color: '#64748b' }}>
                                                     {hasFullView
                                                         ? 'Approved requests ready for fulfillment. Expand each request to fulfill individual line items.'
@@ -1911,7 +1911,7 @@ export default function InventoryPage() {
                                                                         </Button>
                                                                     </TableCell>
                                                                     <TableCell>
-                                                                        <button onClick={() => router.push(`/requests/${req.id}`)} className="text-sm font-medium hover:underline" style={{ color: '#1a7070' }}>
+                                                                        <button onClick={() => router.push(`/requests/${req.id}`)} className="text-sm font-medium hover:underline" style={{ color: '#1e40af' }}>
                                                                             {(req as any).requestId ?? req.id.slice(0, 8)}
                                                                         </button>
                                                                     </TableCell>
@@ -2011,7 +2011,7 @@ export default function InventoryPage() {
                 {activeView === 'approvals' && user.role === 'Director' && (
                                 <div style={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: 12 }}>
                                     <div className="p-6 pb-4">
-                                        <h2 className="text-lg font-semibold" style={{ color: '#0f2a2a' }}>Pending Approvals</h2>
+                                        <h2 className="text-lg font-semibold" style={{ color: '#0f172a' }}>Pending Approvals</h2>
                                         <p className="text-sm" style={{ color: '#64748b' }}>Product requests from your functional group awaiting your approval.</p>
                                     </div>
                                     <div className="px-6 pb-6">
@@ -2044,7 +2044,7 @@ export default function InventoryPage() {
                                                                         </Button>
                                                                     </TableCell>
                                                                     <TableCell>
-                                                                        <button onClick={() => router.push(`/requests/${req.id}`)} className="text-sm font-medium hover:underline" style={{ color: '#1a7070' }}>
+                                                                        <button onClick={() => router.push(`/requests/${req.id}`)} className="text-sm font-medium hover:underline" style={{ color: '#1e40af' }}>
                                                                             {(req as any).requestId ?? req.id.slice(0, 8)}
                                                                         </button>
                                                                     </TableCell>
@@ -2126,7 +2126,7 @@ export default function InventoryPage() {
                     {/* Approved/In-Progress requests with line-item fulfill */}
                     <div style={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: 12 }}>
                         <div className="p-6 pb-4">
-                            <h2 className="text-lg font-semibold" style={{ color: '#0f2a2a' }}>Requests Ready for Fulfillment</h2>
+                            <h2 className="text-lg font-semibold" style={{ color: '#0f172a' }}>Requests Ready for Fulfillment</h2>
                             <p className="text-sm" style={{ color: '#64748b' }}>Approved and in-progress requests with line items to fulfill.</p>
                         </div>
                         <div className="px-6 pb-6">
@@ -2155,7 +2155,7 @@ export default function InventoryPage() {
                                                                 </Button>
                                                             </TableCell>
                                                             <TableCell>
-                                                                <button onClick={() => router.push(`/requests/${req.id}`)} className="text-sm font-medium hover:underline" style={{ color: '#1a7070' }}>
+                                                                <button onClick={() => router.push(`/requests/${req.id}`)} className="text-sm font-medium hover:underline" style={{ color: '#1e40af' }}>
                                                                     {(req as any).requestId ?? req.id.slice(0, 8)}
                                                                 </button>
                                                             </TableCell>
@@ -2197,7 +2197,7 @@ export default function InventoryPage() {
                                                                                     </TableCell>
                                                                                     {canEdit && <TableCell className="text-right">
                                                                                         {li.status === 'Pending' && (
-                                                                                            <Button size="sm" disabled={isSaving} onClick={() => handleFulfillLineItem(req, li)} style={{ backgroundColor: '#1a7070' }}>
+                                                                                            <Button size="sm" disabled={isSaving} onClick={() => handleFulfillLineItem(req, li)} style={{ backgroundColor: '#1e40af' }}>
                                                                                                 Fulfill
                                                                                             </Button>
                                                                                         )}
@@ -2226,7 +2226,7 @@ export default function InventoryPage() {
                     {/* Legacy fulfillments */}
                     <div style={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: 12 }}>
                         <div className="p-6 pb-4">
-                            <h2 className="text-lg font-semibold" style={{ color: '#0f2a2a' }}>Legacy Fulfillments</h2>
+                            <h2 className="text-lg font-semibold" style={{ color: '#0f172a' }}>Legacy Fulfillments</h2>
                             <p className="text-sm" style={{ color: '#64748b' }}>In-progress fulfillments being partially dispensed over time.</p>
                         </div>
                         <div className="px-6 pb-6">
@@ -2289,7 +2289,7 @@ export default function InventoryPage() {
                                         <div className="flex flex-col gap-4">
                                             <div className="flex justify-between items-center">
                                                 <div>
-                                                    <h2 className="text-lg font-semibold" style={{ color: '#0f2a2a' }}>Transaction History</h2>
+                                                    <h2 className="text-lg font-semibold" style={{ color: '#0f172a' }}>Transaction History</h2>
                                                     <p className="text-sm" style={{ color: '#64748b' }}>View a log of all inventory transactions.</p>
                                                 </div>
                                                 <Button variant="outline" onClick={handleExportTransactions}>
@@ -2405,11 +2405,11 @@ export default function InventoryPage() {
                                         <div className="p-6 pb-4">
                                             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                                                 <div>
-                                                    <h2 className="text-lg font-semibold flex items-center gap-2" style={{ color: '#0f2a2a' }}><UserCog className="h-5 w-5" /> Users</h2>
+                                                    <h2 className="text-lg font-semibold flex items-center gap-2" style={{ color: '#0f172a' }}><UserCog className="h-5 w-5" /> Users</h2>
                                                     <p className="text-sm" style={{ color: '#64748b' }}>Manage system users, roles, and functional group assignments.</p>
                                                 </div>
                                                 {canEdit && (
-                                                    <Button onClick={() => handleOpenUserForm(null)} style={{ backgroundColor: '#1a7070' }}>
+                                                    <Button onClick={() => handleOpenUserForm(null)} style={{ backgroundColor: '#1e40af' }}>
                                                         <PlusCircle className="mr-2 h-4 w-4" /> Add User
                                                     </Button>
                                                 )}
@@ -2480,11 +2480,11 @@ export default function InventoryPage() {
                                         <div className="p-6 pb-4">
                                             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                                                 <div>
-                                                    <h2 className="text-lg font-semibold flex items-center gap-2" style={{ color: '#0f2a2a' }}><Building2 className="h-5 w-5" /> Functional Groups</h2>
+                                                    <h2 className="text-lg font-semibold flex items-center gap-2" style={{ color: '#0f172a' }}><Building2 className="h-5 w-5" /> Functional Groups</h2>
                                                     <p className="text-sm" style={{ color: '#64748b' }}>Manage HULLC functional groups. Deactivating a group does not remove existing user assignments.</p>
                                                 </div>
                                                 {canEdit && (
-                                                    <Button onClick={() => handleOpenGroupForm(null)} style={{ backgroundColor: '#1a7070' }}>
+                                                    <Button onClick={() => handleOpenGroupForm(null)} style={{ backgroundColor: '#1e40af' }}>
                                                         <PlusCircle className="mr-2 h-4 w-4" /> Add Group
                                                     </Button>
                                                 )}
@@ -2549,11 +2549,11 @@ export default function InventoryPage() {
                                         <div className="p-6 pb-4">
                                             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                                                 <div>
-                                                    <h2 className="text-lg font-semibold flex items-center gap-2" style={{ color: '#0f2a2a' }}><Package className="h-5 w-5" /> Projects</h2>
+                                                    <h2 className="text-lg font-semibold flex items-center gap-2" style={{ color: '#0f172a' }}><Package className="h-5 w-5" /> Projects</h2>
                                                     <p className="text-sm" style={{ color: '#64748b' }}>Manage projects available for product requests.</p>
                                                 </div>
                                                 {canEdit && (
-                                                    <Button onClick={() => handleOpenProjectForm(null)} style={{ backgroundColor: '#1a7070' }}>
+                                                    <Button onClick={() => handleOpenProjectForm(null)} style={{ backgroundColor: '#1e40af' }}>
                                                         <PlusCircle className="mr-2 h-4 w-4" /> Add Project
                                                     </Button>
                                                 )}
@@ -2617,11 +2617,11 @@ export default function InventoryPage() {
                                         <div className="p-6 pb-4">
                                             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                                                 <div>
-                                                    <h2 className="text-lg font-semibold flex items-center gap-2" style={{ color: '#0f2a2a' }}>Manufacturers</h2>
+                                                    <h2 className="text-lg font-semibold flex items-center gap-2" style={{ color: '#0f172a' }}>Manufacturers</h2>
                                                     <p className="text-sm" style={{ color: '#64748b' }}>Manage manufacturers for products.</p>
                                                 </div>
                                                 {canEdit && (
-                                                    <Button onClick={() => handleOpenManufacturerForm(null)} style={{ backgroundColor: '#1a7070' }}>
+                                                    <Button onClick={() => handleOpenManufacturerForm(null)} style={{ backgroundColor: '#1e40af' }}>
                                                         <PlusCircle className="mr-2 h-4 w-4" /> Add Manufacturer
                                                     </Button>
                                                 )}
@@ -2690,11 +2690,11 @@ export default function InventoryPage() {
                                         <div className="p-6 pb-4">
                                             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                                                 <div>
-                                                    <h2 className="text-lg font-semibold flex items-center gap-2" style={{ color: '#0f2a2a' }}>Storage Locations</h2>
+                                                    <h2 className="text-lg font-semibold flex items-center gap-2" style={{ color: '#0f172a' }}>Storage Locations</h2>
                                                     <p className="text-sm" style={{ color: '#64748b' }}>Manage storage locations for lot rows. Locations in use by active lots cannot be deactivated.</p>
                                                 </div>
                                                 {canEdit && (
-                                                    <Button onClick={() => handleOpenLocationForm(null)} style={{ backgroundColor: '#1a7070' }}>
+                                                    <Button onClick={() => handleOpenLocationForm(null)} style={{ backgroundColor: '#1e40af' }}>
                                                         <PlusCircle className="mr-2 h-4 w-4" /> Add Location
                                                     </Button>
                                                 )}
@@ -3027,7 +3027,7 @@ export default function InventoryPage() {
                                 }}
                                 disabled={isImporting}
                                 className="w-full text-left px-4 py-3 rounded-lg border text-sm font-medium transition-colors hover:bg-gray-50"
-                                style={{ borderColor: '#e2e8f0', color: '#0f2a2a' }}
+                                style={{ borderColor: '#e2e8f0', color: '#0f172a' }}
                             >
                                 {isImporting ? (
                                     <span className="flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> Importing...</span>

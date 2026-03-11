@@ -70,7 +70,7 @@ function NewProductFormPage() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <Loader2 className="h-12 w-12 animate-spin" style={{ color: '#1a7070' }} />
+        <Loader2 className="h-12 w-12 animate-spin" style={{ color: '#1e40af' }} />
       </div>
     );
   }
@@ -78,17 +78,17 @@ function NewProductFormPage() {
   if (!user) return null;
 
   return (
-    <div className="min-h-screen w-full content-with-sidebar" style={{ backgroundColor: '#f0f4f4' }}>
+    <div className="min-h-screen w-full content-with-sidebar" style={{ backgroundColor: '#eef2f7' }}>
       {/* Top bar */}
       <div className="sticky top-0 z-30 flex items-center justify-between px-8" style={{ height: 60, backgroundColor: '#fff', borderBottom: '1px solid #e2e8f0' }}>
         <div className="flex items-center gap-2 text-sm">
-          <button onClick={() => router.push('/')} className="hover:underline" style={{ color: '#1a7070' }}>HULLC Inventory</button>
+          <button onClick={() => router.push('/')} className="hover:underline" style={{ color: '#1e40af' }}>HULLC Inventory</button>
           <ChevronRight className="h-4 w-4" style={{ color: '#64748b' }} />
-          <span style={{ color: '#0f2a2a' }} className="font-medium">Add New Product</span>
+          <span style={{ color: '#0f172a' }} className="font-medium">Add New Product</span>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" onClick={() => window.location.href = '/'} disabled={isSaving}>Cancel</Button>
-          <Button type="submit" form="product-form" disabled={isSaving} style={{ backgroundColor: '#1a7070' }}>
+          <Button type="submit" form="product-form" disabled={isSaving} style={{ backgroundColor: '#1e40af' }}>
             {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Save Product
           </Button>
@@ -113,7 +113,7 @@ function NewProductFormPage() {
 
 export default function NewProductPage() {
   return (
-    <Suspense fallback={<div className="flex items-center justify-center min-h-screen"><Loader2 className="h-12 w-12 animate-spin" style={{ color: '#1a7070' }} /></div>}>
+    <Suspense fallback={<div className="flex items-center justify-center min-h-screen"><Loader2 className="h-12 w-12 animate-spin" style={{ color: '#1e40af' }} /></div>}>
       <NewProductFormPage />
     </Suspense>
   );

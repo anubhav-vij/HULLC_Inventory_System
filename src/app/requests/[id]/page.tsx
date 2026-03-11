@@ -125,7 +125,7 @@ function FulfillForm({ requestId, lineItem, productId, user, onComplete, onCance
   if (isLoadingLots) {
     return (
       <div className="flex items-center justify-center py-8">
-        <Loader2 className="h-6 w-6 animate-spin" style={{ color: "#1a7070" }} />
+        <Loader2 className="h-6 w-6 animate-spin" style={{ color: "#1e40af" }} />
       </div>
     );
   }
@@ -133,7 +133,7 @@ function FulfillForm({ requestId, lineItem, productId, user, onComplete, onCance
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold" style={{ color: "#0f2a2a" }}>
+        <h3 className="text-sm font-semibold" style={{ color: "#0f172a" }}>
           Fulfill Line Item — {lineItem.requestedDate} (Qty: {lineItem.quantity})
         </h3>
         <button onClick={onCancel} className="p-1 rounded hover:bg-gray-100">
@@ -187,11 +187,11 @@ function FulfillForm({ requestId, lineItem, productId, user, onComplete, onCance
             <tbody>
               {lots.map((lot, idx) => (
                 <tr key={lot.id} style={idx > 0 ? { borderTop: "1px solid #f1f5f9" } : undefined}>
-                  <td className="px-4 py-2" style={{ color: "#0f2a2a" }}>
+                  <td className="px-4 py-2" style={{ color: "#0f172a" }}>
                     {lot.lotNumber || lot.id.slice(0, 8)}
                     {lot.location && <span className="text-xs ml-2" style={{ color: "#64748b" }}>({lot.location})</span>}
                   </td>
-                  <td className="px-4 py-2" style={{ color: "#0f2a2a" }}>{lot.quantity}</td>
+                  <td className="px-4 py-2" style={{ color: "#0f172a" }}>{lot.quantity}</td>
                   <td className="px-4 py-2">
                     <Input
                       type="number"
@@ -220,7 +220,7 @@ function FulfillForm({ requestId, lineItem, productId, user, onComplete, onCance
           size="sm"
           onClick={handleSubmit}
           disabled={isSaving || totalSelected < 1}
-          style={{ backgroundColor: "#1a7070", color: "#fff" }}
+          style={{ backgroundColor: "#1e40af", color: "#fff" }}
         >
           {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
           Confirm Fulfillment
@@ -391,9 +391,9 @@ function RequestDetailContent() {
     return (
       <div
         className="content-with-sidebar flex items-center justify-center min-h-screen"
-        style={{ backgroundColor: "#f0f4f4" }}
+        style={{ backgroundColor: "#eef2f7" }}
       >
-        <Loader2 className="h-10 w-10 animate-spin" style={{ color: "#1a7070" }} />
+        <Loader2 className="h-10 w-10 animate-spin" style={{ color: "#1e40af" }} />
       </div>
     );
   }
@@ -416,7 +416,7 @@ function RequestDetailContent() {
   return (
     <div
       className="content-with-sidebar min-h-screen"
-      style={{ backgroundColor: "#f0f4f4", marginLeft: "240px" }}
+      style={{ backgroundColor: "#eef2f7", marginLeft: "240px" }}
     >
       {/* Top bar */}
       <div
@@ -431,7 +431,7 @@ function RequestDetailContent() {
           className="flex items-center gap-1 text-sm transition-colors"
           style={{ color: "#64748b" }}
           onMouseEnter={(e) =>
-            (e.currentTarget.style.color = "#0f2a2a")
+            (e.currentTarget.style.color = "#0f172a")
           }
           onMouseLeave={(e) =>
             (e.currentTarget.style.color = "#64748b")
@@ -441,7 +441,7 @@ function RequestDetailContent() {
           Product Requests
         </button>
         <ChevronRight className="h-3.5 w-3.5" style={{ color: "#64748b" }} />
-        <span className="text-sm font-medium" style={{ color: "#0f2a2a" }}>
+        <span className="text-sm font-medium" style={{ color: "#0f172a" }}>
           {requestDisplayId}
         </span>
       </div>
@@ -451,7 +451,7 @@ function RequestDetailContent() {
         <div style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 12 }}>
           <div style={{ backgroundColor: '#f1f5f9', borderBottom: '1px solid #e2e8f0', borderRadius: '12px 12px 0 0', padding: '16px 24px' }} className="flex items-start justify-between">
             <div>
-              <h1 className="text-xl font-semibold" style={{ color: '#0f2a2a' }}>
+              <h1 className="text-xl font-semibold" style={{ color: '#0f172a' }}>
                 {requestDisplayId}
               </h1>
               <p className="text-sm mt-0.5" style={{ color: '#64748b' }}>
@@ -471,7 +471,7 @@ function RequestDetailContent() {
               <p className="text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: '#475569', fontSize: '11px', letterSpacing: '0.05em' }}>
                 Product
               </p>
-              <p className="text-sm font-medium" style={{ color: '#0f2a2a' }}>
+              <p className="text-sm font-medium" style={{ color: '#0f172a' }}>
                 {request.productName}
               </p>
             </div>
@@ -479,7 +479,7 @@ function RequestDetailContent() {
               <p className="text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: '#475569', fontSize: '11px', letterSpacing: '0.05em' }}>
                 Manufacturer Part #
               </p>
-              <p className="text-sm" style={{ color: '#0f2a2a' }}>
+              <p className="text-sm" style={{ color: '#0f172a' }}>
                 {(request as any).manufacturerPartNumber || '\u2014'}
               </p>
             </div>
@@ -487,7 +487,7 @@ function RequestDetailContent() {
               <p className="text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: '#475569', fontSize: '11px', letterSpacing: '0.05em' }}>
                 Requestor
               </p>
-              <p className="text-sm" style={{ color: '#0f2a2a' }}>
+              <p className="text-sm" style={{ color: '#0f172a' }}>
                 {request.requestorName}
               </p>
               <p className="text-xs" style={{ color: '#64748b' }}>
@@ -498,7 +498,7 @@ function RequestDetailContent() {
               <p className="text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: '#475569', fontSize: '11px', letterSpacing: '0.05em' }}>
                 Department
               </p>
-              <p className="text-sm" style={{ color: '#0f2a2a' }}>
+              <p className="text-sm" style={{ color: '#0f172a' }}>
                 {request.department}
               </p>
             </div>
@@ -506,7 +506,7 @@ function RequestDetailContent() {
               <p className="text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: '#475569', fontSize: '11px', letterSpacing: '0.05em' }}>
                 Project
               </p>
-              <p className="text-sm" style={{ color: '#0f2a2a' }}>
+              <p className="text-sm" style={{ color: '#0f172a' }}>
                 {request.project ?? '\u2014'}
               </p>
             </div>
@@ -514,7 +514,7 @@ function RequestDetailContent() {
               <p className="text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: '#475569', fontSize: '11px', letterSpacing: '0.05em' }}>
                 UoM
               </p>
-              <p className="text-sm" style={{ color: '#0f2a2a' }}>
+              <p className="text-sm" style={{ color: '#0f172a' }}>
                 {(request as any).uom || '\u2014'}
               </p>
             </div>
@@ -522,7 +522,7 @@ function RequestDetailContent() {
               <p className="text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: '#475569', fontSize: '11px', letterSpacing: '0.05em' }}>
                 Justification
               </p>
-              <p className="text-sm" style={{ color: '#0f2a2a' }}>
+              <p className="text-sm" style={{ color: '#0f172a' }}>
                 {request.justification}
               </p>
             </div>
@@ -559,7 +559,7 @@ function RequestDetailContent() {
           >
             <h3
               className="text-sm font-semibold"
-              style={{ color: "#0f2a2a" }}
+              style={{ color: "#0f172a" }}
             >
               Line Items
             </h3>
@@ -628,13 +628,13 @@ function RequestDetailContent() {
                     >
                       <td
                         className="px-6 py-3"
-                        style={{ color: "#0f2a2a" }}
+                        style={{ color: "#0f172a" }}
                       >
                         {li.requestedDate}
                       </td>
                       <td
                         className="px-6 py-3"
-                        style={{ color: "#0f2a2a" }}
+                        style={{ color: "#0f172a" }}
                       >
                         {li.quantity}
                       </td>
@@ -643,7 +643,7 @@ function RequestDetailContent() {
                       </td>
                       <td
                         className="px-6 py-3"
-                        style={{ color: "#0f2a2a" }}
+                        style={{ color: "#0f172a" }}
                       >
                         {li.fulfilledQuantity}
                       </td>
@@ -654,16 +654,16 @@ function RequestDetailContent() {
                               size="sm"
                               onClick={() => setFulfillingLineItemId(li.id)}
                               style={{
-                                backgroundColor: "#1a7070",
+                                backgroundColor: "#1e40af",
                                 color: "#fff",
                               }}
                               onMouseEnter={(e) =>
                                 (e.currentTarget.style.backgroundColor =
-                                  "#155e5e")
+                                  "#1e3a8a")
                               }
                               onMouseLeave={(e) =>
                                 (e.currentTarget.style.backgroundColor =
-                                  "#1a7070")
+                                  "#1e40af")
                               }
                             >
                               <Package className="mr-1.5 h-3.5 w-3.5" />
@@ -708,7 +708,7 @@ function RequestDetailContent() {
         {canApproveReject && (
           <div style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 12 }}>
             <div style={{ backgroundColor: '#f1f5f9', borderBottom: '1px solid #e2e8f0', borderRadius: '12px 12px 0 0', padding: '12px 20px' }}>
-              <h3 className="text-sm font-semibold" style={{ color: '#0f2a2a' }}>
+              <h3 className="text-sm font-semibold" style={{ color: '#0f172a' }}>
                 {canSciOpsApproveReject ? 'Sci-Ops Director Action' : 'Director Action'}
               </h3>
             </div>
@@ -796,7 +796,7 @@ function RequestDetailContent() {
           >
             <p className="text-sm" style={{ color: "#64748b" }}>
               This request is currently{" "}
-              <span className="font-medium" style={{ color: "#0f2a2a" }}>
+              <span className="font-medium" style={{ color: "#0f172a" }}>
                 {request.status}
               </span>
               . You will be notified when the status changes.
@@ -814,9 +814,9 @@ export default function RequestDetailPage() {
       fallback={
         <div
           className="content-with-sidebar flex items-center justify-center min-h-screen"
-          style={{ backgroundColor: "#f0f4f4", marginLeft: "240px" }}
+          style={{ backgroundColor: "#eef2f7", marginLeft: "240px" }}
         >
-          <Loader2 className="h-10 w-10 animate-spin" style={{ color: "#1a7070" }} />
+          <Loader2 className="h-10 w-10 animate-spin" style={{ color: "#1e40af" }} />
         </div>
       }
     >

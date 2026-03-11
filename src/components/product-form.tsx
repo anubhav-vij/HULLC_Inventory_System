@@ -137,7 +137,7 @@ export function ProductForm({ product, onSave, onCancel, isSaving, isAdmin = tru
           {/* Product Information Card */}
           <div style={cardStyle}>
             <div style={cardHeaderStyle}>
-              <h3 style={{ color: '#0f2a2a', fontSize: '15px', fontWeight: 700, margin: 0 }}>Product Information</h3>
+              <h3 style={{ color: '#0f172a', fontSize: '15px', fontWeight: 700, margin: 0 }}>Product Information</h3>
             </div>
             <div style={{ backgroundColor: '#f8fafc', padding: 20, borderRadius: '0 0 12px 12px' }} className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <FormField
@@ -286,7 +286,7 @@ export function ProductForm({ product, onSave, onCancel, isSaving, isAdmin = tru
           {/* Lots Card */}
           <div style={cardStyle}>
             <div style={cardHeaderStyle} className="flex items-center justify-between">
-              <h3 style={{ color: '#0f2a2a', fontSize: '15px', fontWeight: 700, margin: 0 }}>Lots</h3>
+              <h3 style={{ color: '#0f172a', fontSize: '15px', fontWeight: 700, margin: 0 }}>Lots</h3>
             </div>
             <div style={{ backgroundColor: '#f8fafc', padding: 20, borderRadius: '0 0 12px 12px' }}>
               {form.formState.errors.lots?.message && (
@@ -299,7 +299,7 @@ export function ProductForm({ product, onSave, onCancel, isSaving, isAdmin = tru
                   <div key={field.id} style={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: '10px' }} className="p-4 space-y-3 relative">
                     <input type="hidden" {...form.register(`lots.${index}.id`)} />
                     <div className="flex items-center justify-between mb-1">
-                      <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium" style={{ backgroundColor: '#e0f2f1', color: '#1a7070' }}>
+                      <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium" style={{ backgroundColor: '#e0f2f1', color: '#1e40af' }}>
                         Lot {index + 1}
                       </span>
                       {fields.length > 1 && (
