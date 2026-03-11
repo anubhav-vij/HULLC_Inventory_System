@@ -92,6 +92,16 @@ each phase sequentially, marking `[~]` while in progress and `[x]` when complete
 - [x] Request detail page: shows UoM, manufacturer part #, SOM badge, rejection stage in rejection note
 - [x] Form contrast applied: `/requests/new`, `/requests/[id]`, `/products/new`, `/products/[id]/edit` — #f8fafc cards, #f1f5f9 headers, white inputs, #475569 labels
 
+### Sessions 10-12 — Audit Fields, Roles UI, Metrics, Excel Import (2026-03-11)
+- [x] Migration 011: added `created_by`/`updated_by` audit fields to all 13 tables
+- [x] All 19 mutation API endpoints populate audit fields from `x-user-id` header
+- [x] Phase 8: PM/Chief see full Admin view with mutations hidden (`canEdit` vs `hasFullView` pattern)
+- [x] Phase 5b: Metrics pages — `/metrics/received` and `/metrics/disbursed` (Admin only, standalone pages)
+- [x] Metrics API routes: `GET /api/metrics/received`, `GET /api/metrics/disbursed` with date range filtering
+- [x] Sidebar: Metrics expandable group added; generalized expandable menu state (`openMenus` Set)
+- [x] Phase 11: Excel sheet selector dialog for multi-sheet .xlsx files; single-sheet files import directly
+- [x] Excel import/export fully replaces CSV (SheetJS `xlsx` library)
+
 ---
 
 ## Phase 1 — User Management
@@ -198,6 +208,20 @@ each phase sequentially, marking `[~]` while in progress and `[x]` when complete
 
 ---
 
+## Phase 5b — Metrics Reports (Admin Only)
+
+> Standalone full-page reports for Admin to view inventory received and disbursed within a date range.
+
+- [x] Add Metrics expandable group to sidebar (Admin only) with "Inventory Received" and "Inventory Disbursed" children
+- [x] Generalize sidebar expandable menu state from single `configOpen` to `openMenus` Set
+- [x] API: `GET /api/metrics/received?from=&to=` — joins lots→products, filters by receipt_date range
+- [x] API: `GET /api/metrics/disbursed?from=&to=` — joins transaction_items→transactions→products, filters by date range
+- [x] Page: `/metrics/received` — date range filter, sortable table, summary row, Excel export
+- [x] Page: `/metrics/disbursed` — date range filter, sortable table (10 columns), summary row, Excel export
+- [x] Both pages: Admin-only guard, sidebar navigation, back button, role badge, consistent design tokens
+
+---
+
 ## Phase 6 — Search & Filtering
 
 > Makes the application usable at scale when hundreds of products and transactions exist.
@@ -269,7 +293,7 @@ each phase sequentially, marking `[~]` while in progress and `[x]` when complete
 
 - [x] Install SheetJS (`xlsx`) library
 - [x] Replace CSV import with Excel (.xlsx) import
-- [ ] Add sheet selector when uploaded file contains multiple sheets
+- [x] Add sheet selector when uploaded file contains multiple sheets
 - [x] Map Excel columns to Product and Lot model fields
 - [x] Replace CSV export with Excel export for Inventory tab
 - [x] Replace CSV export with Excel export for Transactions tab

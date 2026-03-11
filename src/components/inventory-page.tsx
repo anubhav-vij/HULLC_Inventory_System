@@ -67,6 +67,9 @@ export default function InventoryPage() {
     const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
     const [isImporting, setIsImporting] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const [sheetSelectorOpen, setSheetSelectorOpen] = useState(false);
+    const [sheetNames, setSheetNames] = useState<string[]>([]);
+    const [pendingWorkbook, setPendingWorkbook] = useState<XLSX.WorkBook | null>(null);
     const [openProductIds, setOpenProductIds] = useState<Set<string>>(new Set());
     const [openTransactionIds, setOpenTransactionIds] = useState<Set<string>>(new Set());
     const [openRequestIds, setOpenRequestIds] = useState<Set<string>>(new Set());
@@ -1120,17 +1123,10 @@ export default function InventoryPage() {
         fileInputRef.current?.click();
     };
 
-    const handleFileImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
-        const file = event.target.files?.[0];
-        if (!file) return;
-
+    const processImportSheet = async (workbook: XLSX.WorkBook, selectedSheet: string) => {
         setIsImporting(true);
         try {
-            const data = await file.arrayBuffer();
-            const workbook = XLSX.read(data, { cellDates: true });
-            const sheetName = workbook.SheetNames[0];
-            if (!sheetName) throw new Error('No sheets found in the file.');
-            const rows = XLSX.utils.sheet_to_json<any>(workbook.Sheets[sheetName], { defval: '' });
+            const rows = XLSX.utils.sheet_to_json<any>(workbook.Sheets[selectedSheet], { defval: '' });
 
             const requiredHeaders = [
                 'product_id', 'product_name', 'manufacturer', 'manufacturer_part_number', 'location',
@@ -1229,7 +1225,38 @@ export default function InventoryPage() {
         } finally {
             setIsImporting(false);
             setIsImportDialogOpen(false);
-            if (event.target) event.target.value = '';
+            setSheetSelectorOpen(false);
+            setPendingWorkbook(null);
+            setSheetNames([]);
+        }
+    };
+
+    const handleFileImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+        if (event.target) event.target.value = '';
+
+        try {
+            const data = await file.arrayBuffer();
+            const workbook = XLSX.read(data, { cellDates: true });
+
+            if (!workbook.SheetNames.length) {
+                toast({ title: 'Import Failed', description: 'No sheets found in the file.', variant: 'destructive' });
+                return;
+            }
+
+            if (workbook.SheetNames.length > 1) {
+                // Multi-sheet file — show sheet selector
+                setPendingWorkbook(workbook);
+                setSheetNames(workbook.SheetNames);
+                setSheetSelectorOpen(true);
+                setIsImportDialogOpen(false);
+            } else {
+                // Single sheet — proceed directly
+                await processImportSheet(workbook, workbook.SheetNames[0]);
+            }
+        } catch (error: any) {
+            toast({ title: 'Import Failed', description: error.message, variant: 'destructive' });
         }
     };
 
@@ -1447,7 +1474,11 @@ export default function InventoryPage() {
     return (
         <div className="min-h-screen w-full" style={{ backgroundColor: '#f0f4f4' }}>
             <input type="file" ref={fileInputRef} onChange={handleFileImport} style={{ display: 'none' }} accept=".xlsx,.xls,.csv" />
-            <Sidebar activeView={activeView} onNavigate={setActiveView} user={user} onLogout={handleLogout} />
+            <Sidebar activeView={activeView} onNavigate={(view) => {
+                if (view === 'metrics-received') { router.push('/metrics/received'); return; }
+                if (view === 'metrics-disbursed') { router.push('/metrics/disbursed'); return; }
+                setActiveView(view);
+            }} user={user} onLogout={handleLogout} />
             <div className="content-with-sidebar">
                 {/* Top bar */}
                 <div className="sticky top-0 z-30 flex items-center justify-between px-8" style={{ height: 60, backgroundColor: '#fff', borderBottom: '1px solid #e2e8f0' }}>
@@ -2947,9 +2978,9 @@ export default function InventoryPage() {
             <Dialog open={isImportDialogOpen} onOpenChange={setIsImportDialogOpen}>
                 <DialogContent>
                     <DialogHeader>
-                        <DialogTitle>Import Products from CSV</DialogTitle>
+                        <DialogTitle>Import Products from Excel</DialogTitle>
                         <DialogDescription>
-                            Upload a CSV file to bulk-import products. The file must have the following headers:
+                            Upload an Excel (.xlsx) or CSV file to bulk-import products. The file must have the following headers:
                         </DialogDescription>
                     </DialogHeader>
                     <div className="text-sm bg-muted p-4 rounded-md overflow-x-auto">
@@ -2958,7 +2989,7 @@ export default function InventoryPage() {
                         </code>
                     </div>
                     <p className="text-sm text-muted-foreground">
-                        Each row in the CSV represents a single lot. Products with multiple lots should have multiple rows with the same product information. The `reorder_threshold` applies to the product and should be the same on all rows for that product. Dates should be in YYYY-MM-DD format.
+                        Each row represents a single lot. Products with multiple lots should have multiple rows with the same product information. If the file contains multiple sheets, you will be asked to select which sheet to import.
                     </p>
                     <div className="flex justify-end gap-2 pt-4">
                         <Button variant="ghost" onClick={() => setIsImportDialogOpen(false)} disabled={isImporting}>Cancel</Button>
@@ -2966,6 +2997,50 @@ export default function InventoryPage() {
                             {isImporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CloudUpload className="mr-2 h-4 w-4" />}
                             {isImporting ? 'Importing...' : 'Select File'}
                         </Button>
+                    </div>
+                </DialogContent>
+            </Dialog>
+
+            {/* Sheet selector dialog for multi-sheet Excel files */}
+            <Dialog open={sheetSelectorOpen} onOpenChange={(open) => {
+                if (!open) {
+                    setSheetSelectorOpen(false);
+                    setPendingWorkbook(null);
+                    setSheetNames([]);
+                }
+            }}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Select Sheet</DialogTitle>
+                        <DialogDescription>
+                            This file contains multiple sheets. Select the sheet to import:
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-2 py-2">
+                        {sheetNames.map((name) => (
+                            <button
+                                key={name}
+                                onClick={() => {
+                                    if (pendingWorkbook) {
+                                        processImportSheet(pendingWorkbook, name);
+                                    }
+                                }}
+                                disabled={isImporting}
+                                className="w-full text-left px-4 py-3 rounded-lg border text-sm font-medium transition-colors hover:bg-gray-50"
+                                style={{ borderColor: '#e2e8f0', color: '#0f2a2a' }}
+                            >
+                                {isImporting ? (
+                                    <span className="flex items-center gap-2"><Loader2 className="h-4 w-4 animate-spin" /> Importing...</span>
+                                ) : name}
+                            </button>
+                        ))}
+                    </div>
+                    <div className="flex justify-end pt-2">
+                        <Button variant="ghost" onClick={() => {
+                            setSheetSelectorOpen(false);
+                            setPendingWorkbook(null);
+                            setSheetNames([]);
+                        }} disabled={isImporting}>Cancel</Button>
                     </div>
                 </DialogContent>
             </Dialog>

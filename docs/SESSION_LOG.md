@@ -2,6 +2,49 @@
 
 ---
 
+## Session 12 — 2026-03-11
+
+### What was accomplished
+
+Completed Phase 8 (Additional Roles UI), Phase 5b (Metrics Reports), and Phase 11 (Excel sheet selector).
+
+1. **Phase 8 — Additional Roles UI**:
+   - Added `canEdit` (Admin only) and `hasFullView` (Admin + ProjectManager + Chief) helpers in inventory-page.tsx
+   - All ~25 `user.role === 'Admin'` checks replaced: visibility uses `hasFullView`, mutations use `canEdit`
+   - PM/Chief see full Admin view with all add/edit/delete/action buttons hidden
+   - Updated `/api/users` GET to allow PM/Chief read access
+   - Added role badge to page header
+
+2. **Phase 5b — Metrics Reports (Admin Only)**:
+   - Created `GET /api/metrics/received` — joins lots→products, filters by `receipt_date` range
+   - Created `GET /api/metrics/disbursed` — joins transaction_items→transactions→products with LEFT JOINs to fulfillments→product_requests for project/group info
+   - Created `/metrics/received` page — standalone full page with sidebar, date range filter (default: first of month to today), sortable date column, summary row (lots received + total quantity), Excel export
+   - Created `/metrics/disbursed` page — same pattern, 10-column table (Product, Manufacturer, Mfr Part #, UoM, Lot Number, Qty Dispensed, Dispensed By, Project, Functional Group, Date), summary row (transactions + total quantity dispensed)
+   - Added Metrics expandable group to sidebar nav (Admin only) with PackagePlus/PackageMinus icons
+   - Generalized sidebar from hardcoded `configOpen` boolean to `openMenus` Set supporting multiple expandable groups
+   - Sidebar `onNavigate` in inventory-page.tsx intercepts metrics nav items to `router.push()` to full pages
+
+3. **Phase 11 — Excel Sheet Selector**:
+   - Refactored `handleFileImport` into `processImportSheet(workbook, selectedSheet)` + file reader
+   - When uploaded .xlsx has multiple sheets, shows a selector dialog listing all sheet names as clickable buttons
+   - Single-sheet files skip the selector and import directly
+   - Added state: `sheetSelectorOpen`, `sheetNames`, `pendingWorkbook`
+   - Import dialog text updated from "CSV" to "Excel"
+
+### Files created
+- `src/app/api/metrics/received/route.ts`
+- `src/app/api/metrics/disbursed/route.ts`
+- `src/app/metrics/received/page.tsx`
+- `src/app/metrics/disbursed/page.tsx`
+
+### Files modified
+- `src/components/inventory-page.tsx` — roles refactor, Excel import with sheet selector, metrics navigation
+- `src/components/sidebar.tsx` — Metrics nav group, generalized expandable menus
+- `src/app/api/users/route.ts` — PM/Chief read access
+- `docs/TASKS.md` — Phase 5b added, Phase 11 sheet selector marked complete
+
+---
+
 ## Session 11 — 2026-03-11
 
 ### What was accomplished
