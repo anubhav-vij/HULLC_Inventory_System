@@ -102,6 +102,16 @@ each phase sequentially, marking `[~]` while in progress and `[x]` when complete
 - [x] Phase 11: Excel sheet selector dialog for multi-sheet .xlsx files; single-sheet files import directly
 - [x] Excel import/export fully replaces CSV (SheetJS `xlsx` library)
 
+### Session 13 — CSS Overhaul, Dark Mode, Request ID Backfill (2026-03-11)
+- [x] CSS palette switch: main content area from teal to navy/indigo (Lab Inventory Tracker style)
+- [x] Sidebar retains dark teal identity (#0d3d3d, #80d4d4, #155e5e)
+- [x] Updated hardcoded colors across 8 component files (#1a7070→#1e40af, #0f2a2a→#0f172a, #f0f4f4→#eef2f7)
+- [x] Added dark mode CSS variables (.dark class in globals.css)
+- [x] Added print styles for future audit reports (Phase 12 ready)
+- [x] Focus ring updated to navy (#1e40af)
+- [x] Migration 012: backfilled all existing requests with HULLC-YYYY-XXXX IDs
+- [x] Request ID sequence table populated (year 2026, last_number 10)
+
 ---
 
 ## Phase 1 — User Management
