@@ -183,7 +183,8 @@ export async function PUT(request: Request, { params }: RouteContext) {
       await client.query(
         `UPDATE product_requests
          SET status = $1, director_id = $2, director_approved_at = NOW(), director_comments = $3,
-             som_approval_status = CASE WHEN $4 THEN 'pending' ELSE som_approval_status END
+             som_approval_status = CASE WHEN $4 THEN 'pending' ELSE som_approval_status END,
+             updated_by = $2
          WHERE id = $5`,
         [newStatus, userId, comments, somRequired, id]
       );

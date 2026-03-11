@@ -3,8 +3,14 @@ import { z } from 'zod';
 import bcrypt from 'bcryptjs';
 import { query, withTransaction } from '@/lib/db';
 
+const FULL_VIEW_ROLES = ['Admin', 'ProjectManager', 'Chief'];
+
 function isAdmin(request: Request) {
   return request.headers.get('x-user-role') === 'Admin';
+}
+
+function hasFullView(request: Request) {
+  return FULL_VIEW_ROLES.includes(request.headers.get('x-user-role') ?? '');
 }
 
 interface UserRow {
@@ -42,10 +48,10 @@ const USER_SELECT = `
   LEFT JOIN functional_groups fg ON fg.id = u.functional_group_id
 `;
 
-// GET /api/users — Admin only
+// GET /api/users — Admin, ProjectManager, Chief
 export async function GET(request: Request) {
-  if (!isAdmin(request)) {
-    return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
+  if (!hasFullView(request)) {
+    return NextResponse.json({ error: 'Access required: Admin, ProjectManager, or Chief' }, { status: 403 });
   }
 
   try {
@@ -106,14 +112,15 @@ export async function POST(request: Request) {
   }
 
   const passwordHash = await bcrypt.hash(password, 12);
+  const actorId = request.headers.get('x-user-id') || null;
 
   try {
     const user = await withTransaction(async (client) => {
       const { rows } = await client.query<{ id: string }>(
-        `INSERT INTO users (full_name, email, password_hash, role, department, functional_group_id, is_active)
-         VALUES ($1, $2, $3, $4, $5, $6, TRUE)
+        `INSERT INTO users (full_name, email, password_hash, role, department, functional_group_id, is_active, created_by, updated_by)
+         VALUES ($1, $2, $3, $4, $5, $6, TRUE, $7, $7)
          RETURNING id`,
-        [fullName, email, passwordHash, role, department, functionalGroupId ?? null]
+        [fullName, email, passwordHash, role, department, functionalGroupId ?? null, actorId]
       );
       const { rows: full } = await client.query<UserRow>(
         `${USER_SELECT} WHERE u.id = $1`,

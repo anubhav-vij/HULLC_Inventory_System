@@ -30,6 +30,7 @@ export async function PUT(request: Request, { params }: RouteContext) {
     return NextResponse.json({ error: 'Validation failed', issues: parsed.error.flatten() }, { status: 422 });
   }
 
+  const userId = request.headers.get('x-user-id') || null;
   const sets: string[] = [];
   const vals: unknown[] = [];
   let idx = 1;
@@ -45,6 +46,10 @@ export async function PUT(request: Request, { params }: RouteContext) {
   if (parsed.data.isActive !== undefined) {
     sets.push(`is_active = $${idx++}`);
     vals.push(parsed.data.isActive);
+  }
+  if (userId) {
+    sets.push(`updated_by = $${idx++}`);
+    vals.push(userId);
   }
 
   if (sets.length === 0) {

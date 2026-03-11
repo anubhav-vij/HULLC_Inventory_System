@@ -38,11 +38,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Validation failed', issues: parsed.error.flatten() }, { status: 422 });
   }
 
+  const userId = request.headers.get('x-user-id') || null;
   try {
     const { rows } = await query(
-      `INSERT INTO storage_locations (name) VALUES ($1)
+      `INSERT INTO storage_locations (name, created_by, updated_by) VALUES ($1, $2, $2)
        RETURNING id, name, is_active AS "isActive", created_at AS "createdAt"`,
-      [parsed.data.name.trim()]
+      [parsed.data.name.trim(), userId]
     );
     return NextResponse.json(rows[0], { status: 201 });
   } catch (error: any) {

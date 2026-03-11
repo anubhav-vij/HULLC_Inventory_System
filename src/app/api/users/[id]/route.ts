@@ -91,6 +91,7 @@ export async function PUT(request: Request, { params }: RouteContext) {
     }
   }
 
+  const actorId = request.headers.get('x-user-id') || null;
   const setParts: string[] = [];
   const values: unknown[] = [];
   let idx = 1;
@@ -100,6 +101,7 @@ export async function PUT(request: Request, { params }: RouteContext) {
   if (role !== undefined)              { setParts.push(`role = $${idx++}`);                  values.push(role); }
   if (functionalGroupId !== undefined) { setParts.push(`functional_group_id = $${idx++}`);   values.push(functionalGroupId); }
   if (department !== undefined)        { setParts.push(`department = $${idx++}`);             values.push(department); }
+  if (actorId)                         { setParts.push(`updated_by = $${idx++}`);             values.push(actorId); }
 
   if (setParts.length === 0) {
     return NextResponse.json({ error: 'No fields to update' }, { status: 422 });

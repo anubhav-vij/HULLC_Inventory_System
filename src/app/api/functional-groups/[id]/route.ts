@@ -59,6 +59,7 @@ export async function PUT(request: Request, { params }: RouteContext) {
   }
 
   const { name, isActive } = parsed.data;
+  const userId = request.headers.get('x-user-id') || null;
   const setParts: string[] = [];
   const values: unknown[] = [];
   let idx = 1;
@@ -70,6 +71,10 @@ export async function PUT(request: Request, { params }: RouteContext) {
   if (isActive !== undefined) {
     setParts.push(`is_active = $${idx++}`);
     values.push(isActive);
+  }
+  if (userId) {
+    setParts.push(`updated_by = $${idx++}`);
+    values.push(userId);
   }
   values.push(id);
 

@@ -251,6 +251,8 @@ export async function POST(request: Request) {
     }
   }
 
+  const userId = request.headers.get('x-user-id') || null;
+
   try {
     const result = await withTransaction(async (client) => {
       // Verify product exists
@@ -266,18 +268,18 @@ export async function POST(request: Request) {
       await client.query(
         `INSERT INTO product_requests
            (id, product_id, product_name, requestor_name, requestor_email,
-            department, project, justification, sop_read, status)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'Pending Approval')`,
+            department, project, justification, sop_read, status, created_by, updated_by)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'Pending Approval', $10, $10)`,
         [requestId, productId, productName, requestorName, requestorEmail,
-         department, project ?? null, justification, sopRead]
+         department, project ?? null, justification, sopRead, userId]
       );
 
       // Insert line items
       for (const li of lineItems) {
         await client.query(
-          `INSERT INTO request_line_items (id, request_id, requested_date, quantity)
-           VALUES ($1, $2, $3, $4)`,
-          [uuidv4(), requestId, li.requestedDate, li.quantity]
+          `INSERT INTO request_line_items (id, request_id, requested_date, quantity, created_by)
+           VALUES ($1, $2, $3, $4, $5)`,
+          [uuidv4(), requestId, li.requestedDate, li.quantity, userId]
         );
       }
 

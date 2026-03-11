@@ -39,11 +39,12 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Validation failed', issues: parsed.error.flatten() }, { status: 422 });
   }
 
+  const userId = request.headers.get('x-user-id') || null;
   try {
     const { rows } = await query(
-      `INSERT INTO manufacturers (name, alternate_names) VALUES ($1, $2)
+      `INSERT INTO manufacturers (name, alternate_names, created_by, updated_by) VALUES ($1, $2, $3, $3)
        RETURNING id, name, alternate_names AS "alternateNames", is_active AS "isActive", created_at AS "createdAt"`,
-      [parsed.data.name.trim(), parsed.data.alternateNames?.trim() || null]
+      [parsed.data.name.trim(), parsed.data.alternateNames?.trim() || null, userId]
     );
     return NextResponse.json(rows[0], { status: 201 });
   } catch (error: any) {

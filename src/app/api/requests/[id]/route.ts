@@ -208,12 +208,13 @@ export async function PUT(request: Request, { params }: RouteContext) {
         );
       }
 
+      const updatedBy = request.headers.get('x-user-id') || null;
       const { rows: updated } = await client.query<RequestRow>(
         `UPDATE product_requests
-         SET status = $1, rejection_note = COALESCE($2, rejection_note)
-         WHERE id = $3
+         SET status = $1, rejection_note = COALESCE($2, rejection_note), updated_by = COALESCE($3, updated_by)
+         WHERE id = $4
          RETURNING *`,
-        [newStatus, rejectionNote ?? null, id]
+        [newStatus, rejectionNote ?? null, updatedBy, id]
       );
 
       // Re-fetch with line items

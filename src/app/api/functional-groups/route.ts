@@ -68,10 +68,12 @@ export async function POST(request: Request) {
     );
   }
 
+  const userId = request.headers.get('x-user-id') || null;
+
   try {
     const { rows } = await query<FunctionalGroupRow>(
-      'INSERT INTO functional_groups (name) VALUES ($1) RETURNING *',
-      [parsed.data.name]
+      'INSERT INTO functional_groups (name, created_by, updated_by) VALUES ($1, $2, $2) RETURNING *',
+      [parsed.data.name, userId]
     );
     return NextResponse.json(rowToGroup(rows[0]), { status: 201 });
   } catch (error: any) {

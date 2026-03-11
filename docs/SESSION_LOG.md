@@ -2,6 +2,81 @@
 
 ---
 
+## Session 11 — 2026-03-11
+
+### What was accomplished
+
+Added `created_by` and `updated_by` audit fields to all database tables, wired through all API routes and client-side fetch calls.
+
+1. **Migration 011** — `011_add_audit_fields.sql`:
+   - Added `created_by UUID REFERENCES users(id) ON DELETE SET NULL` and `updated_by UUID REFERENCES users(id) ON DELETE SET NULL` to: products, lots, lot_files, product_requests, request_line_items, fulfillments, transactions, transaction_items, users, functional_groups, projects, manufacturers, storage_locations
+   - Fixed missing `updated_at` column + trigger on manufacturers, storage_locations, and request_line_items
+
+2. **API Route Updates** — All 19 mutation endpoints now populate audit fields:
+   - Products POST/PUT: `created_by`/`updated_by` from `x-user-id` header
+   - Transactions POST: `created_by`/`updated_by` on transactions + `created_by` on transaction_items
+   - Requests POST: `created_by`/`updated_by` on product_requests + `created_by` on request_line_items
+   - Requests PUT (general): `updated_by`
+   - Requests approve/reject/sciops-approve/sciops-reject: `updated_by`
+   - Requests line-items fulfill: `created_by`/`updated_by` on fulfillments, transactions, transaction_items; `updated_by` on line items and request
+   - Fulfillments POST: `created_by`/`updated_by`
+   - Users POST/PUT: `created_by`/`updated_by` from acting admin's ID
+   - Functional Groups POST/PUT: `created_by`/`updated_by`
+   - Projects POST/PUT: `created_by`/`updated_by`
+   - Manufacturers POST/PUT: `created_by`/`updated_by`
+   - Storage Locations POST/PUT: `created_by`/`updated_by`
+
+3. **Client-Side Updates** — All mutation fetch calls now include `x-user-id` header:
+   - `adminHeaders()` helper in inventory-page.tsx now includes `x-user-id`
+   - Product new/edit pages send `x-user-id`
+   - Request new page sends `x-user-id`
+   - Transaction creation, line-item fulfillment, legacy fulfillment, CSV import all send `x-user-id`
+
+### Files created
+- `src/lib/db/migrations/011_add_audit_fields.sql`
+
+### Files modified
+- `src/app/api/products/route.ts` — created_by in POST
+- `src/app/api/products/[id]/route.ts` — updated_by in PUT
+- `src/app/api/transactions/route.ts` — created_by on transactions + transaction_items
+- `src/app/api/requests/route.ts` — created_by on requests + line items
+- `src/app/api/requests/[id]/route.ts` — updated_by in PUT
+- `src/app/api/requests/[id]/approve/route.ts` — updated_by
+- `src/app/api/requests/[id]/reject/route.ts` — updated_by
+- `src/app/api/requests/[id]/sciops-approve/route.ts` — updated_by
+- `src/app/api/requests/[id]/sciops-reject/route.ts` — updated_by
+- `src/app/api/requests/[id]/line-items/[lineItemId]/route.ts` — created_by/updated_by throughout
+- `src/app/api/fulfillments/route.ts` — created_by in POST
+- `src/app/api/users/route.ts` — created_by in POST
+- `src/app/api/users/[id]/route.ts` — updated_by in PUT
+- `src/app/api/functional-groups/route.ts` — created_by in POST
+- `src/app/api/functional-groups/[id]/route.ts` — updated_by in PUT
+- `src/app/api/projects/route.ts` — created_by in POST
+- `src/app/api/projects/[id]/route.ts` — updated_by in PUT
+- `src/app/api/manufacturers/route.ts` — created_by in POST
+- `src/app/api/manufacturers/[id]/route.ts` — updated_by in PUT
+- `src/app/api/storage-locations/route.ts` — created_by in POST
+- `src/app/api/storage-locations/[id]/route.ts` — updated_by in PUT
+- `src/components/inventory-page.tsx` — x-user-id in all mutation headers
+- `src/app/products/new/page.tsx` — x-user-id header
+- `src/app/products/[id]/edit/page.tsx` — x-user-id header
+- `src/app/requests/new/page.tsx` — x-user-id header
+
+4. **Phase 5 — Dashboard** — Enhanced the dashboard as the default landing page for all roles:
+   - Dashboard now visible to all roles (removed Admin-only restriction from sidebar)
+   - Default landing page set to 'dashboard' for all roles on login
+   - 5 summary cards: Total Products (with stock count), Added This Week, Transactions Today, Pending Items (role-aware), Low Stock Alert
+   - Pending Items card: Directors see pending approvals count, Admins see unfulfilled requests, Staff sees own pending requests
+   - Low Stock card: products at or below reorder threshold, highlighted in red
+   - All clickable cards navigate to the relevant view
+   - Low stock detail table below cards when products are below threshold
+   - All cards update in real time from React state (no separate API needed)
+
+### TypeScript status
+Clean — only pre-existing test file redeclaration errors.
+
+---
+
 ## Session 10 — 2026-03-11
 
 ### What was accomplished

@@ -20,7 +20,7 @@ import { HullcLogo } from './icons';
 import { useToast } from '@/hooks/use-toast';
 import { v4 as uuidv4 } from 'uuid';
 import { format, isValid } from 'date-fns';
-import Papa from 'papaparse';
+import * as XLSX from 'xlsx';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import { deleteFile, getFile } from '@/lib/file-store';
@@ -33,12 +33,8 @@ import { Label } from './ui/label';
 const USER_STORAGE_KEY = 'hullc-user-data';
 const DEPT_PRODUCTS_STORAGE_KEY_PREFIX = 'hullc-dept-products';
 
-function getDefaultView(role: string): string {
-    switch (role) {
-        case 'Admin': return 'dashboard';
-        case 'Director': return 'approvals';
-        default: return 'inventory';
-    }
+function getDefaultView(_role: string): string {
+    return 'dashboard';
 }
 
 function coerceProduct(p: any): Product {
@@ -82,6 +78,14 @@ export default function InventoryPage() {
     const [fulfillmentToCancel, setFulfillmentToCancel] = useState<Fulfillment | null>(null);
     const [rejectionNote, setRejectionNote] = useState('');
     const [searchQuery, setSearchQuery] = useState('');
+
+    // Filter state
+    const [txDateFrom, setTxDateFrom] = useState('');
+    const [txDateTo, setTxDateTo] = useState('');
+    const [txDeptFilter, setTxDeptFilter] = useState('');
+    const [reqStatusFilter, setReqStatusFilter] = useState('');
+    const [reqDateFrom, setReqDateFrom] = useState('');
+    const [reqDateTo, setReqDateTo] = useState('');
 
     // Login form state
     const [loginEmail, setLoginEmail] = useState('');
@@ -142,13 +146,56 @@ export default function InventoryPage() {
         if (!searchQuery) {
             return products;
         }
-        const lowercasedQuery = searchQuery.toLowerCase();
+        const q = searchQuery.toLowerCase();
         return products.filter(product =>
-            product.name.toLowerCase().includes(lowercasedQuery) ||
-            product.manufacturerPartNumber.toLowerCase().includes(lowercasedQuery) ||
-            product.id.toLowerCase().includes(lowercasedQuery)
+            product.name.toLowerCase().includes(q) ||
+            product.manufacturerPartNumber.toLowerCase().includes(q) ||
+            product.id.toLowerCase().includes(q) ||
+            (product.manufacturer ?? '').toLowerCase().includes(q) ||
+            product.lots.some(l => l.lotNumber.toLowerCase().includes(q))
         );
     }, [products, searchQuery]);
+
+    const filteredTransactions = useMemo(() => {
+        let result = transactions;
+        if (txDateFrom) {
+            const from = new Date(txDateFrom);
+            from.setHours(0, 0, 0, 0);
+            result = result.filter(t => new Date(t.date) >= from);
+        }
+        if (txDateTo) {
+            const to = new Date(txDateTo);
+            to.setHours(23, 59, 59, 999);
+            result = result.filter(t => new Date(t.date) <= to);
+        }
+        if (txDeptFilter) {
+            result = result.filter(t => t.department === txDeptFilter);
+        }
+        return result;
+    }, [transactions, txDateFrom, txDateTo, txDeptFilter]);
+
+    const filteredRequests = useMemo(() => {
+        let result = productRequests;
+        if (reqStatusFilter) {
+            result = result.filter(r => r.status === reqStatusFilter);
+        }
+        if (reqDateFrom) {
+            const from = new Date(reqDateFrom);
+            from.setHours(0, 0, 0, 0);
+            result = result.filter(r => new Date(r.date) >= from);
+        }
+        if (reqDateTo) {
+            const to = new Date(reqDateTo);
+            to.setHours(23, 59, 59, 999);
+            result = result.filter(r => new Date(r.date) <= to);
+        }
+        return result;
+    }, [productRequests, reqStatusFilter, reqDateFrom, reqDateTo]);
+
+    const txDepartments = useMemo(() => {
+        const depts = new Set(transactions.map(t => t.department).filter(Boolean));
+        return Array.from(depts).sort();
+    }, [transactions]);
 
     const toggleProductCollapse = (productId: string) => {
         setOpenProductIds(prev => {
@@ -236,8 +283,8 @@ export default function InventoryPage() {
                     dispensedItems: (f.dispensedItems ?? []).map((tx: any) => ({ ...tx, date: new Date(tx.date) })),
                 })));
 
-                // Load user management data for Admin
-                if (user.role === 'Admin') {
+                // Load config data for Admin, ProjectManager, Chief
+                if (['Admin', 'ProjectManager', 'Chief'].includes(user.role)) {
                     const [usersRes, groupsRes, projectsRes, mfrsRes, locationsRes] = await Promise.all([
                         fetch('/api/users', { headers: adminHeaders }),
                         fetch('/api/functional-groups?active=false'),
@@ -318,7 +365,7 @@ export default function InventoryPage() {
 
     // ─── User Management handlers ────────────────────────────────────────────
 
-    const adminHeaders = () => ({ 'Content-Type': 'application/json', 'x-user-role': user?.role ?? '' });
+    const adminHeaders = () => ({ 'Content-Type': 'application/json', 'x-user-role': user?.role ?? '', 'x-user-id': user?.id ?? '' });
 
     const handleOpenUserForm = (u: SystemUser | null) => {
         setUserToEdit(u);
@@ -711,7 +758,7 @@ export default function InventoryPage() {
                 }
                 const res = await fetch(`/api/products/${productToEdit.id}`, {
                     method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 'Content-Type': 'application/json', 'x-user-id': user?.id ?? '' },
                     body: JSON.stringify(payload),
                 });
                 if (!res.ok) {
@@ -724,7 +771,7 @@ export default function InventoryPage() {
             } else {
                 const res = await fetch('/api/products', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 'Content-Type': 'application/json', 'x-user-id': user?.id ?? '' },
                     body: JSON.stringify(payload),
                 });
                 if (!res.ok) {
@@ -795,7 +842,7 @@ export default function InventoryPage() {
                     const lineItemId = parts[2];
                     res = await fetch(`/api/requests/${reqId}/line-items/${lineItemId}`, {
                         method: 'PUT',
-                        headers: { 'Content-Type': 'application/json', 'x-user-role': user?.role ?? 'Admin' },
+                        headers: { 'Content-Type': 'application/json', 'x-user-role': user?.role ?? 'Admin', 'x-user-id': user?.id ?? '' },
                         body: JSON.stringify({
                             date: data.date instanceof Date ? data.date.toISOString() : data.date,
                             notes: data.notes,
@@ -806,7 +853,7 @@ export default function InventoryPage() {
                     // Path B: dispense for a legacy fulfillment
                     res = await fetch(`/api/fulfillments/${fulfillmentToUpdate.id}`, {
                         method: 'PUT',
-                        headers: { 'Content-Type': 'application/json' },
+                        headers: { 'Content-Type': 'application/json', 'x-user-id': user?.id ?? '' },
                         body: JSON.stringify({
                             date: data.date instanceof Date ? data.date.toISOString() : data.date,
                             notes: data.notes,
@@ -846,7 +893,7 @@ export default function InventoryPage() {
                 // Path A: standalone transaction
                 const res = await fetch('/api/transactions', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 'Content-Type': 'application/json', 'x-user-id': user?.id ?? '' },
                     body: JSON.stringify({
                         productId: productForTransaction.id,
                         date: data.date instanceof Date ? data.date.toISOString() : data.date,
@@ -1073,132 +1120,148 @@ export default function InventoryPage() {
         fileInputRef.current?.click();
     };
 
-    const handleFileImport = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const handleFileImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
         if (!file) return;
 
         setIsImporting(true);
-        Papa.parse<any>(file, {
-            header: true,
-            skipEmptyLines: true,
-            complete: async (results) => {
-                try {
-                    const requiredHeaders = [
-                        'product_id', 'product_name', 'manufacturer', 'manufacturer_part_number', 'location',
-                        'lot_number', 'quantity', 'receipt_date', 'expiration_date', 'reorder_threshold', 'notes'
-                    ];
-                    const headers = results.meta.fields || [];
-                    if (!requiredHeaders.every(h => headers.includes(h))) {
-                        throw new Error(`CSV must contain the following headers: ${requiredHeaders.join(', ')}`);
-                    }
+        try {
+            const data = await file.arrayBuffer();
+            const workbook = XLSX.read(data, { cellDates: true });
+            const sheetName = workbook.SheetNames[0];
+            if (!sheetName) throw new Error('No sheets found in the file.');
+            const rows = XLSX.utils.sheet_to_json<any>(workbook.Sheets[sheetName], { defval: '' });
 
-                    const importedProductsMap = new Map<string, any>();
-                    for (const row of results.data) {
-                        const {
-                            product_id, product_name, manufacturer, manufacturer_part_number, location,
-                            lot_number, quantity, receipt_date, expiration_date, reorder_threshold, notes
-                        } = row;
-                        if (!product_id || !product_name || !lot_number) continue;
-                        const lot = {
-                            id: uuidv4(),
-                            lotNumber: lot_number,
-                            quantity: parseInt(quantity, 10) || 0,
-                            receiptDate: receipt_date,
-                            expirationDate: expiration_date || null,
-                            location,
-                            file: null,
-                            notes: notes || '',
-                        };
-                        if (importedProductsMap.has(product_id)) {
-                            importedProductsMap.get(product_id).lots.push(lot);
-                        } else {
-                            importedProductsMap.set(product_id, {
-                                id: product_id,
-                                name: product_name,
-                                manufacturer,
-                                manufacturerPartNumber: manufacturer_part_number,
-                                reorderThreshold: reorder_threshold ? parseInt(reorder_threshold, 10) : null,
-                                lots: [lot],
-                            });
-                        }
-                    }
-
-                    const csvProducts = Array.from(importedProductsMap.values());
-                    if (csvProducts.length === 0) {
-                        toast({ title: 'Import Failed', description: 'No valid product data found in the file.', variant: 'destructive' });
-                        return;
-                    }
-
-                    const existingIds = new Set(products.map(p => p.id));
-                    let successCount = 0;
-                    const importErrors: string[] = [];
-
-                    for (const product of csvProducts) {
-                        try {
-                            if (existingIds.has(product.id)) {
-                                const res = await fetch(`/api/products/${product.id}`, {
-                                    method: 'PUT',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify(product),
-                                });
-                                if (!res.ok) {
-                                    const b = await res.json().catch(() => ({}));
-                                    importErrors.push(`${product.id}: ${(b as any).error || 'update failed'}`);
-                                } else { successCount++; }
-                            } else {
-                                const { id: _ignored, ...productWithoutId } = product;
-                                const res = await fetch('/api/products', {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify(productWithoutId),
-                                });
-                                if (!res.ok) {
-                                    const b = await res.json().catch(() => ({}));
-                                    importErrors.push(`${product.name}: ${(b as any).error || 'create failed'}`);
-                                } else { successCount++; }
-                            }
-                        } catch { importErrors.push(`${product.name}: network error`); }
-                    }
-
-                    const pRes = await fetch('/api/products');
-                    if (pRes.ok) setProducts((await pRes.json()).map(coerceProduct));
-
-                    if (importErrors.length > 0) {
-                        toast({ title: 'Import Partial', description: `${successCount} imported, ${importErrors.length} failed: ${importErrors.slice(0, 2).join('; ')}`, variant: 'destructive' });
-                    } else {
-                        toast({ title: 'Import Successful', description: `${successCount} product(s) imported.` });
-                    }
-                } catch (error: any) {
-                    toast({ title: 'Import Failed', description: error.message, variant: 'destructive' });
-                } finally {
-                    setIsImporting(false);
-                    setIsImportDialogOpen(false);
-                    if (event.target) event.target.value = '';
+            const requiredHeaders = [
+                'product_id', 'product_name', 'manufacturer', 'manufacturer_part_number', 'location',
+                'lot_number', 'quantity', 'receipt_date', 'expiration_date', 'reorder_threshold', 'notes'
+            ];
+            if (rows.length > 0) {
+                const headers = Object.keys(rows[0]);
+                if (!requiredHeaders.every(h => headers.includes(h))) {
+                    throw new Error(`File must contain the following headers: ${requiredHeaders.join(', ')}`);
                 }
-            },
-            error: (error: any) => {
-                toast({ title: 'Import Error', description: error.message, variant: 'destructive' });
-                setIsImporting(false);
             }
+
+            const importedProductsMap = new Map<string, any>();
+            for (const row of rows) {
+                const {
+                    product_id, product_name, manufacturer, manufacturer_part_number, location,
+                    lot_number, quantity, receipt_date, expiration_date, reorder_threshold, notes
+                } = row;
+                if (!product_id || !product_name || !lot_number) continue;
+                const formatDate = (d: any) => {
+                    if (!d) return null;
+                    if (d instanceof Date) return format(d, 'yyyy-MM-dd');
+                    return String(d);
+                };
+                const lot = {
+                    id: uuidv4(),
+                    lotNumber: String(lot_number),
+                    quantity: parseInt(String(quantity), 10) || 0,
+                    receiptDate: formatDate(receipt_date) ?? format(new Date(), 'yyyy-MM-dd'),
+                    expirationDate: formatDate(expiration_date),
+                    location: String(location),
+                    file: null,
+                    notes: String(notes || ''),
+                };
+                if (importedProductsMap.has(String(product_id))) {
+                    importedProductsMap.get(String(product_id)).lots.push(lot);
+                } else {
+                    importedProductsMap.set(String(product_id), {
+                        id: String(product_id),
+                        name: String(product_name),
+                        manufacturer: String(manufacturer),
+                        manufacturerPartNumber: String(manufacturer_part_number),
+                        reorderThreshold: reorder_threshold ? parseInt(String(reorder_threshold), 10) : null,
+                        lots: [lot],
+                    });
+                }
+            }
+
+            const xlsxProducts = Array.from(importedProductsMap.values());
+            if (xlsxProducts.length === 0) {
+                toast({ title: 'Import Failed', description: 'No valid product data found in the file.', variant: 'destructive' });
+                return;
+            }
+
+            const existingIds = new Set(products.map(p => p.id));
+            let successCount = 0;
+            const importErrors: string[] = [];
+
+            for (const product of xlsxProducts) {
+                try {
+                    if (existingIds.has(product.id)) {
+                        const res = await fetch(`/api/products/${product.id}`, {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json', 'x-user-id': user?.id ?? '' },
+                            body: JSON.stringify(product),
+                        });
+                        if (!res.ok) {
+                            const b = await res.json().catch(() => ({}));
+                            importErrors.push(`${product.id}: ${(b as any).error || 'update failed'}`);
+                        } else { successCount++; }
+                    } else {
+                        const { id: _ignored, ...productWithoutId } = product;
+                        const res = await fetch('/api/products', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', 'x-user-id': user?.id ?? '' },
+                            body: JSON.stringify(productWithoutId),
+                        });
+                        if (!res.ok) {
+                            const b = await res.json().catch(() => ({}));
+                            importErrors.push(`${product.name}: ${(b as any).error || 'create failed'}`);
+                        } else { successCount++; }
+                    }
+                } catch { importErrors.push(`${product.name}: network error`); }
+            }
+
+            const pRes = await fetch('/api/products');
+            if (pRes.ok) setProducts((await pRes.json()).map(coerceProduct));
+
+            if (importErrors.length > 0) {
+                toast({ title: 'Import Partial', description: `${successCount} imported, ${importErrors.length} failed: ${importErrors.slice(0, 2).join('; ')}`, variant: 'destructive' });
+            } else {
+                toast({ title: 'Import Successful', description: `${successCount} product(s) imported.` });
+            }
+        } catch (error: any) {
+            toast({ title: 'Import Failed', description: error.message, variant: 'destructive' });
+        } finally {
+            setIsImporting(false);
+            setIsImportDialogOpen(false);
+            if (event.target) event.target.value = '';
+        }
+    };
+
+    const exportToExcel = (data: Record<string, any>[], filename: string, sheetName = 'Sheet1') => {
+        const ws = XLSX.utils.json_to_sheet(data);
+        // Auto-size columns
+        const colWidths = Object.keys(data[0] || {}).map(key => {
+            const maxLen = Math.max(key.length, ...data.map(row => String(row[key] ?? '').length));
+            return { wch: Math.min(maxLen + 2, 40) };
         });
+        ws['!cols'] = colWidths;
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, sheetName);
+        XLSX.writeFile(wb, filename);
     };
 
     const handleExportInventory = () => {
         const dataToExport = products.flatMap(product =>
             product.lots.map(lot => ({
-                'product_id': product.id,
-                'product_name': product.name,
-                'manufacturer': product.manufacturer,
-                'manufacturer_part_number': product.manufacturerPartNumber,
-                'reorder_threshold': product.reorderThreshold ?? '',
-                'lot_id': lot.id,
-                'lot_number': lot.lotNumber,
-                'quantity': lot.quantity,
-                'receipt_date': isValid(lot.receiptDate) ? format(lot.receiptDate, 'yyyy-MM-dd') : '',
-                'expiration_date': lot.expirationDate && isValid(lot.expirationDate) ? format(lot.expirationDate, 'yyyy-MM-dd') : '',
-                'location': lot.location,
-                'file_name': lot.file?.name ?? '',
-                'notes': lot.notes ?? '',
+                'Product ID': product.id,
+                'Product Name': product.name,
+                'Manufacturer': product.manufacturer,
+                'Manufacturer Part #': product.manufacturerPartNumber,
+                'VWR Part #': (product as any).vwrPartNumber ?? '',
+                'UoM': product.uom ?? '',
+                'Reorder Threshold': product.reorderThreshold ?? '',
+                'Lot Number': lot.lotNumber,
+                'Quantity': lot.quantity,
+                'Receipt Date': isValid(lot.receiptDate) ? format(lot.receiptDate, 'yyyy-MM-dd') : '',
+                'Expiration Date': lot.expirationDate && isValid(lot.expirationDate) ? format(lot.expirationDate, 'yyyy-MM-dd') : '',
+                'Storage Location': lot.location,
+                'Notes': lot.notes ?? '',
             }))
         );
 
@@ -1207,34 +1270,22 @@ export default function InventoryPage() {
             return;
         }
 
-        const csv = Papa.unparse(dataToExport);
-        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-        const link = document.createElement('a');
-        if (link.href) {
-            URL.revokeObjectURL(link.href);
-        }
-        const url = URL.createObjectURL(blob);
-        link.href = url;
-        link.setAttribute('download', 'inventory_export.csv');
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+        exportToExcel(dataToExport, 'inventory_export.xlsx', 'Inventory');
         toast({ title: "Export Started", description: "Your inventory data is downloading." });
     };
 
     const handleExportTransactions = () => {
         const dataToExport = transactions.flatMap(tx =>
             tx.items.map(item => ({
-                'transaction_id': tx.id,
-                'transaction_date': format(tx.date, 'yyyy-MM-dd HH:mm:ss'),
-                'transaction_notes': tx.notes ?? '',
-                'product_id': tx.productId,
-                'product_name': tx.productName,
-                'requestor_name': tx.requestorName ?? 'N/A',
-                'department': tx.department ?? 'N/A',
-                'lot_id': item.lotId,
-                'lot_number': item.lotNumber,
-                'quantity_dispensed': item.quantity,
+                'Transaction ID': tx.id,
+                'Date': format(tx.date, 'yyyy-MM-dd HH:mm:ss'),
+                'Product ID': tx.productId,
+                'Product Name': tx.productName,
+                'Requestor': tx.requestorName ?? 'N/A',
+                'Department': tx.department ?? 'N/A',
+                'Lot Number': item.lotNumber,
+                'Quantity Dispensed': item.quantity,
+                'Notes': tx.notes ?? '',
             }))
         );
 
@@ -1243,18 +1294,7 @@ export default function InventoryPage() {
             return;
         }
 
-        const csv = Papa.unparse(dataToExport);
-        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-        const link = document.createElement('a');
-        if (link.href) {
-            URL.revokeObjectURL(link.href);
-        }
-        const url = URL.createObjectURL(blob);
-        link.href = url;
-        link.setAttribute('download', 'transactions_export.csv');
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
+        exportToExcel(dataToExport, 'transactions_export.xlsx', 'Transactions');
         toast({ title: "Export Started", description: "Your transaction data is downloading." });
     };
 
@@ -1387,7 +1427,9 @@ export default function InventoryPage() {
         return <DepartmentalPage user={user} onLogout={handleLogout} />;
     }
 
-    const inventoryColSpan = user.role === 'Admin' ? 8 : 4;
+    const canEdit = user.role === 'Admin';
+    const hasFullView = ['Admin', 'ProjectManager', 'Chief'].includes(user.role);
+    const inventoryColSpan = hasFullView ? 8 : 4;
     const requestsColSpan = 7;
 
     const pageTitle: Record<string, { title: string; subtitle?: string }> = {
@@ -1404,41 +1446,151 @@ export default function InventoryPage() {
 
     return (
         <div className="min-h-screen w-full" style={{ backgroundColor: '#f0f4f4' }}>
-            <input type="file" ref={fileInputRef} onChange={handleFileImport} style={{ display: 'none' }} accept=".csv" />
+            <input type="file" ref={fileInputRef} onChange={handleFileImport} style={{ display: 'none' }} accept=".xlsx,.xls,.csv" />
             <Sidebar activeView={activeView} onNavigate={setActiveView} user={user} onLogout={handleLogout} />
             <div className="content-with-sidebar">
                 {/* Top bar */}
-                <div className="sticky top-0 z-30 flex items-center px-8" style={{ height: 60, backgroundColor: '#fff', borderBottom: '1px solid #e2e8f0' }}>
+                <div className="sticky top-0 z-30 flex items-center justify-between px-8" style={{ height: 60, backgroundColor: '#fff', borderBottom: '1px solid #e2e8f0' }}>
                     <div>
                         <h1 className="text-lg font-semibold" style={{ color: '#0f2a2a' }}>{currentPage.title}</h1>
                         {currentPage.subtitle && <p className="text-xs" style={{ color: '#64748b' }}>{currentPage.subtitle}</p>}
                     </div>
+                    <Badge variant="outline" className="text-xs font-medium" style={{ color: '#1a7070', borderColor: '#1a7070' }}>{user.role}</Badge>
                 </div>
 
             <TooltipProvider>
                 <main className="p-8">
 
                 {/* ── Dashboard View ──────────────────────────────────── */}
-                {activeView === 'dashboard' && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                        <div style={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: 12 }} className="p-6">
-                            <p className="text-xs font-medium uppercase tracking-wider" style={{ color: '#64748b' }}>Total Products</p>
-                            <p className="text-3xl font-bold mt-2" style={{ color: '#0f2a2a' }}>{products.length}</p>
+                {activeView === 'dashboard' && (() => {
+                    const sevenDaysAgo = new Date();
+                    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+                    sevenDaysAgo.setHours(0, 0, 0, 0);
+                    const recentProducts = products.filter(p => {
+                        const lots = p.lots ?? [];
+                        return lots.some(l => l.receiptDate && new Date(l.receiptDate) >= sevenDaysAgo);
+                    });
+
+                    const todayStart = new Date();
+                    todayStart.setHours(0, 0, 0, 0);
+                    const todayTransactions = transactions.filter(t => new Date(t.date) >= todayStart);
+
+                    // Role-aware pending count
+                    let pendingLabel = 'Pending Items';
+                    let pendingCount = 0;
+                    if (user.role === 'Director') {
+                        pendingCount = productRequests.filter(r => r.status === 'Pending Approval' || r.status === 'Pending SciOps Approval').length;
+                        pendingLabel = 'Pending Approvals';
+                    } else if (hasFullView) {
+                        pendingCount = productRequests.filter(r => r.status === 'Approved' || r.status === 'In Progress').length;
+                        pendingLabel = 'Unfulfilled Requests';
+                    } else {
+                        pendingCount = productRequests.filter(r => r.status !== 'Completed' && r.status !== 'Rejected').length;
+                        pendingLabel = 'Your Pending Requests';
+                    }
+
+                    const lowStockProducts = products.filter(p => {
+                        const stock = totalQuantity(p.lots);
+                        return p.reorderThreshold != null && p.reorderThreshold > 0 && stock <= p.reorderThreshold;
+                    });
+
+                    const cardStyle = { backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: 12 };
+                    const clickableCardStyle = { ...cardStyle, cursor: 'pointer' as const, transition: 'box-shadow 0.15s' };
+                    const labelStyle = { color: '#64748b' };
+                    const valueStyle = { color: '#0f2a2a' };
+
+                    return (
+                    <div className="space-y-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {/* Total Products */}
+                            <div style={cardStyle} className="p-6">
+                                <p className="text-xs font-medium uppercase tracking-wider" style={labelStyle}>Total Products</p>
+                                <p className="text-3xl font-bold mt-2" style={valueStyle}>{products.length}</p>
+                                <p className="text-xs mt-1" style={labelStyle}>Total stock: {products.reduce((s, p) => s + totalQuantity(p.lots), 0)} units</p>
+                            </div>
+
+                            {/* Products added in last 7 days */}
+                            <div
+                                style={clickableCardStyle}
+                                className="p-6 hover:shadow-md"
+                                onClick={() => setActiveView('inventory')}
+                            >
+                                <p className="text-xs font-medium uppercase tracking-wider" style={labelStyle}>Added This Week</p>
+                                <p className="text-3xl font-bold mt-2" style={valueStyle}>{recentProducts.length}</p>
+                                <p className="text-xs mt-1" style={{ color: '#1a7070' }}>Click to view inventory</p>
+                            </div>
+
+                            {/* Transactions today */}
+                            <div
+                                style={clickableCardStyle}
+                                className="p-6 hover:shadow-md"
+                                onClick={() => setActiveView('transactions')}
+                            >
+                                <p className="text-xs font-medium uppercase tracking-wider" style={labelStyle}>Transactions Today</p>
+                                <p className="text-3xl font-bold mt-2" style={valueStyle}>{todayTransactions.length}</p>
+                                <p className="text-xs mt-1" style={{ color: '#1a7070' }}>Click to view transactions</p>
+                            </div>
+
+                            {/* Pending items — role-aware */}
+                            <div
+                                style={clickableCardStyle}
+                                className="p-6 hover:shadow-md"
+                                onClick={() => {
+                                    if (user.role === 'Director') setActiveView('approvals');
+                                    else if (hasFullView) setActiveView('fulfillments');
+                                    else setActiveView('requests');
+                                }}
+                            >
+                                <p className="text-xs font-medium uppercase tracking-wider" style={labelStyle}>{pendingLabel}</p>
+                                <p className="text-3xl font-bold mt-2" style={pendingCount > 0 ? { color: '#ea580c' } : valueStyle}>{pendingCount}</p>
+                                <p className="text-xs mt-1" style={{ color: '#1a7070' }}>Click to view</p>
+                            </div>
+
+                            {/* Products at/below reorder threshold */}
+                            <div
+                                style={clickableCardStyle}
+                                className="p-6 hover:shadow-md"
+                                onClick={() => setActiveView('inventory')}
+                            >
+                                <p className="text-xs font-medium uppercase tracking-wider" style={labelStyle}>Low Stock Alert</p>
+                                <p className="text-3xl font-bold mt-2" style={lowStockProducts.length > 0 ? { color: '#dc2626' } : valueStyle}>{lowStockProducts.length}</p>
+                                <p className="text-xs mt-1" style={labelStyle}>At or below reorder threshold</p>
+                            </div>
                         </div>
-                        <div style={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: 12 }} className="p-6">
-                            <p className="text-xs font-medium uppercase tracking-wider" style={{ color: '#64748b' }}>Total Stock</p>
-                            <p className="text-3xl font-bold mt-2" style={{ color: '#0f2a2a' }}>{products.reduce((s, p) => s + totalQuantity(p.lots), 0)}</p>
-                        </div>
-                        <div style={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: 12 }} className="p-6">
-                            <p className="text-xs font-medium uppercase tracking-wider" style={{ color: '#64748b' }}>Active Requests</p>
-                            <p className="text-3xl font-bold mt-2" style={{ color: '#0f2a2a' }}>{productRequests.filter(r => r.status !== 'Completed' && r.status !== 'Rejected').length}</p>
-                        </div>
-                        <div style={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: 12 }} className="p-6">
-                            <p className="text-xs font-medium uppercase tracking-wider" style={{ color: '#64748b' }}>Transactions</p>
-                            <p className="text-3xl font-bold mt-2" style={{ color: '#0f2a2a' }}>{transactions.length}</p>
-                        </div>
+
+                        {/* Low stock detail table */}
+                        {lowStockProducts.length > 0 && (
+                            <div style={cardStyle}>
+                                <div className="px-6 py-4" style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: '#f8fafc', borderRadius: '12px 12px 0 0' }}>
+                                    <h3 className="text-sm font-semibold" style={{ color: '#0f2a2a' }}>Low Stock Products</h3>
+                                </div>
+                                <div className="overflow-x-auto">
+                                    <table className="w-full">
+                                        <thead>
+                                            <tr style={{ backgroundColor: '#f8fafc' }}>
+                                                <th className="px-6 py-3 text-left text-[11px] font-semibold uppercase tracking-wider" style={labelStyle}>Product ID</th>
+                                                <th className="px-6 py-3 text-left text-[11px] font-semibold uppercase tracking-wider" style={labelStyle}>Name</th>
+                                                <th className="px-6 py-3 text-right text-[11px] font-semibold uppercase tracking-wider" style={labelStyle}>Current Stock</th>
+                                                <th className="px-6 py-3 text-right text-[11px] font-semibold uppercase tracking-wider" style={labelStyle}>Reorder At</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {lowStockProducts.map(p => (
+                                                <tr key={p.id} className="border-t" style={{ borderColor: '#e2e8f0' }}>
+                                                    <td className="px-6 py-3 text-sm" style={{ color: '#1a7070' }}>{p.id}</td>
+                                                    <td className="px-6 py-3 text-sm font-medium" style={valueStyle}>{p.name}</td>
+                                                    <td className="px-6 py-3 text-sm text-right font-semibold" style={{ color: '#dc2626' }}>{totalQuantity(p.lots)}</td>
+                                                    <td className="px-6 py-3 text-sm text-right" style={labelStyle}>{p.reorderThreshold}</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        )}
                     </div>
-                )}
+                    );
+                })()}
 
                 {/* ── Inventory View ──────────────────────────────────── */}
                 {activeView === 'inventory' && (
@@ -1460,17 +1612,21 @@ export default function InventoryPage() {
                                                     onChange={(e) => setSearchQuery(e.target.value)}
                                                 />
                                             </div>
-                                            {user.role === 'Admin' && (
+                                            {hasFullView && (
                                                 <div className="flex gap-2">
                                                     <Button variant="outline" onClick={handleExportInventory}>
                                                         <Download className="mr-2 h-4 w-4" /> <span className="hidden sm:inline">Export</span>
                                                     </Button>
-                                                    <Button variant="outline" onClick={() => setIsImportDialogOpen(true)}>
-                                                        <CloudUpload className="mr-2 h-4 w-4" /> <span className="hidden sm:inline">Import</span>
-                                                    </Button>
-                                                    <Button onClick={handleAddNew}>
-                                                        <PlusCircle className="mr-2 h-4 w-4" /> Add Product
-                                                    </Button>
+                                                    {canEdit && (
+                                                        <>
+                                                            <Button variant="outline" onClick={() => setIsImportDialogOpen(true)}>
+                                                                <CloudUpload className="mr-2 h-4 w-4" /> <span className="hidden sm:inline">Import</span>
+                                                            </Button>
+                                                            <Button onClick={handleAddNew}>
+                                                                <PlusCircle className="mr-2 h-4 w-4" /> Add Product
+                                                            </Button>
+                                                        </>
+                                                    )}
                                                 </div>
                                             )}
                                         </div>
@@ -1481,17 +1637,17 @@ export default function InventoryPage() {
                                         <Table>
                                             <TableHeader>
                                                 <TableRow style={{ backgroundColor: '#f8fafc' }}>
-                                                    {user.role === 'Admin' && <TableHead className="w-[50px]"></TableHead>}
+                                                    {hasFullView && <TableHead className="w-[50px]"></TableHead>}
                                                     <TableHead className="text-[11.5px] font-semibold uppercase tracking-wider" style={{ color: '#64748b' }}>Product</TableHead>
                                                     <TableHead className="text-[11.5px] font-semibold uppercase tracking-wider" style={{ color: '#64748b' }}>Manufacturer</TableHead>
                                                     <TableHead className="text-[11.5px] font-semibold uppercase tracking-wider" style={{ color: '#64748b' }}>Mfr Part #</TableHead>
                                                     <TableHead className="text-[11.5px] font-semibold uppercase tracking-wider" style={{ color: '#64748b' }}>VWR Part #</TableHead>
                                                     <TableHead className="text-[11.5px] font-semibold uppercase tracking-wider" style={{ color: '#64748b' }}>UoM</TableHead>
-                                                    {user.role === 'Admin' && <TableHead className="text-[11.5px] font-semibold uppercase tracking-wider" style={{ color: '#64748b' }}>Total Quantity</TableHead>}
-                                                    {user.role === 'Admin' && <TableHead className="text-[11.5px] font-semibold uppercase tracking-wider" style={{ color: '#64748b' }}>Needed</TableHead>}
-                                                    {user.role === 'Admin' && <TableHead className="text-[11.5px] font-semibold uppercase tracking-wider" style={{ color: '#64748b' }}>Storage Location</TableHead>}
-                                                    {user.role === 'Admin' ?
-                                                        <TableHead className="w-[100px] text-right">Actions</TableHead> :
+                                                    {hasFullView && <TableHead className="text-[11.5px] font-semibold uppercase tracking-wider" style={{ color: '#64748b' }}>Total Quantity</TableHead>}
+                                                    {hasFullView && <TableHead className="text-[11.5px] font-semibold uppercase tracking-wider" style={{ color: '#64748b' }}>Needed</TableHead>}
+                                                    {hasFullView && <TableHead className="text-[11.5px] font-semibold uppercase tracking-wider" style={{ color: '#64748b' }}>Storage Location</TableHead>}
+                                                    {hasFullView ?
+                                                        <TableHead className={cn("text-right", canEdit ? "w-[100px]" : "w-[80px]")}>{canEdit ? 'Actions' : ''}</TableHead> :
                                                         <TableHead className="w-[120px] text-right">Action</TableHead>
                                                     }
                                                 </TableRow>
@@ -1514,7 +1670,7 @@ export default function InventoryPage() {
                                                                         "bg-orange-100 dark:bg-orange-950 hover:bg-orange-200 dark:hover:bg-orange-900": isExpiredFlag,
                                                                     })}
                                                                 >
-                                                                    {user.role === 'Admin' && (
+                                                                    {hasFullView && (
                                                                         <TableCell>
                                                                             <Button variant="ghost" size="sm" className="w-9 p-0 data-[state=open]:rotate-90" onClick={() => toggleProductCollapse(product.id)} data-state={isOpen ? 'open' : 'closed'}>
                                                                                 <ChevronsUpDown className="h-4 w-4" />
@@ -1529,7 +1685,7 @@ export default function InventoryPage() {
                                                                     <TableCell>{product.manufacturerPartNumber}</TableCell>
                                                                     <TableCell>{(product as any).vwrPartNumber ?? ''}</TableCell>
                                                                     <TableCell>{product.uom ?? '—'}</TableCell>
-                                                                    {user.role === 'Admin' && (
+                                                                    {hasFullView && (
                                                                         <TableCell>
                                                                             <div className="flex items-center gap-2">
                                                                                 <Badge variant={needsReorder(product) ? "destructive" : "secondary"}>{totalQuantity(product.lots)}</Badge>
@@ -1546,7 +1702,7 @@ export default function InventoryPage() {
                                                                             </div>
                                                                         </TableCell>
                                                                     )}
-                                                                    {user.role === 'Admin' && (
+                                                                    {hasFullView && (
                                                                         <TableCell>
                                                                             {needed > 0 ? (
                                                                                 <Tooltip>
@@ -1563,10 +1719,10 @@ export default function InventoryPage() {
                                                                             )}
                                                                         </TableCell>
                                                                     )}
-                                                                    {user.role === 'Admin' && (
+                                                                    {hasFullView && (
                                                                         <TableCell><div className="flex items-center gap-2"><Warehouse className="h-4 w-4 text-muted-foreground"/>{getDisplayLocation(product.lots)}</div></TableCell>
                                                                     )}
-                                                                    {user.role === 'Admin' ? (
+                                                                    {canEdit ? (
                                                                         <TableCell className="text-right">
                                                                             <DropdownMenu>
                                                                                 <DropdownMenuTrigger asChild><Button variant="ghost" className="h-8 w-8 p-0"><span className="sr-only">Open menu</span><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
@@ -1578,6 +1734,8 @@ export default function InventoryPage() {
                                                                                 </DropdownMenuContent>
                                                                             </DropdownMenu>
                                                                         </TableCell>
+                                                                    ) : hasFullView ? (
+                                                                        <TableCell />
                                                                     ) : (
                                                                         <TableCell className="text-right">
                                                                             <Button size="sm" onClick={() => handleRequestProduct(product)}>
@@ -1586,7 +1744,7 @@ export default function InventoryPage() {
                                                                         </TableCell>
                                                                     )}
                                                                 </TableRow>
-                                                                {isOpen && user.role === 'Admin' && (
+                                                                {isOpen && hasFullView && (
                                                                      <TableRow className="bg-muted/50 hover:bg-muted/50">
                                                                         <TableCell colSpan={inventoryColSpan} className="p-0">
                                                                             <div className="p-4">
@@ -1651,12 +1809,48 @@ export default function InventoryPage() {
                 {activeView === 'requests' && (
                                 <div style={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: 12 }}>
                                     <div className="p-6 pb-4">
-                                        <h2 className="text-lg font-semibold" style={{ color: '#0f2a2a' }}>Product Requests</h2>
-                                        <p className="text-sm" style={{ color: '#64748b' }}>
-                                            {user.role === 'Admin'
-                                                ? 'Approved requests ready for fulfillment. Expand each request to fulfill individual line items.'
-                                                : 'Your pending approval requests.'}
-                                        </p>
+                                        <div className="flex flex-col gap-4">
+                                            <div>
+                                                <h2 className="text-lg font-semibold" style={{ color: '#0f2a2a' }}>Product Requests</h2>
+                                                <p className="text-sm" style={{ color: '#64748b' }}>
+                                                    {hasFullView
+                                                        ? 'Approved requests ready for fulfillment. Expand each request to fulfill individual line items.'
+                                                        : 'Your pending approval requests.'}
+                                                </p>
+                                            </div>
+                                            <div className="flex flex-wrap items-end gap-3">
+                                                <div>
+                                                    <label className="text-[11px] font-semibold uppercase tracking-wider block mb-1" style={{ color: '#64748b' }}>Status</label>
+                                                    <select
+                                                        value={reqStatusFilter}
+                                                        onChange={(e) => setReqStatusFilter(e.target.value)}
+                                                        className="h-10 rounded-md border px-3 text-sm w-[200px]"
+                                                        style={{ borderColor: '#e2e8f0' }}
+                                                    >
+                                                        <option value="">All statuses</option>
+                                                        <option value="Pending Approval">Pending Approval</option>
+                                                        <option value="Pending SciOps Approval">Pending SciOps Approval</option>
+                                                        <option value="Approved">Approved</option>
+                                                        <option value="In Progress">In Progress</option>
+                                                        <option value="Completed">Completed</option>
+                                                        <option value="Rejected">Rejected</option>
+                                                    </select>
+                                                </div>
+                                                <div>
+                                                    <label className="text-[11px] font-semibold uppercase tracking-wider block mb-1" style={{ color: '#64748b' }}>From</label>
+                                                    <Input type="date" value={reqDateFrom} onChange={(e) => setReqDateFrom(e.target.value)} className="w-[160px]" />
+                                                </div>
+                                                <div>
+                                                    <label className="text-[11px] font-semibold uppercase tracking-wider block mb-1" style={{ color: '#64748b' }}>To</label>
+                                                    <Input type="date" value={reqDateTo} onChange={(e) => setReqDateTo(e.target.value)} className="w-[160px]" />
+                                                </div>
+                                                {(reqStatusFilter || reqDateFrom || reqDateTo) && (
+                                                    <Button variant="ghost" size="sm" onClick={() => { setReqStatusFilter(''); setReqDateFrom(''); setReqDateTo(''); }}>
+                                                        Clear filters
+                                                    </Button>
+                                                )}
+                                            </div>
+                                        </div>
                                     </div>
                                     <div className="px-6 pb-6">
                                         <div className="border rounded-lg overflow-hidden" style={{ borderColor: '#e2e8f0' }}>
@@ -1673,8 +1867,8 @@ export default function InventoryPage() {
                                                 </TableRow>
                                             </TableHeader>
                                             <TableBody>
-                                                {productRequests.length > 0 ? (
-                                                    productRequests.map(req => {
+                                                {filteredRequests.length > 0 ? (
+                                                    filteredRequests.map(req => {
                                                          const isOpen = openRequestIds.has(req.id);
                                                          return (
                                                             <React.Fragment key={req.id}>
@@ -1701,7 +1895,7 @@ export default function InventoryPage() {
                                                                     <TableCell>{format(new Date(req.date), 'PPP')}</TableCell>
                                                                     <TableCell>{getStatusBadge(req.status)}</TableCell>
                                                                     <TableCell className="text-right">
-                                                                        {(req.status === 'Approved' || req.status === 'In Progress') && user.role === 'Admin' && (
+                                                                        {(req.status === 'Approved' || req.status === 'In Progress') && canEdit && (
                                                                             <Button size="sm" variant="outline" disabled={isSaving} onClick={() => handleRejectRequest(req)}>Reject</Button>
                                                                         )}
                                                                     </TableCell>
@@ -1735,7 +1929,7 @@ export default function InventoryPage() {
                                                                                                     <TableHead>Requested Date</TableHead>
                                                                                                     <TableHead>Quantity</TableHead>
                                                                                                     <TableHead>Status</TableHead>
-                                                                                                    {user.role === 'Admin' && <TableHead className="text-right">Action</TableHead>}
+                                                                                                    {canEdit && <TableHead className="text-right">Action</TableHead>}
                                                                                                 </TableRow>
                                                                                             </TableHeader>
                                                                                             <TableBody>
@@ -1748,7 +1942,7 @@ export default function InventoryPage() {
                                                                                                                 {li.status}
                                                                                                             </Badge>
                                                                                                         </TableCell>
-                                                                                                        {user.role === 'Admin' && (
+                                                                                                        {canEdit && (
                                                                                                             <TableCell className="text-right">
                                                                                                                 {li.status === 'Pending' && (req.status === 'Approved' || req.status === 'In Progress') && (
                                                                                                                     <Button size="sm" disabled={isSaving} onClick={() => handleFulfillLineItem(req, li)}>
@@ -1772,7 +1966,7 @@ export default function InventoryPage() {
                                                     })
                                                 ) : (
                                                     <TableRow>
-                                                        <TableCell colSpan={7} className="h-24 text-center">No product requests found.</TableCell>
+                                                        <TableCell colSpan={7} className="h-24 text-center">{(reqStatusFilter || reqDateFrom || reqDateTo) ? 'No requests match your filters.' : 'No product requests found.'}</TableCell>
                                                     </TableRow>
                                                 )}
                                             </TableBody>
@@ -1896,7 +2090,7 @@ export default function InventoryPage() {
                 )}
 
                 {/* ── Fulfillments View ──────────────────────────────── */}
-                {activeView === 'fulfillments' && user.role === 'Admin' && (
+                {activeView === 'fulfillments' && hasFullView && (
                     <div className="space-y-6">
                     {/* Approved/In-Progress requests with line-item fulfill */}
                     <div style={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: 12 }}>
@@ -1944,7 +2138,7 @@ export default function InventoryPage() {
                                                             </TableCell>
                                                             <TableCell>{getStatusBadge(req.status)}</TableCell>
                                                             <TableCell className="text-right">
-                                                                <Button size="sm" variant="outline" disabled={isSaving} onClick={() => handleRejectRequest(req)}>Reject</Button>
+                                                                {canEdit && <Button size="sm" variant="outline" disabled={isSaving} onClick={() => handleRejectRequest(req)}>Reject</Button>}
                                                             </TableCell>
                                                         </TableRow>
                                                         {isOpen && (
@@ -1957,7 +2151,7 @@ export default function InventoryPage() {
                                                                                 <TableHead>Requested Date</TableHead>
                                                                                 <TableHead>Quantity</TableHead>
                                                                                 <TableHead>Status</TableHead>
-                                                                                <TableHead className="text-right">Action</TableHead>
+                                                                                {canEdit && <TableHead className="text-right">Action</TableHead>}
                                                                             </TableRow>
                                                                         </TableHeader>
                                                                         <TableBody>
@@ -1970,13 +2164,13 @@ export default function InventoryPage() {
                                                                                             {li.status}
                                                                                         </Badge>
                                                                                     </TableCell>
-                                                                                    <TableCell className="text-right">
+                                                                                    {canEdit && <TableCell className="text-right">
                                                                                         {li.status === 'Pending' && (
                                                                                             <Button size="sm" disabled={isSaving} onClick={() => handleFulfillLineItem(req, li)} style={{ backgroundColor: '#1a7070' }}>
                                                                                                 Fulfill
                                                                                             </Button>
                                                                                         )}
-                                                                                    </TableCell>
+                                                                                    </TableCell>}
                                                                                 </TableRow>
                                                                             ))}
                                                                         </TableBody>
@@ -2030,14 +2224,16 @@ export default function InventoryPage() {
                                                                         <Badge variant="outline">{dispensed} / {f.totalQuantityRequested}</Badge>
                                                                     </TableCell>
                                                                     <TableCell className="text-right">
-                                                                        <div className="flex gap-2 justify-end">
-                                                                            <Button size="sm" variant="outline" disabled={isSaving} onClick={() => handleCancelFulfillment(f)}>
-                                                                                Cancel
-                                                                            </Button>
-                                                                            <Button size="sm" disabled={isSaving} onClick={() => handleDispenseForFulfillment(f)}>
-                                                                                Dispense Items
-                                                                            </Button>
-                                                                        </div>
+                                                                        {canEdit && (
+                                                                            <div className="flex gap-2 justify-end">
+                                                                                <Button size="sm" variant="outline" disabled={isSaving} onClick={() => handleCancelFulfillment(f)}>
+                                                                                    Cancel
+                                                                                </Button>
+                                                                                <Button size="sm" disabled={isSaving} onClick={() => handleDispenseForFulfillment(f)}>
+                                                                                    Dispense Items
+                                                                                </Button>
+                                                                            </div>
+                                                                        )}
                                                                     </TableCell>
                                                                 </TableRow>
                                                             )
@@ -2056,17 +2252,46 @@ export default function InventoryPage() {
                 )}
 
                 {/* ── Transactions View ──────────────────────────────── */}
-                {activeView === 'transactions' && user.role === 'Admin' && (
+                {activeView === 'transactions' && hasFullView && (
                                 <div style={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: 12 }}>
                                     <div className="p-6 pb-4">
-                                        <div className="flex justify-between items-center">
-                                            <div>
-                                                <h2 className="text-lg font-semibold" style={{ color: '#0f2a2a' }}>Transaction History</h2>
-                                                <p className="text-sm" style={{ color: '#64748b' }}>View a log of all inventory transactions.</p>
+                                        <div className="flex flex-col gap-4">
+                                            <div className="flex justify-between items-center">
+                                                <div>
+                                                    <h2 className="text-lg font-semibold" style={{ color: '#0f2a2a' }}>Transaction History</h2>
+                                                    <p className="text-sm" style={{ color: '#64748b' }}>View a log of all inventory transactions.</p>
+                                                </div>
+                                                <Button variant="outline" onClick={handleExportTransactions}>
+                                                    <Download className="mr-2 h-4 w-4" /> Export Excel
+                                                </Button>
                                             </div>
-                                            <Button variant="outline" onClick={handleExportTransactions}>
-                                                <Download className="mr-2 h-4 w-4" /> Export CSV
-                                            </Button>
+                                            <div className="flex flex-wrap items-end gap-3">
+                                                <div>
+                                                    <label className="text-[11px] font-semibold uppercase tracking-wider block mb-1" style={{ color: '#64748b' }}>From</label>
+                                                    <Input type="date" value={txDateFrom} onChange={(e) => setTxDateFrom(e.target.value)} className="w-[160px]" />
+                                                </div>
+                                                <div>
+                                                    <label className="text-[11px] font-semibold uppercase tracking-wider block mb-1" style={{ color: '#64748b' }}>To</label>
+                                                    <Input type="date" value={txDateTo} onChange={(e) => setTxDateTo(e.target.value)} className="w-[160px]" />
+                                                </div>
+                                                <div>
+                                                    <label className="text-[11px] font-semibold uppercase tracking-wider block mb-1" style={{ color: '#64748b' }}>Department</label>
+                                                    <select
+                                                        value={txDeptFilter}
+                                                        onChange={(e) => setTxDeptFilter(e.target.value)}
+                                                        className="h-10 rounded-md border px-3 text-sm w-[200px]"
+                                                        style={{ borderColor: '#e2e8f0' }}
+                                                    >
+                                                        <option value="">All departments</option>
+                                                        {txDepartments.map(d => <option key={d} value={d}>{d}</option>)}
+                                                    </select>
+                                                </div>
+                                                {(txDateFrom || txDateTo || txDeptFilter) && (
+                                                    <Button variant="ghost" size="sm" onClick={() => { setTxDateFrom(''); setTxDateTo(''); setTxDeptFilter(''); }}>
+                                                        Clear filters
+                                                    </Button>
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
                                     <div className="px-6 pb-6">
@@ -2085,8 +2310,8 @@ export default function InventoryPage() {
                                                 </TableRow>
                                             </TableHeader>
                                             <TableBody>
-                                            {transactions.length > 0 ? (
-                                                transactions.map(tx => {
+                                            {filteredTransactions.length > 0 ? (
+                                                filteredTransactions.map(tx => {
                                                     const isOpen = openTransactionIds.has(tx.id);
                                                     return (
                                                         <React.Fragment key={tx.id}>
@@ -2108,12 +2333,14 @@ export default function InventoryPage() {
                                                                 </TableCell>
                                                                 <TableCell className="truncate max-w-xs">{tx.notes || 'N/A'}</TableCell>
                                                                 <TableCell className="text-right">
-                                                                    <DropdownMenu>
-                                                                        <DropdownMenuTrigger asChild><Button variant="ghost" className="h-8 w-8 p-0"><span className="sr-only">Open menu</span><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
-                                                                        <DropdownMenuContent align="end">
-                                                                            <DropdownMenuItem onClick={() => handleDeleteTransaction(tx)} className="text-destructive focus:text-destructive focus:bg-destructive/10"><Trash2 className="mr-2 h-4 w-4" /> Delete</DropdownMenuItem>
-                                                                        </DropdownMenuContent>
-                                                                    </DropdownMenu>
+                                                                    {canEdit && (
+                                                                        <DropdownMenu>
+                                                                            <DropdownMenuTrigger asChild><Button variant="ghost" className="h-8 w-8 p-0"><span className="sr-only">Open menu</span><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
+                                                                            <DropdownMenuContent align="end">
+                                                                                <DropdownMenuItem onClick={() => handleDeleteTransaction(tx)} className="text-destructive focus:text-destructive focus:bg-destructive/10"><Trash2 className="mr-2 h-4 w-4" /> Delete</DropdownMenuItem>
+                                                                            </DropdownMenuContent>
+                                                                        </DropdownMenu>
+                                                                    )}
                                                                 </TableCell>
                                                             </TableRow>
                                                             {isOpen && (
@@ -2130,7 +2357,7 @@ export default function InventoryPage() {
                                                     )
                                                 })
                                             ) : (
-                                                <TableRow><TableCell colSpan={8} className="h-24 text-center">No transactions have been recorded yet.</TableCell></TableRow>
+                                                <TableRow><TableCell colSpan={8} className="h-24 text-center">{(txDateFrom || txDateTo || txDeptFilter) ? 'No transactions match your filters.' : 'No transactions have been recorded yet.'}</TableCell></TableRow>
                                             )}
                                             </TableBody>
                                         </Table>
@@ -2140,7 +2367,7 @@ export default function InventoryPage() {
                 )}
 
                 {/* ── Config: Users ──────────────────────────────── */}
-                {(activeView === 'configuration' || activeView === 'config-users') && user.role === 'Admin' && (
+                {(activeView === 'configuration' || activeView === 'config-users') && hasFullView && (
                                 <div className="space-y-6">
                                     {/* Users table */}
                                     <div style={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: 12 }}>
@@ -2150,9 +2377,11 @@ export default function InventoryPage() {
                                                     <h2 className="text-lg font-semibold flex items-center gap-2" style={{ color: '#0f2a2a' }}><UserCog className="h-5 w-5" /> Users</h2>
                                                     <p className="text-sm" style={{ color: '#64748b' }}>Manage system users, roles, and functional group assignments.</p>
                                                 </div>
-                                                <Button onClick={() => handleOpenUserForm(null)} style={{ backgroundColor: '#1a7070' }}>
-                                                    <PlusCircle className="mr-2 h-4 w-4" /> Add User
-                                                </Button>
+                                                {canEdit && (
+                                                    <Button onClick={() => handleOpenUserForm(null)} style={{ backgroundColor: '#1a7070' }}>
+                                                        <PlusCircle className="mr-2 h-4 w-4" /> Add User
+                                                    </Button>
+                                                )}
                                             </div>
                                         </div>
                                         <div className="px-6 pb-6">
@@ -2164,12 +2393,12 @@ export default function InventoryPage() {
                                                         <TableHead>Role</TableHead>
                                                         <TableHead>Functional Group</TableHead>
                                                         <TableHead>Status</TableHead>
-                                                        <TableHead className="text-right">Actions</TableHead>
+                                                        {canEdit && <TableHead className="text-right">Actions</TableHead>}
                                                     </TableRow>
                                                 </TableHeader>
                                                 <TableBody>
                                                     {appUsers.length === 0 && (
-                                                        <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">No users found.</TableCell></TableRow>
+                                                        <TableRow><TableCell colSpan={canEdit ? 6 : 5} className="text-center text-muted-foreground py-8">No users found.</TableCell></TableRow>
                                                     )}
                                                     {appUsers.map(u => (
                                                         <TableRow key={u.id}>
@@ -2183,7 +2412,7 @@ export default function InventoryPage() {
                                                                     {u.isActive ? 'Active' : 'Inactive'}
                                                                 </Badge>
                                                             </TableCell>
-                                                            <TableCell className="text-right">
+                                                            {canEdit && <TableCell className="text-right">
                                                                 <div className="flex justify-end gap-1">
                                                                     <Tooltip>
                                                                         <TooltipTrigger asChild>
@@ -2202,7 +2431,7 @@ export default function InventoryPage() {
                                                                         <TooltipContent>{u.isActive ? 'Deactivate user' : 'Activate user'}</TooltipContent>
                                                                     </Tooltip>
                                                                 </div>
-                                                            </TableCell>
+                                                            </TableCell>}
                                                         </TableRow>
                                                     ))}
                                                 </TableBody>
@@ -2213,7 +2442,7 @@ export default function InventoryPage() {
                 )}
 
                 {/* ── Config: Functional Groups ──────────────────────────── */}
-                {(activeView === 'configuration' || activeView === 'config-groups') && user.role === 'Admin' && (
+                {(activeView === 'configuration' || activeView === 'config-groups') && hasFullView && (
                                 <div className="space-y-6">
                                     {/* Functional Groups table */}
                                     <div style={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: 12 }}>
@@ -2223,9 +2452,11 @@ export default function InventoryPage() {
                                                     <h2 className="text-lg font-semibold flex items-center gap-2" style={{ color: '#0f2a2a' }}><Building2 className="h-5 w-5" /> Functional Groups</h2>
                                                     <p className="text-sm" style={{ color: '#64748b' }}>Manage HULLC functional groups. Deactivating a group does not remove existing user assignments.</p>
                                                 </div>
-                                                <Button onClick={() => handleOpenGroupForm(null)} style={{ backgroundColor: '#1a7070' }}>
-                                                    <PlusCircle className="mr-2 h-4 w-4" /> Add Group
-                                                </Button>
+                                                {canEdit && (
+                                                    <Button onClick={() => handleOpenGroupForm(null)} style={{ backgroundColor: '#1a7070' }}>
+                                                        <PlusCircle className="mr-2 h-4 w-4" /> Add Group
+                                                    </Button>
+                                                )}
                                             </div>
                                         </div>
                                         <div className="px-6 pb-6">
@@ -2234,12 +2465,12 @@ export default function InventoryPage() {
                                                     <TableRow>
                                                         <TableHead>Group Name</TableHead>
                                                         <TableHead>Status</TableHead>
-                                                        <TableHead className="text-right">Actions</TableHead>
+                                                        {canEdit && <TableHead className="text-right">Actions</TableHead>}
                                                     </TableRow>
                                                 </TableHeader>
                                                 <TableBody>
                                                     {functionalGroups.length === 0 && (
-                                                        <TableRow><TableCell colSpan={3} className="text-center text-muted-foreground py-8">No functional groups found.</TableCell></TableRow>
+                                                        <TableRow><TableCell colSpan={canEdit ? 3 : 2} className="text-center text-muted-foreground py-8">No functional groups found.</TableCell></TableRow>
                                                     )}
                                                     {functionalGroups.map(g => (
                                                         <TableRow key={g.id}>
@@ -2250,7 +2481,7 @@ export default function InventoryPage() {
                                                                     {g.isActive ? 'Active' : 'Inactive'}
                                                                 </Badge>
                                                             </TableCell>
-                                                            <TableCell className="text-right">
+                                                            {canEdit && <TableCell className="text-right">
                                                                 <div className="flex justify-end gap-1">
                                                                     <Tooltip>
                                                                         <TooltipTrigger asChild>
@@ -2269,7 +2500,7 @@ export default function InventoryPage() {
                                                                         <TooltipContent>{g.isActive ? 'Deactivate group' : 'Activate group'}</TooltipContent>
                                                                     </Tooltip>
                                                                 </div>
-                                                            </TableCell>
+                                                            </TableCell>}
                                                         </TableRow>
                                                     ))}
                                                 </TableBody>
@@ -2280,7 +2511,7 @@ export default function InventoryPage() {
                 )}
 
                 {/* ── Config: Projects ──────────────────────────── */}
-                {(activeView === 'configuration' || activeView === 'config-projects') && user.role === 'Admin' && (
+                {(activeView === 'configuration' || activeView === 'config-projects') && hasFullView && (
                                 <div className="space-y-6">
                                     {/* Projects table */}
                                     <div style={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: 12 }}>
@@ -2290,9 +2521,11 @@ export default function InventoryPage() {
                                                     <h2 className="text-lg font-semibold flex items-center gap-2" style={{ color: '#0f2a2a' }}><Package className="h-5 w-5" /> Projects</h2>
                                                     <p className="text-sm" style={{ color: '#64748b' }}>Manage projects available for product requests.</p>
                                                 </div>
-                                                <Button onClick={() => handleOpenProjectForm(null)} style={{ backgroundColor: '#1a7070' }}>
-                                                    <PlusCircle className="mr-2 h-4 w-4" /> Add Project
-                                                </Button>
+                                                {canEdit && (
+                                                    <Button onClick={() => handleOpenProjectForm(null)} style={{ backgroundColor: '#1a7070' }}>
+                                                        <PlusCircle className="mr-2 h-4 w-4" /> Add Project
+                                                    </Button>
+                                                )}
                                             </div>
                                         </div>
                                         <div className="px-6 pb-6">
@@ -2301,12 +2534,12 @@ export default function InventoryPage() {
                                                     <TableRow>
                                                         <TableHead>Project Name</TableHead>
                                                         <TableHead>Status</TableHead>
-                                                        <TableHead className="text-right">Actions</TableHead>
+                                                        {canEdit && <TableHead className="text-right">Actions</TableHead>}
                                                     </TableRow>
                                                 </TableHeader>
                                                 <TableBody>
                                                     {appProjects.length === 0 && (
-                                                        <TableRow><TableCell colSpan={3} className="text-center text-muted-foreground py-8">No projects found.</TableCell></TableRow>
+                                                        <TableRow><TableCell colSpan={canEdit ? 3 : 2} className="text-center text-muted-foreground py-8">No projects found.</TableCell></TableRow>
                                                     )}
                                                     {appProjects.map(p => (
                                                         <TableRow key={p.id}>
@@ -2317,7 +2550,7 @@ export default function InventoryPage() {
                                                                     {p.isActive ? 'Active' : 'Inactive'}
                                                                 </Badge>
                                                             </TableCell>
-                                                            <TableCell className="text-right">
+                                                            {canEdit && <TableCell className="text-right">
                                                                 <div className="flex justify-end gap-1">
                                                                     <Tooltip>
                                                                         <TooltipTrigger asChild>
@@ -2336,7 +2569,7 @@ export default function InventoryPage() {
                                                                         <TooltipContent>{p.isActive ? 'Deactivate project' : 'Activate project'}</TooltipContent>
                                                                     </Tooltip>
                                                                 </div>
-                                                            </TableCell>
+                                                            </TableCell>}
                                                         </TableRow>
                                                     ))}
                                                 </TableBody>
@@ -2347,7 +2580,7 @@ export default function InventoryPage() {
                 )}
 
                 {/* ── Config: Manufacturers ──────────────────────────── */}
-                {activeView === 'config-manufacturers' && user.role === 'Admin' && (
+                {activeView === 'config-manufacturers' && hasFullView && (
                                 <div className="space-y-6">
                                     <div style={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: 12 }}>
                                         <div className="p-6 pb-4">
@@ -2356,9 +2589,11 @@ export default function InventoryPage() {
                                                     <h2 className="text-lg font-semibold flex items-center gap-2" style={{ color: '#0f2a2a' }}>Manufacturers</h2>
                                                     <p className="text-sm" style={{ color: '#64748b' }}>Manage manufacturers for products.</p>
                                                 </div>
-                                                <Button onClick={() => handleOpenManufacturerForm(null)} style={{ backgroundColor: '#1a7070' }}>
-                                                    <PlusCircle className="mr-2 h-4 w-4" /> Add Manufacturer
-                                                </Button>
+                                                {canEdit && (
+                                                    <Button onClick={() => handleOpenManufacturerForm(null)} style={{ backgroundColor: '#1a7070' }}>
+                                                        <PlusCircle className="mr-2 h-4 w-4" /> Add Manufacturer
+                                                    </Button>
+                                                )}
                                             </div>
                                         </div>
                                         <div className="px-6 pb-6">
@@ -2367,12 +2602,12 @@ export default function InventoryPage() {
                                                     <TableRow>
                                                         <TableHead>Manufacturer Name</TableHead>
                                                         <TableHead>Status</TableHead>
-                                                        <TableHead className="text-right">Actions</TableHead>
+                                                        {canEdit && <TableHead className="text-right">Actions</TableHead>}
                                                     </TableRow>
                                                 </TableHeader>
                                                 <TableBody>
                                                     {appManufacturers.length === 0 && (
-                                                        <TableRow><TableCell colSpan={3} className="text-center text-muted-foreground py-8">No manufacturers found.</TableCell></TableRow>
+                                                        <TableRow><TableCell colSpan={canEdit ? 3 : 2} className="text-center text-muted-foreground py-8">No manufacturers found.</TableCell></TableRow>
                                                     )}
                                                     {appManufacturers.map(m => (
                                                         <TableRow key={m.id}>
@@ -2388,7 +2623,7 @@ export default function InventoryPage() {
                                                                     {m.isActive ? 'Active' : 'Inactive'}
                                                                 </Badge>
                                                             </TableCell>
-                                                            <TableCell className="text-right">
+                                                            {canEdit && <TableCell className="text-right">
                                                                 <div className="flex justify-end gap-1">
                                                                     <Tooltip>
                                                                         <TooltipTrigger asChild>
@@ -2407,7 +2642,7 @@ export default function InventoryPage() {
                                                                         <TooltipContent>{m.isActive ? 'Deactivate manufacturer' : 'Activate manufacturer'}</TooltipContent>
                                                                     </Tooltip>
                                                                 </div>
-                                                            </TableCell>
+                                                            </TableCell>}
                                                         </TableRow>
                                                     ))}
                                                 </TableBody>
@@ -2418,7 +2653,7 @@ export default function InventoryPage() {
                 )}
 
                 {/* ── Config: Storage Locations ──────────────────────────── */}
-                {activeView === 'config-locations' && user.role === 'Admin' && (
+                {activeView === 'config-locations' && hasFullView && (
                                 <div className="space-y-6">
                                     <div style={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: 12 }}>
                                         <div className="p-6 pb-4">
@@ -2427,9 +2662,11 @@ export default function InventoryPage() {
                                                     <h2 className="text-lg font-semibold flex items-center gap-2" style={{ color: '#0f2a2a' }}>Storage Locations</h2>
                                                     <p className="text-sm" style={{ color: '#64748b' }}>Manage storage locations for lot rows. Locations in use by active lots cannot be deactivated.</p>
                                                 </div>
-                                                <Button onClick={() => handleOpenLocationForm(null)} style={{ backgroundColor: '#1a7070' }}>
-                                                    <PlusCircle className="mr-2 h-4 w-4" /> Add Location
-                                                </Button>
+                                                {canEdit && (
+                                                    <Button onClick={() => handleOpenLocationForm(null)} style={{ backgroundColor: '#1a7070' }}>
+                                                        <PlusCircle className="mr-2 h-4 w-4" /> Add Location
+                                                    </Button>
+                                                )}
                                             </div>
                                         </div>
                                         <div className="px-6 pb-6">
@@ -2438,12 +2675,12 @@ export default function InventoryPage() {
                                                     <TableRow>
                                                         <TableHead>Location Name</TableHead>
                                                         <TableHead>Status</TableHead>
-                                                        <TableHead className="text-right">Actions</TableHead>
+                                                        {canEdit && <TableHead className="text-right">Actions</TableHead>}
                                                     </TableRow>
                                                 </TableHeader>
                                                 <TableBody>
                                                     {appLocations.length === 0 && (
-                                                        <TableRow><TableCell colSpan={3} className="text-center text-muted-foreground py-8">No storage locations found.</TableCell></TableRow>
+                                                        <TableRow><TableCell colSpan={canEdit ? 3 : 2} className="text-center text-muted-foreground py-8">No storage locations found.</TableCell></TableRow>
                                                     )}
                                                     {appLocations.map(l => (
                                                         <TableRow key={l.id}>
@@ -2454,7 +2691,7 @@ export default function InventoryPage() {
                                                                     {l.isActive ? 'Active' : 'Inactive'}
                                                                 </Badge>
                                                             </TableCell>
-                                                            <TableCell className="text-right">
+                                                            {canEdit && <TableCell className="text-right">
                                                                 <div className="flex justify-end gap-1">
                                                                     <Tooltip>
                                                                         <TooltipTrigger asChild>
@@ -2473,7 +2710,7 @@ export default function InventoryPage() {
                                                                         <TooltipContent>{l.isActive ? 'Deactivate location' : 'Activate location'}</TooltipContent>
                                                                     </Tooltip>
                                                                 </div>
-                                                            </TableCell>
+                                                            </TableCell>}
                                                         </TableRow>
                                                     ))}
                                                 </TableBody>

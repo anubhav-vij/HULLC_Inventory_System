@@ -134,6 +134,7 @@ export async function POST(request: Request) {
   }
 
   const { requestId } = parsed.data;
+  const userId = request.headers.get('x-user-id') || null;
 
   try {
     const created = await withTransaction(async (client) => {
@@ -167,12 +168,12 @@ export async function POST(request: Request) {
       const fulfillmentId = uuidv4();
       await client.query(
         `INSERT INTO fulfillments
-           (id, request_id, product_id, product_name, department, total_quantity_requested)
-         VALUES ($1, $2, $3, $4, $5, $6)`,
+           (id, request_id, product_id, product_name, department, total_quantity_requested, created_by, updated_by)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $7)`,
         [
           fulfillmentId, requestId,
           req.product_id, req.product_name,
-          req.department, 0,
+          req.department, 0, userId,
         ]
       );
 

@@ -91,7 +91,8 @@ export async function PUT(request: Request, { params }: RouteContext) {
              rejection_note = $1,
              rejected_by = $2,
              rejection_stage = 'sciops',
-             som_approval_status = 'rejected'
+             som_approval_status = 'rejected',
+             updated_by = $2
          WHERE id = $3`,
         [rejectionNote, userId || null, id]
       );

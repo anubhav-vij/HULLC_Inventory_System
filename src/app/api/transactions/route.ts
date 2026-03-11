@@ -133,6 +133,7 @@ export async function POST(request: Request) {
   }
 
   const { productId, date, notes, items, requestorName, department, fulfillmentId } = parsed.data;
+  const userId = request.headers.get('x-user-id') || null;
 
   try {
     const created = await withTransaction(async (client) => {
@@ -196,8 +197,8 @@ export async function POST(request: Request) {
       await client.query(
         `INSERT INTO transactions
            (id, product_id, product_name, date, notes, total_quantity,
-            requestor_name, department, fulfillment_id)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+            requestor_name, department, fulfillment_id, created_by, updated_by)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $10)`,
         [
           transactionId,
           productId,
@@ -208,15 +209,16 @@ export async function POST(request: Request) {
           requestorName ?? null,
           department ?? null,
           fulfillmentId ?? null,
+          userId,
         ]
       );
 
       // 5. Insert transaction_items and decrement lot quantities
       for (const item of lotData) {
         await client.query(
-          `INSERT INTO transaction_items (id, transaction_id, lot_id, lot_number, quantity)
-           VALUES ($1, $2, $3, $4, $5)`,
-          [uuidv4(), transactionId, item.lotId, item.lotNumber, item.quantityTaken]
+          `INSERT INTO transaction_items (id, transaction_id, lot_id, lot_number, quantity, created_by)
+           VALUES ($1, $2, $3, $4, $5, $6)`,
+          [uuidv4(), transactionId, item.lotId, item.lotNumber, item.quantityTaken, userId]
         );
 
         await client.query('UPDATE lots SET quantity = quantity - $1 WHERE id = $2', [

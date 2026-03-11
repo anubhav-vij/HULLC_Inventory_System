@@ -91,7 +91,7 @@ function EditProductFormPage() {
     try {
       const res = await fetch(`/api/products/${product.id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'x-user-id': user?.id ?? '' },
         body: JSON.stringify(payload),
       });
       if (!res.ok) {

@@ -87,7 +87,8 @@ export async function PUT(request: Request, { params }: RouteContext) {
          SET status = 'Approved',
              som_approval_status = 'approved',
              sciops_director_approved_at = NOW(),
-             sciops_director_approved_by = $1
+             sciops_director_approved_by = $1,
+             updated_by = $1
          WHERE id = $2`,
         [userId, id]
       );

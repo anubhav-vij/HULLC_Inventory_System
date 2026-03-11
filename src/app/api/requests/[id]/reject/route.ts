@@ -147,7 +147,8 @@ export async function PUT(request: Request, { params }: RouteContext) {
              rejection_note = $1,
              rejected_by = $2,
              rejection_stage = $3,
-             director_rejection_note = COALESCE($4, director_rejection_note)
+             director_rejection_note = COALESCE($4, director_rejection_note),
+             updated_by = $2
          WHERE id = $5`,
         [rejectionNote, userId || null, rejectionStage, directorNote, id]
       );

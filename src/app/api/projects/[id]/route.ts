@@ -24,6 +24,7 @@ export async function PUT(request: Request, { params }: RouteContext) {
     return NextResponse.json({ error: 'Validation failed', issues: parsed.error.flatten() }, { status: 422 });
   }
   const { name, isActive } = parsed.data;
+  const userId = request.headers.get('x-user-id') || null;
   if (name === undefined && isActive === undefined) {
     return NextResponse.json({ error: 'No fields to update' }, { status: 400 });
   }
@@ -32,6 +33,7 @@ export async function PUT(request: Request, { params }: RouteContext) {
     const vals: unknown[] = [];
     if (name !== undefined) { vals.push(name); setParts.push(`name = $${vals.length}`); }
     if (isActive !== undefined) { vals.push(isActive); setParts.push(`is_active = $${vals.length}`); }
+    if (userId) { vals.push(userId); setParts.push(`updated_by = $${vals.length}`); }
     vals.push(id);
     const { rows } = await query<{ id: string; name: string; is_active: boolean }>(
       `UPDATE projects SET ${setParts.join(', ')} WHERE id = $${vals.length} RETURNING id, name, is_active`,

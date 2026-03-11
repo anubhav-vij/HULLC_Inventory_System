@@ -31,10 +31,11 @@ export async function POST(request: Request) {
   if (!parsed.success) {
     return NextResponse.json({ error: 'Validation failed', issues: parsed.error.flatten() }, { status: 422 });
   }
+  const userId = request.headers.get('x-user-id') || null;
   try {
     const { rows } = await query<{ id: string; name: string; is_active: boolean }>(
-      'INSERT INTO projects (name) VALUES ($1) RETURNING id, name, is_active',
-      [parsed.data.name]
+      'INSERT INTO projects (name, created_by, updated_by) VALUES ($1, $2, $2) RETURNING id, name, is_active',
+      [parsed.data.name, userId]
     );
     return NextResponse.json({ id: rows[0].id, name: rows[0].name, isActive: rows[0].is_active }, { status: 201 });
   } catch (error: any) {

@@ -119,7 +119,7 @@ each phase sequentially, marking `[~]` while in progress and `[x]` when complete
 - [x] Enforce one Director per functional group — UI warning + API validation
 - [x] Replace login screen role dropdown with email + password fields
 - [x] On login, load full user profile (name, email, role, functional group) into session
-- [ ] Add audit fields to all tables: created_by, updated_by (reference users.id) where applicable
+- [x] Add audit fields to all tables: created_by, updated_by (reference users.id) where applicable
 
 ---
 
@@ -188,13 +188,13 @@ each phase sequentially, marking `[~]` while in progress and `[x]` when complete
 
 > Default landing page after login. Role-aware summary cards give each user an immediate view of what needs their attention.
 
-- [ ] Add Dashboard as default tab on login (replaces Inventory as landing tab)
-- [ ] Summary card: total products currently in inventory
-- [ ] Summary card: products added in the last 7 days (clickable — filters Inventory tab)
-- [ ] Summary card: transactions recorded today (clickable — filters Transactions tab)
-- [ ] Summary card: pending items count — role-aware (Directors see pending approvals count; Admins see approved-but-unfulfilled count; Staff sees their own pending requests count)
-- [ ] Summary card: products at or below reorder threshold (clickable — filters Inventory tab)
-- [ ] All cards update in real time when data changes
+- [x] Add Dashboard as default tab on login (replaces Inventory as landing tab)
+- [x] Summary card: total products currently in inventory
+- [x] Summary card: products added in the last 7 days (clickable — filters Inventory tab)
+- [x] Summary card: transactions recorded today (clickable — filters Transactions tab)
+- [x] Summary card: pending items count — role-aware (Directors see pending approvals count; Admins see approved-but-unfulfilled count; Staff sees their own pending requests count)
+- [x] Summary card: products at or below reorder threshold (clickable — filters Inventory tab)
+- [x] All cards update in real time when data changes
 
 ---
 
@@ -202,13 +202,13 @@ each phase sequentially, marking `[~]` while in progress and `[x]` when complete
 
 > Makes the application usable at scale when hundreds of products and transactions exist.
 
-- [ ] Add search bar to Inventory tab — search by product name, vendor, lot number (client-side filter)
-- [ ] Add functional group filter dropdown to Inventory tab
-- [ ] Add date range filter (from/to + Clear button) to Transactions tab
-- [ ] Add functional group filter to Transactions tab
-- [ ] Add status filter to Product Requests tab
-- [ ] Add date range filter to Product Requests tab
-- [ ] Ensure all filters are additive (search + filter + date range all combine)
+- [x] Add search bar to Inventory tab — search by product name, vendor, lot number (client-side filter)
+- [x] Add functional group filter dropdown to Inventory tab
+- [x] Add date range filter (from/to + Clear button) to Transactions tab
+- [x] Add functional group filter to Transactions tab
+- [x] Add status filter to Product Requests tab
+- [x] Add date range filter to Product Requests tab
+- [x] Ensure all filters are additive (search + filter + date range all combine)
 
 ---
 
@@ -229,11 +229,11 @@ each phase sequentially, marking `[~]` while in progress and `[x]` when complete
 
 > Project Manager and Chief get full visibility without edit access.
 
-- [ ] Project Manager and Chief see the full Admin view
-- [ ] All add, edit, delete, and action buttons hidden for Project Manager and Chief roles
-- [ ] Director sees only their own functional group's requests in the Approvals tab
-- [ ] Update all API routes to permit read access for ProjectManager and Chief roles
-- [ ] Add role label badge to page header showing current user's role
+- [x] Project Manager and Chief see the full Admin view
+- [x] All add, edit, delete, and action buttons hidden for Project Manager and Chief roles
+- [x] Director sees only their own functional group's requests in the Approvals tab
+- [x] Update all API routes to permit read access for ProjectManager and Chief roles
+- [x] Add role label badge to page header showing current user's role
 
 ---
 
@@ -241,12 +241,12 @@ each phase sequentially, marking `[~]` while in progress and `[x]` when complete
 
 > Replaces free-text storage location fields with a managed, consistent list.
 
-- [ ] Create DB migration: add `storage_locations` table (id, name, room_number, temperature_conditions, is_active, created_at)
-- [ ] Add API: `GET/POST/PUT/DELETE /api/storage-locations`
-- [ ] Add Storage Locations tab (Admin only)
-- [ ] Admins can add, edit, and deactivate storage locations from the UI
-- [ ] Lot storage location field becomes a dropdown populated from `storage_locations` table
-- [ ] Prevent deleting a location that is referenced by active lots (return 409)
+- [x] Create DB migration: add `storage_locations` table (id, name, room_number, temperature_conditions, is_active, created_at)
+- [x] Add API: `GET/POST/PUT/DELETE /api/storage-locations`
+- [x] Add Storage Locations tab (Admin only)
+- [x] Admins can add, edit, and deactivate storage locations from the UI
+- [x] Lot storage location field becomes a dropdown populated from `storage_locations` table
+- [x] Prevent deleting a location that is referenced by active lots (return 409)
 
 ---
 
@@ -267,13 +267,13 @@ each phase sequentially, marking `[~]` while in progress and `[x]` when complete
 
 > Upgrades the existing CSV import/export to Excel for better usability and compatibility.
 
-- [ ] Install SheetJS (`xlsx`) library
-- [ ] Replace CSV import with Excel (.xlsx) import
+- [x] Install SheetJS (`xlsx`) library
+- [x] Replace CSV import with Excel (.xlsx) import
 - [ ] Add sheet selector when uploaded file contains multiple sheets
-- [ ] Map Excel columns to Product and Lot model fields
-- [ ] Replace CSV export with Excel export for Inventory tab
-- [ ] Replace CSV export with Excel export for Transactions tab
-- [ ] Exported files include formatted headers and auto-sized column widths
+- [x] Map Excel columns to Product and Lot model fields
+- [x] Replace CSV export with Excel export for Inventory tab
+- [x] Replace CSV export with Excel export for Transactions tab
+- [x] Exported files include formatted headers and auto-sized column widths
 
 ---
 

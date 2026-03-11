@@ -29,17 +29,17 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { id: "dashboard", label: "Dashboard", icon: LayoutDashboard, roles: ["Admin"] },
+  { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
   { id: "inventory", label: "HULLC Inventory", icon: Package },
   { id: "requests", label: "Product Requests", icon: ClipboardList },
   { id: "approvals", label: "Approvals", icon: CheckSquare, roles: ["Director"] },
-  { id: "transactions", label: "Transactions", icon: ArrowLeftRight, roles: ["Admin"] },
-  { id: "fulfillments", label: "Fulfillments", icon: Truck, roles: ["Admin"] },
+  { id: "transactions", label: "Transactions", icon: ArrowLeftRight, roles: ["Admin", "ProjectManager", "Chief"] },
+  { id: "fulfillments", label: "Fulfillments", icon: Truck, roles: ["Admin", "ProjectManager", "Chief"] },
   {
     id: "configuration",
     label: "Configuration",
     icon: Settings,
-    roles: ["Admin"],
+    roles: ["Admin", "ProjectManager", "Chief"],
     children: [
       { id: "config-users", label: "Users", icon: Users },
       { id: "config-groups", label: "Functional Groups", icon: Building2 },

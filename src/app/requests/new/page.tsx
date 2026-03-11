@@ -157,7 +157,7 @@ function NewRequestForm() {
     try {
       const res = await fetch('/api/requests', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'x-user-id': user?.id ?? '' },
         body: JSON.stringify({
           productId: product.id,
           productName: product.name,

@@ -42,6 +42,7 @@ export async function PUT(request: Request, { params }: RouteContext) {
   const { id: requestId, lineItemId } = await params;
 
   const role = request.headers.get('x-user-role') ?? '';
+  const userId = request.headers.get('x-user-id') || null;
   if (role !== 'Admin') {
     return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
   }
@@ -149,19 +150,19 @@ export async function PUT(request: Request, { params }: RouteContext) {
       const fulfillmentId = uuidv4();
       await client.query(
         `INSERT INTO fulfillments
-           (id, request_id, product_id, product_name, department, total_quantity_requested, request_line_item_id)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-        [fulfillmentId, requestId, req.product_id, req.product_name, req.department, totalDispensed, lineItemId]
+           (id, request_id, product_id, product_name, department, total_quantity_requested, request_line_item_id, created_by, updated_by)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $8)`,
+        [fulfillmentId, requestId, req.product_id, req.product_name, req.department, totalDispensed, lineItemId, userId]
       );
 
       // 5. Create transaction
       const transactionId = uuidv4();
       await client.query(
         `INSERT INTO transactions
-           (id, product_id, product_name, date, notes, total_quantity, requestor_name, department, fulfillment_id)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+           (id, product_id, product_name, date, notes, total_quantity, requestor_name, department, fulfillment_id, created_by, updated_by)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $10)`,
         [transactionId, req.product_id, req.product_name, new Date(date), notes,
-         totalDispensed, req.requestor_name, req.department, fulfillmentId]
+         totalDispensed, req.requestor_name, req.department, fulfillmentId, userId]
       );
 
       // 6. Insert transaction items + decrement lot quantities
@@ -173,9 +174,9 @@ export async function PUT(request: Request, { params }: RouteContext) {
         const lotNumber = lotRows[0]?.lot_number ?? item.lotId;
 
         await client.query(
-          `INSERT INTO transaction_items (transaction_id, lot_id, lot_number, quantity)
-           VALUES ($1, $2, $3, $4)`,
-          [transactionId, item.lotId, lotNumber, item.quantityTaken]
+          `INSERT INTO transaction_items (transaction_id, lot_id, lot_number, quantity, created_by)
+           VALUES ($1, $2, $3, $4, $5)`,
+          [transactionId, item.lotId, lotNumber, item.quantityTaken, userId]
         );
 
         await client.query(
@@ -187,9 +188,9 @@ export async function PUT(request: Request, { params }: RouteContext) {
       // 7. Update line item to Fulfilled
       await client.query(
         `UPDATE request_line_items
-         SET status = 'Fulfilled', fulfilled_quantity = $1, fulfillment_id = $2
-         WHERE id = $3`,
-        [totalDispensed, fulfillmentId, lineItemId]
+         SET status = 'Fulfilled', fulfilled_quantity = $1, fulfillment_id = $2, updated_by = $3
+         WHERE id = $4`,
+        [totalDispensed, fulfillmentId, userId, lineItemId]
       );
 
       // 8. Check if ALL line items for this request are now Fulfilled
@@ -202,8 +203,8 @@ export async function PUT(request: Request, { params }: RouteContext) {
       const newRequestStatus = allFulfilled ? 'Completed' : 'In Progress';
 
       await client.query(
-        'UPDATE product_requests SET status = $1 WHERE id = $2',
-        [newRequestStatus, requestId]
+        'UPDATE product_requests SET status = $1, updated_by = $2 WHERE id = $3',
+        [newRequestStatus, userId, requestId]
       );
 
       // Fetch and return the updated request
