@@ -16,30 +16,78 @@ interface RequestRow {
   requestor_name: string;
   requestor_email: string;
   department: string;
-  quantity: number;
-  project: string;
+  project: string | null;
   justification: string;
   sop_read: boolean;
   status: string;
   rejection_note: string | null;
+  director_id: string | null;
+  director_approved_at: Date | null;
+  director_rejection_note: string | null;
+  rejected_by: string | null;
+  rejection_stage: string | null;
   date: Date;
+  request_number: number | null;
+  request_id: string | null;
+  line_items: Array<{
+    id: string;
+    requestId: string;
+    requestedDate: string;
+    quantity: number;
+    status: string;
+    fulfilledQuantity: number;
+    fulfillmentId: string | null;
+  }> | null;
 }
+
+const LINE_ITEMS_SUBQUERY = `
+  COALESCE(
+    json_agg(
+      json_build_object(
+        'id', rli.id,
+        'requestId', rli.request_id,
+        'requestedDate', to_char(rli.requested_date, 'YYYY-MM-DD'),
+        'quantity', rli.quantity,
+        'status', rli.status,
+        'fulfilledQuantity', rli.fulfilled_quantity,
+        'fulfillmentId', rli.fulfillment_id
+      ) ORDER BY rli.requested_date
+    ) FILTER (WHERE rli.id IS NOT NULL),
+    '[]'
+  ) AS line_items
+`;
 
 function rowToRequest(row: RequestRow) {
   return {
     id: row.id,
+    requestId: row.request_id ?? undefined,
+    requestNumber: row.request_number ?? undefined,
     productId: row.product_id,
     productName: row.product_name,
     requestorName: row.requestor_name,
     requestorEmail: row.requestor_email,
     department: row.department,
-    quantity: row.quantity,
-    project: row.project,
+    project: row.project ?? null,
     justification: row.justification,
     sopRead: row.sop_read,
     status: row.status,
     rejectionNote: row.rejection_note ?? undefined,
+    directorId: row.director_id ?? null,
+    directorApprovedAt: row.director_approved_at ? row.director_approved_at.toISOString() : null,
+    directorRejectionNote: row.director_rejection_note ?? null,
+    rejectedBy: row.rejected_by ?? null,
+    rejectionStage: row.rejection_stage ?? null,
     date: row.date,
+    lineItems: (row.line_items ?? []).map(li => ({
+      id: li.id,
+      requestId: li.requestId,
+      requestedDate: li.requestedDate,
+      quantity: li.quantity,
+      status: li.status,
+      fulfilledQuantity: li.fulfilledQuantity,
+      fulfillmentId: li.fulfillmentId ?? null,
+      createdAt: new Date().toISOString(),
+    })),
   };
 }
 
@@ -48,10 +96,11 @@ function rowToRequest(row: RequestRow) {
 // ---------------------------------------------------------------------------
 
 const VALID_TRANSITIONS: Record<string, string[]> = {
-  'Pending':     ['In Progress', 'Rejected'],
-  'In Progress': ['Completed'],
-  'Completed':   [],
-  'Rejected':    [],
+  'Pending Approval': ['Approved', 'Rejected'],
+  'Approved':         ['In Progress', 'Rejected'],
+  'In Progress':      ['Completed', 'Rejected'],
+  'Completed':        [],
+  'Rejected':         [],
 };
 
 // ---------------------------------------------------------------------------
@@ -73,7 +122,6 @@ const UpdateStatusSchema = z
 
 // ---------------------------------------------------------------------------
 // GET /api/requests/[id]
-// Returns a single product request. 404 if not found.
 // ---------------------------------------------------------------------------
 
 export async function GET(_request: Request, { params }: RouteContext) {
@@ -81,7 +129,11 @@ export async function GET(_request: Request, { params }: RouteContext) {
 
   try {
     const { rows } = await query<RequestRow>(
-      'SELECT * FROM product_requests WHERE id = $1',
+      `SELECT pr.*, ${LINE_ITEMS_SUBQUERY}
+       FROM product_requests pr
+       LEFT JOIN request_line_items rli ON rli.request_id = pr.id
+       WHERE pr.id = $1
+       GROUP BY pr.id`,
       [id]
     );
 
@@ -98,8 +150,7 @@ export async function GET(_request: Request, { params }: RouteContext) {
 
 // ---------------------------------------------------------------------------
 // PUT /api/requests/[id]
-// Updates request status. Enforces valid state transitions.
-// Returns 404 if not found, 409 if transition is invalid.
+// General status update with transition validation.
 // ---------------------------------------------------------------------------
 
 export async function PUT(request: Request, { params }: RouteContext) {
@@ -124,9 +175,13 @@ export async function PUT(request: Request, { params }: RouteContext) {
 
   try {
     const result = await withTransaction(async (client) => {
-      // Lock the row for the duration of the status check + update
       const { rows } = await client.query<RequestRow>(
-        'SELECT * FROM product_requests WHERE id = $1 FOR UPDATE',
+        `SELECT pr.*, ${LINE_ITEMS_SUBQUERY}
+         FROM product_requests pr
+         LEFT JOIN request_line_items rli ON rli.request_id = pr.id
+         WHERE pr.id = $1
+         GROUP BY pr.id
+         FOR UPDATE OF pr`,
         [id]
       );
       if (rows.length === 0) return null;
@@ -143,13 +198,23 @@ export async function PUT(request: Request, { params }: RouteContext) {
 
       const { rows: updated } = await client.query<RequestRow>(
         `UPDATE product_requests
-         SET status = $1, rejection_note = $2
+         SET status = $1, rejection_note = COALESCE($2, rejection_note)
          WHERE id = $3
          RETURNING *`,
         [newStatus, rejectionNote ?? null, id]
       );
 
-      return updated[0];
+      // Re-fetch with line items
+      const { rows: full } = await client.query<RequestRow>(
+        `SELECT pr.*, ${LINE_ITEMS_SUBQUERY}
+         FROM product_requests pr
+         LEFT JOIN request_line_items rli ON rli.request_id = pr.id
+         WHERE pr.id = $1
+         GROUP BY pr.id`,
+        [updated[0].id]
+      );
+
+      return full[0];
     });
 
     if (!result) {
@@ -166,11 +231,7 @@ export async function PUT(request: Request, { params }: RouteContext) {
 
     if (err.code === 'INVALID_TRANSITION') {
       return NextResponse.json(
-        {
-          error: err.message,
-          currentStatus: err.currentStatus,
-          newStatus: err.newStatus,
-        },
+        { error: err.message, currentStatus: err.currentStatus, newStatus: err.newStatus },
         { status: 409 }
       );
     }
@@ -182,8 +243,7 @@ export async function PUT(request: Request, { params }: RouteContext) {
 
 // ---------------------------------------------------------------------------
 // DELETE /api/requests/[id]
-// Deletes a request. Only allowed when status is Pending or Rejected.
-// Returns 409 if In Progress or Completed, 404 if not found, 204 on success.
+// Only allowed when status is Pending Approval or Rejected.
 // ---------------------------------------------------------------------------
 
 export async function DELETE(_request: Request, { params }: RouteContext) {
@@ -200,7 +260,7 @@ export async function DELETE(_request: Request, { params }: RouteContext) {
 
       const { status } = rows[0];
 
-      if (status === 'In Progress' || status === 'Completed') {
+      if (status === 'In Progress' || status === 'Approved' || status === 'Completed') {
         return { found: true, deletable: false, status };
       }
 
@@ -216,7 +276,7 @@ export async function DELETE(_request: Request, { params }: RouteContext) {
       return NextResponse.json(
         {
           error: `Cannot delete a request with status "${result.status}". ` +
-            'Only Pending or Rejected requests can be deleted.',
+            'Only Pending Approval or Rejected requests can be deleted.',
         },
         { status: 409 }
       );

@@ -31,6 +31,22 @@ async function seed() {
     console.log(`  ${rowCount && rowCount > 0 ? 'created' : 'exists '}: ${name}`);
   }
 
+  // Projects (idempotent — skip duplicates)
+  console.log('\nProjects:');
+  const PROJECTS = [
+    'Project Alpha',
+    'Project Beta',
+    'Clinical Trial Gamma',
+    'Pre-clinical Study Delta',
+  ];
+  for (const name of PROJECTS) {
+    const { rowCount } = await query(
+      'INSERT INTO projects (name) VALUES ($1) ON CONFLICT (name) DO NOTHING',
+      [name]
+    );
+    console.log(`  ${rowCount && rowCount > 0 ? 'created' : 'exists '}: ${name}`);
+  }
+
   // Initial admin user (idempotent — skip if email exists)
   console.log('\nAdmin user:');
   const existingAdmin = await query(

@@ -11,7 +11,7 @@ type RouteContext = { params: Promise<{ id: string }> };
 
 interface FulfillmentRow {
   id: string;
-  request_id: string;
+  request_id: string | null;
   product_id: string;
   product_name: string;
   department: string;
@@ -74,7 +74,7 @@ const FULFILLMENT_SELECT_SQL = `
 function rowToFulfillment(row: FulfillmentRow) {
   return {
     id: row.id,
-    requestId: row.request_id,
+    requestId: row.request_id ?? null,
     productId: row.product_id,
     productName: row.product_name,
     department: row.department,
@@ -151,16 +151,20 @@ export async function PUT(request: Request, { params }: RouteContext) {
 
       const { product_id: productId, product_name: productName, request_id: requestId } = fRows[0];
 
-      // 2. Fetch the request for requestorName / department snapshot
-      const { rows: reqRows } = await client.query<{
-        requestor_name: string;
-        department: string;
-      }>(
-        'SELECT requestor_name, department FROM product_requests WHERE id = $1',
-        [requestId]
-      );
-      const requestorName = reqRows[0]?.requestor_name ?? null;
-      const reqDepartment = reqRows[0]?.department ?? null;
+      // 2. Fetch the request for requestorName / department snapshot (if linked)
+      let requestorName: string | null = null;
+      let reqDepartment: string | null = null;
+      if (requestId) {
+        const { rows: reqRows } = await client.query<{
+          requestor_name: string;
+          department: string;
+        }>(
+          'SELECT requestor_name, department FROM product_requests WHERE id = $1',
+          [requestId]
+        );
+        requestorName = reqRows[0]?.requestor_name ?? null;
+        reqDepartment = reqRows[0]?.department ?? null;
+      }
 
       // 3. Lock each lot and verify sufficient stock before writing anything
       const lotData: Array<{ lotId: string; lotNumber: string; quantityTaken: number }> = [];
@@ -233,11 +237,13 @@ export async function PUT(request: Request, { params }: RouteContext) {
         ]);
       }
 
-      // 6. Mark the linked request as Completed
-      await client.query(
-        `UPDATE product_requests SET status = 'Completed' WHERE id = $1`,
-        [requestId]
-      );
+      // 6. Mark the linked request as Completed (if there is one)
+      if (requestId) {
+        await client.query(
+          `UPDATE product_requests SET status = 'Completed' WHERE id = $1`,
+          [requestId]
+        );
+      }
 
       // 7. Return the updated fulfillment with all dispensed items
       const { rows } = await client.query<FulfillmentRow>(
@@ -296,7 +302,7 @@ export async function DELETE(_request: Request, { params }: RouteContext) {
       // 1. Fetch and lock the fulfillment
       const { rows: fRows } = await client.query<{
         id: string;
-        request_id: string;
+        request_id: string | null;
       }>(
         'SELECT id, request_id FROM fulfillments WHERE id = $1 FOR UPDATE',
         [id]
@@ -317,11 +323,13 @@ export async function DELETE(_request: Request, { params }: RouteContext) {
         return { found: true, hasTransactions: true };
       }
 
-      // 3. Reset the linked request back to Pending
-      await client.query(
-        `UPDATE product_requests SET status = 'Pending' WHERE id = $1`,
-        [requestId]
-      );
+      // 3. Reset the linked request back to Pending Approval (if there is one)
+      if (requestId) {
+        await client.query(
+          `UPDATE product_requests SET status = 'Pending Approval' WHERE id = $1`,
+          [requestId]
+        );
+      }
 
       // 4. Delete the fulfillment
       await client.query('DELETE FROM fulfillments WHERE id = $1', [id]);

@@ -61,7 +61,7 @@ export async function POST(request: Request) {
     );
   }
 
-  const { name, vendor, vendorPartNumber, reorderThreshold, lots } = parsed.data;
+  const { name, vendor, vendorPartNumber, uom, reorderThreshold, lots } = parsed.data;
 
   try {
     const created = await withTransaction(async (client) => {
@@ -70,9 +70,9 @@ export async function POST(request: Request) {
       const productId = await generateNextProductId(client);
 
       await client.query(
-        `INSERT INTO products (id, name, vendor, vendor_part_number, reorder_threshold)
-         VALUES ($1, $2, $3, $4, $5)`,
-        [productId, name, vendor, vendorPartNumber, reorderThreshold]
+        `INSERT INTO products (id, name, vendor, vendor_part_number, uom, reorder_threshold)
+         VALUES ($1, $2, $3, $4, $5, $6)`,
+        [productId, name, vendor, vendorPartNumber, uom ?? null, reorderThreshold]
       );
 
       // Insert each lot with a server-generated UUID

@@ -8,9 +8,8 @@ import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, For
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Loader2 } from "lucide-react";
-import { type Product, ProductRequestFormSchema, type ProductRequestFormData, DEPARTMENTS, PROJECTS } from "@/lib/types";
+import { type Product, ProductRequestFormSchema, type ProductRequestFormData } from "@/lib/types";
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 
 type RequestFormProps = {
@@ -26,11 +25,11 @@ export function RequestForm({ product, onSave, onCancel, isSaving }: RequestForm
     defaultValues: {
       requestorName: "",
       requestorEmail: "",
-      department: undefined,
-      quantity: 1,
+      department: "",
       project: undefined,
       justification: "",
       sopRead: false,
+      lineItems: [{ requestedDate: "", quantity: 1 }],
     },
   });
 
@@ -89,54 +88,24 @@ export function RequestForm({ product, onSave, onCancel, isSaving }: RequestForm
               name="department"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Select your Department</FormLabel>
-                  <Select onValueChange={field.onChange} defaultValue={field.value}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a department" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {DEPARTMENTS.map(dept => <SelectItem key={dept} value={dept}>{dept}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
+                  <FormLabel>Department / Functional Group</FormLabel>
+                  <FormControl><Input placeholder="e.g., HULLC" {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
             <FormField
               control={form.control}
-              name="quantity"
+              name="project"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Quantity of Request</FormLabel>
-                  <FormControl><Input type="number" min="1" placeholder="1" {...field} onChange={e => field.onChange(parseInt(e.target.value) || 1)} /></FormControl>
+                  <FormLabel>Project (optional)</FormLabel>
+                  <FormControl><Input placeholder="e.g., Project Alpha" {...field} /></FormControl>
                   <FormMessage />
                 </FormItem>
               )}
             />
           </div>
-
-           <FormField
-              control={form.control}
-              name="project"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Which project is this needed to support?</FormLabel>
-                   <Select onValueChange={field.onChange} defaultValue={field.value}>
-                    <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a project" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {PROJECTS.map(proj => <SelectItem key={proj} value={proj}>{proj}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
 
             <FormField
               control={form.control}

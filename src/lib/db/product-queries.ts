@@ -29,6 +29,7 @@ export type ProductRow = {
   name: string;
   vendor: string;
   vendor_part_number: string;
+  uom: string | null;
   reorder_threshold: number | null;
   // json_agg produces a parsed JS array because pg auto-parses JSON columns
   lots: LotJsonRow[];
@@ -48,6 +49,7 @@ export const PRODUCT_SELECT_SQL = `
     p.name,
     p.vendor,
     p.vendor_part_number,
+    p.uom,
     p.reorder_threshold,
     COALESCE(
       json_agg(
@@ -83,6 +85,7 @@ export function rowToProduct(row: ProductRow): Product {
     name: row.name,
     vendor: row.vendor,
     vendorPartNumber: row.vendor_part_number,
+    uom: row.uom ?? undefined,
     reorderThreshold: row.reorder_threshold,
     lots: row.lots.map((lot): Lot => ({
       id: lot.id,

@@ -75,7 +75,7 @@ export async function PUT(request: Request, { params }: RouteContext) {
     );
   }
 
-  const { name, vendor, vendorPartNumber, reorderThreshold, lots } = parsed.data;
+  const { name, vendor, vendorPartNumber, uom, reorderThreshold, lots } = parsed.data;
 
   try {
     const updated = await withTransaction(async (client) => {
@@ -90,9 +90,9 @@ export async function PUT(request: Request, { params }: RouteContext) {
       // 1. Update scalar product fields
       await client.query(
         `UPDATE products
-         SET name = $1, vendor = $2, vendor_part_number = $3, reorder_threshold = $4
-         WHERE id = $5`,
-        [name, vendor, vendorPartNumber, reorderThreshold, id]
+         SET name = $1, vendor = $2, vendor_part_number = $3, uom = $4, reorder_threshold = $5
+         WHERE id = $6`,
+        [name, vendor, vendorPartNumber, uom ?? null, reorderThreshold, id]
       );
 
       // 2. Fetch current lots for this product so we can diff

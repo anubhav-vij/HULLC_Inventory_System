@@ -1,13 +1,14 @@
 
 "use client";
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useFieldArray, useForm } from "react-hook-form";
 import { v4 as uuidv4 } from 'uuid';
 import { Button } from "@/components/ui/button";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { CalendarIcon, Loader2, PlusCircle, Trash2, FileUp, X, Paperclip } from "lucide-react";
@@ -18,6 +19,9 @@ import { Separator } from "./ui/separator";
 import { deleteFile, storeFile } from '@/lib/file-store';
 import { useToast } from '@/hooks/use-toast';
 import { Textarea } from './ui/textarea';
+
+interface VendorOption { id: string; name: string; isActive: boolean; }
+interface LocationOption { id: string; name: string; isActive: boolean; }
 
 type ProductFormProps = {
   product?: Product | null;
@@ -30,6 +34,20 @@ const VALID_FILE_TYPES = "application/pdf,image/jpeg,image/tiff";
 
 export function ProductForm({ product, onSave, onCancel, isSaving }: ProductFormProps) {
   const { toast } = useToast();
+  const [vendors, setVendors] = useState<VendorOption[]>([]);
+  const [locations, setLocations] = useState<LocationOption[]>([]);
+
+  useEffect(() => {
+    fetch('/api/vendors')
+      .then(res => res.ok ? res.json() : [])
+      .then(data => setVendors(data.filter((v: VendorOption) => v.isActive)))
+      .catch(() => {});
+    fetch('/api/storage-locations')
+      .then(res => res.ok ? res.json() : [])
+      .then(data => setLocations(data.filter((l: LocationOption) => l.isActive)))
+      .catch(() => {});
+  }, []);
+
   const form = useForm<ProductFormData>({
     resolver: zodResolver(product ? ProductFormSchema : ProductFormCreateSchema),
     defaultValues: product ? {
@@ -46,6 +64,7 @@ export function ProductForm({ product, onSave, onCancel, isSaving }: ProductForm
       name: "",
       vendor: "",
       vendorPartNumber: "",
+      uom: "",
       reorderThreshold: null,
       lots: [{ lotNumber: "", quantity: 1, receiptDate: new Date(), expirationDate: null, location: "", file: null, notes: "" }],
     },
@@ -112,7 +131,7 @@ export function ProductForm({ product, onSave, onCancel, isSaving }: ProductForm
 
   return (
     <Form {...form}>
-      <form onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col flex-1 min-h-0">
+      <form id="product-form" onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col flex-1 min-h-0">
         <div className="flex-1 overflow-y-auto pr-6 -mr-6 space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <FormField
@@ -132,7 +151,22 @@ export function ProductForm({ product, onSave, onCancel, isSaving }: ProductForm
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Vendor/Manufacturer</FormLabel>
-                  <FormControl><Input placeholder="e.g., Genentech" {...field} /></FormControl>
+                  {vendors.length > 0 ? (
+                    <Select value={field.value || ''} onValueChange={field.onChange}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a vendor..." />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {vendors.map(v => (
+                          <SelectItem key={v.id} value={v.name}>{v.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <FormControl><Input placeholder="e.g., Genentech" {...field} /></FormControl>
+                  )}
                   <FormMessage />
                 </FormItem>
               )}
@@ -144,6 +178,17 @@ export function ProductForm({ product, onSave, onCancel, isSaving }: ProductForm
                 <FormItem>
                   <FormLabel>Vendor Part #</FormLabel>
                   <FormControl><Input placeholder="e.g., ABC-12345" {...field} /></FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="uom"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Unit of Measure</FormLabel>
+                  <FormControl><Input placeholder="e.g., mL, tablets, vials" {...field} value={field.value ?? ''} /></FormControl>
                   <FormMessage />
                 </FormItem>
               )}
@@ -214,7 +259,22 @@ export function ProductForm({ product, onSave, onCancel, isSaving }: ProductForm
                       render={({ field }) => (
                           <FormItem>
                               <FormLabel>Storage Location</FormLabel>
-                              <FormControl><Input placeholder="e.g., Room 101, Shelf A" {...field} /></FormControl>
+                              {locations.length > 0 ? (
+                                <Select value={field.value || ''} onValueChange={field.onChange}>
+                                  <FormControl>
+                                    <SelectTrigger>
+                                      <SelectValue placeholder="Select location..." />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                    {locations.map(l => (
+                                      <SelectItem key={l.id} value={l.name}>{l.name}</SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              ) : (
+                                <FormControl><Input placeholder="e.g., Room 101, Shelf A" {...field} /></FormControl>
+                              )}
                               <FormMessage />
                           </FormItem>
                       )}

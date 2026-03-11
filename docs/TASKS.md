@@ -45,6 +45,37 @@ each phase sequentially, marking `[~]` while in progress and `[x]` when complete
 - [x] Full smoke test passed: login → add product → request → fulfill → transaction → delete
 - [x] Rewrote `README.md` with full setup guide, API reference, session log, and deployment notes
 
+### Session 6 — Fixes & Improvements (2026-03-10)
+- [x] Created `projects` table with migration 004; seeded 4 default projects (Project Alpha, Project Beta, Clinical Trial Gamma, Pre-clinical Study Delta)
+- [x] Added API: `GET /api/projects`, `POST /api/projects` (Admin only), `PUT /api/projects/[id]` (Admin only)
+- [x] Request form: project field is now a required Select dropdown populated from active projects in DB
+- [x] Request form: added future-date validation — past dates blocked with error toast
+- [x] Director approve dialog: now opens an AlertDialog with optional comments textarea; stored as `director_comments` in DB
+- [x] Director reject API: validated — returns 422 with Zod error when rejectionNote is missing or empty
+- [x] Fixed fulfillment refresh: after approve/reject, requests are re-fetched with full role headers so Admin's tab updates immediately
+- [x] Renamed "User Management" tab to "Configuration" (tab value `user-management` → `configuration`)
+- [x] Added Projects management section inside Configuration tab (same UI pattern as Functional Groups)
+- [x] Add Product navigates to `/products/new` full page (popup dialog removed)
+- [x] Edit Product navigates to `/products/[id]/edit` full page (popup dialog removed)
+- [x] Created `src/app/products/new/page.tsx` — standalone Add Product page, Admin-only guard
+- [x] Created `src/app/products/[id]/edit/page.tsx` — standalone Edit Product page with lot file cleanup
+
+### Session 8 — Role-Aware Nav, Vendor/Location Management, UoM, Fulfill Fix (2026-03-11)
+- [x] Dashboard sidebar item restricted to Admin role; default landing pages set per role on login/restore
+- [x] Request ID HULLC-YYYY-XXXX generation verified correct; pre-migration requests show UUID fallback
+- [x] Fulfill bug fixed: inline fulfillment form on `/requests/[id]` — stays on page after fulfillment
+- [x] Product form `id="product-form"` fix — top-bar Save button now triggers form submission
+- [x] Migration 006: `vendors` table (UUID PK, unique name, is_active); seeds from existing product vendors
+- [x] Vendors API: `GET/POST /api/vendors`, `PUT /api/vendors/[id]`; product form uses vendor dropdown
+- [x] Migration 007: `uom TEXT` column on products
+- [x] UoM field added to product form, product API POST/PUT, inventory table, types/queries
+- [x] Sidebar Configuration now expandable sub-menu: Users, Functional Groups, Projects, Vendors, Storage Locations
+- [x] Each config sub-item renders its own management table (split from monolithic configuration view)
+- [x] Migration 008: `storage_locations` table (UUID PK, unique name, is_active); seeds from existing lot locations
+- [x] Storage Locations API: `GET/POST /api/storage-locations`, `PUT /api/storage-locations/[id]`
+- [x] Deactivation returns 409 if referenced by active lots (quantity > 0)
+- [x] Product form lot rows use storage location dropdown (falls back to text input if none exist)
+
 ---
 
 ## Phase 1 — User Management
@@ -80,25 +111,25 @@ each phase sequentially, marking `[~]` while in progress and `[x]` when complete
 
 > Replaces the popup request form with a full-page experience. Adds multi-date scheduling (each date/quantity line item is fulfilled independently) and auto-populates user info from session.
 
-- [ ] Create DB migration: add `request_line_items` table (id, request_id, requested_date, quantity, status, fulfilled_quantity, fulfillment_id, created_at)
-- [ ] Create DB migration: update `product_requests` — remove quantity, add project, director_id, director_approved_at, director_rejection_note, rejected_by, rejection_stage
-- [ ] Create DB migration: update `fulfillments` — link to request_line_item_id instead of request_id
-- [ ] Update request status enum: Pending Approval → Approved → In Progress → Completed → Rejected
-- [ ] Add API: `POST /api/requests` — creates request with multiple line items, status = Pending Approval
-- [ ] Add API: `GET /api/requests` — role-aware: Admin sees Approved/In Progress/Completed/Rejected; Director sees own group's Pending Approval requests; Staff sees own requests only
-- [ ] Add API: `PUT /api/requests/[id]/approve` — Director only, advances status to Approved
-- [ ] Add API: `PUT /api/requests/[id]/reject` — Director or Admin, sets Rejected with note and rejection_stage
-- [ ] Add API: `PUT /api/requests/[id]/line-items/[lineItemId]` — Admin fulfills a single line item
-- [ ] Replace request popup with full page at `/requests/new?productId=`
-- [ ] Request page: auto-populate product name and ID from URL param
-- [ ] Request page: auto-populate requestor name, email, functional group from session
-- [ ] Request page: dynamic line items table — user adds multiple (requested_date, quantity) rows
-- [ ] Request page: minimum 1 line item required, no maximum
-- [ ] Request page: justification field and SOP checkbox remain at bottom
-- [ ] Director view: dedicated Approvals tab showing own group's Pending Approval requests with Approve/Reject buttons
-- [ ] Admin fulfillment view: shows only Approved/In Progress requests; each line item has its own Fulfill button
-- [ ] Request overall status = In Progress when at least one line item is fulfilled
-- [ ] Request overall status = Completed when all line items are fulfilled
+- [x] Create DB migration: add `request_line_items` table (id, request_id, requested_date, quantity, status, fulfilled_quantity, fulfillment_id, created_at)
+- [x] Create DB migration: update `product_requests` — remove quantity, add project, director_id, director_approved_at, director_rejection_note, rejected_by, rejection_stage
+- [x] Create DB migration: update `fulfillments` — link to request_line_item_id instead of request_id
+- [x] Update request status enum: Pending Approval → Approved → In Progress → Completed → Rejected
+- [x] Add API: `POST /api/requests` — creates request with multiple line items, status = Pending Approval
+- [x] Add API: `GET /api/requests` — role-aware: Admin sees Approved/In Progress/Completed/Rejected; Director sees own group's Pending Approval requests; Staff sees own requests only
+- [x] Add API: `PUT /api/requests/[id]/approve` — Director only, advances status to Approved
+- [x] Add API: `PUT /api/requests/[id]/reject` — Director or Admin, sets Rejected with note and rejection_stage
+- [x] Add API: `PUT /api/requests/[id]/line-items/[lineItemId]` — Admin fulfills a single line item
+- [x] Replace request popup with full page at `/requests/new?productId=`
+- [x] Request page: auto-populate product name and ID from URL param
+- [x] Request page: auto-populate requestor name, email, functional group from session
+- [x] Request page: dynamic line items table — user adds multiple (requested_date, quantity) rows
+- [x] Request page: minimum 1 line item required, no maximum
+- [x] Request page: justification field and SOP checkbox remain at bottom
+- [x] Director view: dedicated Approvals tab showing own group's Pending Approval requests with Approve/Reject buttons
+- [x] Admin fulfillment view: shows only Approved/In Progress requests; each line item has its own Fulfill button
+- [x] Request overall status = In Progress when at least one line item is fulfilled
+- [x] Request overall status = Completed when all line items are fulfilled
 
 ---
 

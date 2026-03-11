@@ -2,19 +2,20 @@
 "use client";
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Sidebar } from '@/components/sidebar';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
-import { ChevronsUpDown, MoreHorizontal, Package, Pencil, PlusCircle, Warehouse, ArrowRightLeft, CloudUpload, Loader2, AlertTriangle, Download, Trash2, CheckCircle2, XCircle, Hourglass, FileText, Search, LogOut, Users, Building2, UserCog, ShieldAlert } from 'lucide-react';
+import { ChevronsUpDown, MoreHorizontal, Package, Pencil, PlusCircle, Warehouse, ArrowRightLeft, CloudUpload, Loader2, AlertTriangle, Download, Trash2, CheckCircle2, XCircle, Hourglass, FileText, Search, LogOut, Users, Building2, UserCog, ShieldAlert, ChevronRight } from 'lucide-react';
 import { ProductForm } from './product-form';
 import { TransactionForm } from './transaction-form';
 import { RequestForm } from './request-form';
-import { type Product, type Lot, type ProductFormData, type Transaction, type TransactionFormData, type User, type UserRole, USER_ROLES, type SystemUser, type FunctionalGroup, type ProductRequest, type ProductRequestFormData, type ProductRequestStatus, DEPARTMENTS, type DepartmentalProduct, type Fulfillment } from '@/lib/types';
+import { type Product, type Lot, type ProductFormData, type Transaction, type TransactionFormData, type User, type UserRole, USER_ROLES, type SystemUser, type FunctionalGroup, type ProductRequest, type RequestLineItem, type ProductRequestFormData, type ProductRequestStatus, DEPARTMENTS, type DepartmentalProduct, type Fulfillment } from '@/lib/types';
 import { HullcLogo } from './icons';
 import { useToast } from '@/hooks/use-toast';
 import { v4 as uuidv4 } from 'uuid';
@@ -31,6 +32,14 @@ import { Label } from './ui/label';
 
 const USER_STORAGE_KEY = 'hullc-user-data';
 const DEPT_PRODUCTS_STORAGE_KEY_PREFIX = 'hullc-dept-products';
+
+function getDefaultView(role: string): string {
+    switch (role) {
+        case 'Admin': return 'dashboard';
+        case 'Director': return 'approvals';
+        default: return 'inventory';
+    }
+}
 
 function coerceProduct(p: any): Product {
     return {
@@ -68,6 +77,8 @@ export default function InventoryPage() {
     const [productToDelete, setProductToDelete] = useState<Product | null>(null);
     const [transactionToDelete, setTransactionToDelete] = useState<Transaction | null>(null);
     const [requestToReject, setRequestToReject] = useState<ProductRequest | null>(null);
+    const [requestToApprove, setRequestToApprove] = useState<ProductRequest | null>(null);
+    const [approveComments, setApproveComments] = useState('');
     const [fulfillmentToCancel, setFulfillmentToCancel] = useState<Fulfillment | null>(null);
     const [rejectionNote, setRejectionNote] = useState('');
     const [searchQuery, setSearchQuery] = useState('');
@@ -88,7 +99,28 @@ export default function InventoryPage() {
     const [groupToEdit, setGroupToEdit] = useState<FunctionalGroup | null>(null);
     const [groupFormName, setGroupFormName] = useState('');
 
+    // Projects state
+    const [appProjects, setAppProjects] = useState<{ id: string; name: string; isActive: boolean }[]>([]);
+    const [isProjectFormOpen, setIsProjectFormOpen] = useState(false);
+    const [projectToEdit, setProjectToEdit] = useState<{ id: string; name: string; isActive: boolean } | null>(null);
+    const [projectFormName, setProjectFormName] = useState('');
+
+    // Vendors state
+    const [appVendors, setAppVendors] = useState<{ id: string; name: string; isActive: boolean }[]>([]);
+    const [isVendorFormOpen, setIsVendorFormOpen] = useState(false);
+    const [vendorToEdit, setVendorToEdit] = useState<{ id: string; name: string; isActive: boolean } | null>(null);
+    const [vendorFormName, setVendorFormName] = useState('');
+
+    // Storage Locations state
+    const [appLocations, setAppLocations] = useState<{ id: string; name: string; isActive: boolean }[]>([]);
+    const [isLocationFormOpen, setIsLocationFormOpen] = useState(false);
+    const [locationToEdit, setLocationToEdit] = useState<{ id: string; name: string; isActive: boolean } | null>(null);
+    const [locationFormName, setLocationFormName] = useState('');
+
+    const [activeView, setActiveView] = useState('inventory');
+
     const { toast } = useToast();
+    const router = useRouter();
 
         const totalQuantity = (lots: Lot[]) => lots.reduce((sum, lot) => sum + lot.quantity, 0);
 
@@ -96,8 +128,9 @@ export default function InventoryPage() {
         const demandMap = new Map<string, number>();
 
         productRequests.forEach(req => {
-            if (req.status === 'Pending' || req.status === 'In Progress') {
-                demandMap.set(req.productId, (demandMap.get(req.productId) || 0) + req.quantity);
+            if (req.status === 'Pending Approval' || req.status === 'Approved' || req.status === 'In Progress') {
+                const lineItemTotal = (req.lineItems ?? []).reduce((sum, li) => sum + li.quantity, 0);
+                demandMap.set(req.productId, (demandMap.get(req.productId) || 0) + lineItemTotal);
             }
         });
 
@@ -160,6 +193,7 @@ export default function InventoryPage() {
                 // Only restore sessions that came from the new login flow (have an id)
                 if (parsed && parsed.id) {
                     setUser(parsed);
+                    setActiveView(getDefaultView(parsed.role));
                 } else {
                     // Clear old-format placeholder sessions
                     window.localStorage.removeItem(USER_STORAGE_KEY);
@@ -179,10 +213,11 @@ export default function InventoryPage() {
             setIsLoading(true);
             try {
                 const adminHeaders = { 'x-user-role': user.role };
+                const userHeaders = { 'x-user-role': user.role, 'x-user-id': user.id ?? '', 'x-user-email': user.email ?? '', 'x-user-functional-group': user.functionalGroupName ?? '' };
                 const [pRes, tRes, rRes, fRes] = await Promise.all([
                     fetch('/api/products'),
                     fetch('/api/transactions'),
-                    fetch('/api/requests'),
+                    fetch('/api/requests', { headers: userHeaders }),
                     fetch('/api/fulfillments'),
                 ]);
                 if (!pRes.ok) throw new Error('Failed to load products');
@@ -202,12 +237,18 @@ export default function InventoryPage() {
 
                 // Load user management data for Admin
                 if (user.role === 'Admin') {
-                    const [usersRes, groupsRes] = await Promise.all([
+                    const [usersRes, groupsRes, projectsRes, vendorsRes, locationsRes] = await Promise.all([
                         fetch('/api/users', { headers: adminHeaders }),
                         fetch('/api/functional-groups?active=false'),
+                        fetch('/api/projects', { headers: adminHeaders }),
+                        fetch('/api/vendors', { headers: adminHeaders }),
+                        fetch('/api/storage-locations', { headers: adminHeaders }),
                     ]);
                     if (usersRes.ok) setAppUsers(await usersRes.json());
                     if (groupsRes.ok) setFunctionalGroups(await groupsRes.json());
+                    if (projectsRes.ok) setAppProjects(await projectsRes.json());
+                    if (vendorsRes.ok) setAppVendors(await vendorsRes.json());
+                    if (locationsRes.ok) setAppLocations(await locationsRes.json());
                 }
             } catch (error: any) {
                 console.error('Error loading data', error);
@@ -251,6 +292,7 @@ export default function InventoryPage() {
                 isActive: data.isActive,
             };
             setUser(loggedInUser);
+            setActiveView(getDefaultView(loggedInUser.role));
             window.localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(loggedInUser));
         } catch {
             setLoginError('Network error. Please try again.');
@@ -267,6 +309,7 @@ export default function InventoryPage() {
         setProductRequests([]);
         setAppUsers([]);
         setFunctionalGroups([]);
+        setAppProjects([]);
         setLoginEmail('');
         setLoginPassword('');
         setLoginError('');
@@ -382,16 +425,206 @@ export default function InventoryPage() {
         }
     };
 
+    // ─── Project handlers ────────────────────────────────────────────────────
+
+    const handleOpenProjectForm = (p: { id: string; name: string; isActive: boolean } | null) => {
+        setProjectToEdit(p);
+        setProjectFormName(p ? p.name : '');
+        setIsProjectFormOpen(true);
+    };
+
+    const handleSaveProject = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setIsSaving(true);
+        try {
+            const isEdit = !!projectToEdit;
+            const res = isEdit
+                ? await fetch(`/api/projects/${projectToEdit!.id}`, {
+                    method: 'PUT',
+                    headers: adminHeaders(),
+                    body: JSON.stringify({ name: projectFormName }),
+                  })
+                : await fetch('/api/projects', {
+                    method: 'POST',
+                    headers: adminHeaders(),
+                    body: JSON.stringify({ name: projectFormName }),
+                  });
+            if (!res.ok) {
+                const body = await res.json().catch(() => ({}));
+                throw new Error((body as any).error || 'Failed to save project');
+            }
+            const saved = await res.json();
+            if (isEdit) {
+                setAppProjects(prev => prev.map(p => p.id === saved.id ? saved : p));
+                toast({ title: 'Project Updated' });
+            } else {
+                setAppProjects(prev => [...prev, saved]);
+                toast({ title: 'Project Created' });
+            }
+            setIsProjectFormOpen(false);
+        } catch (error: any) {
+            toast({ title: 'Error', description: error.message, variant: 'destructive' });
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    const handleToggleProjectStatus = async (p: { id: string; name: string; isActive: boolean }) => {
+        setIsSaving(true);
+        try {
+            const res = await fetch(`/api/projects/${p.id}`, {
+                method: 'PUT',
+                headers: adminHeaders(),
+                body: JSON.stringify({ isActive: !p.isActive }),
+            });
+            if (!res.ok) throw new Error('Failed to update project');
+            const updated = await res.json();
+            setAppProjects(prev => prev.map(proj => proj.id === updated.id ? updated : proj));
+            toast({ title: p.isActive ? 'Project Deactivated' : 'Project Activated' });
+        } catch (error: any) {
+            toast({ title: 'Error', description: error.message, variant: 'destructive' });
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    // ─── Vendor Management handlers ──────────────────────────────────────────
+
+    const handleOpenVendorForm = (v: { id: string; name: string; isActive: boolean } | null) => {
+        setVendorToEdit(v);
+        setVendorFormName(v ? v.name : '');
+        setIsVendorFormOpen(true);
+    };
+
+    const handleSaveVendor = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setIsSaving(true);
+        try {
+            const isEdit = !!vendorToEdit;
+            const res = isEdit
+                ? await fetch(`/api/vendors/${vendorToEdit!.id}`, {
+                    method: 'PUT',
+                    headers: adminHeaders(),
+                    body: JSON.stringify({ name: vendorFormName }),
+                  })
+                : await fetch('/api/vendors', {
+                    method: 'POST',
+                    headers: adminHeaders(),
+                    body: JSON.stringify({ name: vendorFormName }),
+                  });
+            if (!res.ok) {
+                const body = await res.json().catch(() => ({}));
+                throw new Error((body as any).error || 'Failed to save vendor');
+            }
+            const saved = await res.json();
+            if (isEdit) {
+                setAppVendors(prev => prev.map(v => v.id === saved.id ? saved : v));
+                toast({ title: 'Vendor Updated' });
+            } else {
+                setAppVendors(prev => [...prev, saved]);
+                toast({ title: 'Vendor Created' });
+            }
+            setIsVendorFormOpen(false);
+        } catch (error: any) {
+            toast({ title: 'Error', description: error.message, variant: 'destructive' });
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    const handleToggleVendorStatus = async (v: { id: string; name: string; isActive: boolean }) => {
+        setIsSaving(true);
+        try {
+            const res = await fetch(`/api/vendors/${v.id}`, {
+                method: 'PUT',
+                headers: adminHeaders(),
+                body: JSON.stringify({ isActive: !v.isActive }),
+            });
+            if (!res.ok) throw new Error('Failed to update vendor');
+            const updated = await res.json();
+            setAppVendors(prev => prev.map(vn => vn.id === updated.id ? updated : vn));
+            toast({ title: v.isActive ? 'Vendor Deactivated' : 'Vendor Activated' });
+        } catch (error: any) {
+            toast({ title: 'Error', description: error.message, variant: 'destructive' });
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    // ─── Storage Location Management handlers ─────────────────────────────────
+
+    const handleOpenLocationForm = (l: { id: string; name: string; isActive: boolean } | null) => {
+        setLocationToEdit(l);
+        setLocationFormName(l ? l.name : '');
+        setIsLocationFormOpen(true);
+    };
+
+    const handleSaveLocation = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setIsSaving(true);
+        try {
+            const isEdit = !!locationToEdit;
+            const res = isEdit
+                ? await fetch(`/api/storage-locations/${locationToEdit!.id}`, {
+                    method: 'PUT',
+                    headers: adminHeaders(),
+                    body: JSON.stringify({ name: locationFormName }),
+                  })
+                : await fetch('/api/storage-locations', {
+                    method: 'POST',
+                    headers: adminHeaders(),
+                    body: JSON.stringify({ name: locationFormName }),
+                  });
+            if (!res.ok) {
+                const body = await res.json().catch(() => ({}));
+                throw new Error((body as any).error || 'Failed to save storage location');
+            }
+            const saved = await res.json();
+            if (isEdit) {
+                setAppLocations(prev => prev.map(l => l.id === saved.id ? saved : l));
+                toast({ title: 'Storage Location Updated' });
+            } else {
+                setAppLocations(prev => [...prev, saved]);
+                toast({ title: 'Storage Location Created' });
+            }
+            setIsLocationFormOpen(false);
+        } catch (error: any) {
+            toast({ title: 'Error', description: error.message, variant: 'destructive' });
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    const handleToggleLocationStatus = async (l: { id: string; name: string; isActive: boolean }) => {
+        setIsSaving(true);
+        try {
+            const res = await fetch(`/api/storage-locations/${l.id}`, {
+                method: 'PUT',
+                headers: adminHeaders(),
+                body: JSON.stringify({ isActive: !l.isActive }),
+            });
+            if (!res.ok) {
+                const body = await res.json().catch(() => ({}));
+                throw new Error((body as any).error || 'Failed to update storage location');
+            }
+            const updated = await res.json();
+            setAppLocations(prev => prev.map(loc => loc.id === updated.id ? updated : loc));
+            toast({ title: l.isActive ? 'Storage Location Deactivated' : 'Storage Location Activated' });
+        } catch (error: any) {
+            toast({ title: 'Error', description: error.message, variant: 'destructive' });
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
     // ─── Product handlers ────────────────────────────────────────────────────
 
     const handleAddNew = () => {
-        setProductToEdit(null);
-        setIsFormOpen(true);
+        router.push('/products/new');
     };
 
     const handleEdit = (product: Product) => {
-        setProductToEdit(product);
-        setIsFormOpen(true);
+        router.push(`/products/${product.id}/edit`);
     };
 
     const handleNewTransaction = (product: Product) => {
@@ -400,8 +633,7 @@ export default function InventoryPage() {
     };
 
     const handleRequestProduct = (product: Product) => {
-        setProductForRequest(product);
-        setIsRequestFormOpen(true);
+        router.push(`/requests/new?productId=${product.id}`);
     };
 
     const handleDeleteProduct = (product: Product) => {
@@ -550,16 +782,37 @@ export default function InventoryPage() {
             const totalDispensed = activeItems.reduce((sum, i) => sum + i.quantityTaken, 0);
 
             if (fulfillmentToUpdate) {
-                // Path B: dispense for a fulfillment
-                const res = await fetch(`/api/fulfillments/${fulfillmentToUpdate.id}`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        date: data.date instanceof Date ? data.date.toISOString() : data.date,
-                        notes: data.notes,
-                        items: activeItems.map(i => ({ lotId: i.lotId, quantityTaken: i.quantityTaken })),
-                    }),
-                });
+                // Check if this is a line item fulfillment (id starts with 'line:')
+                const isLineItemMode = fulfillmentToUpdate.id.startsWith('line:');
+
+                let res: Response;
+                if (isLineItemMode) {
+                    // Path B2: fulfill via line item endpoint
+                    const parts = fulfillmentToUpdate.id.split(':');
+                    const reqId = parts[1];
+                    const lineItemId = parts[2];
+                    res = await fetch(`/api/requests/${reqId}/line-items/${lineItemId}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json', 'x-user-role': user?.role ?? 'Admin' },
+                        body: JSON.stringify({
+                            date: data.date instanceof Date ? data.date.toISOString() : data.date,
+                            notes: data.notes,
+                            items: activeItems.map(i => ({ lotId: i.lotId, quantityTaken: i.quantityTaken })),
+                        }),
+                    });
+                } else {
+                    // Path B: dispense for a legacy fulfillment
+                    res = await fetch(`/api/fulfillments/${fulfillmentToUpdate.id}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            date: data.date instanceof Date ? data.date.toISOString() : data.date,
+                            notes: data.notes,
+                            items: activeItems.map(i => ({ lotId: i.lotId, quantityTaken: i.quantityTaken })),
+                        }),
+                    });
+                }
+
                 if (!res.ok) {
                     const body = await res.json().catch(() => ({}));
                     throw new Error((body as any).error || 'Failed to dispense items');
@@ -569,9 +822,10 @@ export default function InventoryPage() {
                     addFulfilledItemsToDepartmentInventory(request.department, productForTransaction.id, totalDispensed);
                 }
                 // Re-fetch all affected state
+                const userHeaders2 = { 'x-user-role': user?.role ?? '', 'x-user-id': user?.id ?? '', 'x-user-email': user?.email ?? '', 'x-user-functional-group': user?.functionalGroupName ?? '' };
                 const [fRes, rRes, txRes, pRes] = await Promise.all([
                     fetch('/api/fulfillments'),
-                    fetch('/api/requests'),
+                    fetch('/api/requests', { headers: userHeaders2 }),
                     fetch('/api/transactions'),
                     fetch('/api/products'),
                 ]);
@@ -639,7 +893,7 @@ export default function InventoryPage() {
             setProductRequests(prev => [{ ...created, date: new Date(created.date) }, ...prev]);
             toast({
                 title: 'Request Submitted',
-                description: `Your request for ${data.quantity} of "${productForRequest.name}" has been sent for review.`,
+                description: `Your request for "${productForRequest.name}" has been sent for review.`,
             });
             setIsRequestFormOpen(false);
             setProductForRequest(null);
@@ -694,18 +948,69 @@ export default function InventoryPage() {
         setRejectionNote('');
     };
 
+    const handleApproveRequest = (request: ProductRequest) => {
+        setRequestToApprove(request);
+        setApproveComments('');
+    };
+
+    const handleConfirmApproveRequest = async () => {
+        if (!requestToApprove || !user) return;
+        setIsSaving(true);
+        try {
+            const res = await fetch(`/api/requests/${requestToApprove.id}/approve`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', 'x-user-role': user.role, 'x-user-id': user.id ?? '' },
+                body: JSON.stringify({ comments: approveComments.trim() || undefined }),
+            });
+            if (!res.ok) {
+                const body = await res.json().catch(() => ({}));
+                throw new Error((body as any).error || 'Failed to approve request');
+            }
+            const updated = await res.json();
+            setProductRequests(prev => prev.map(r => r.id === updated.id ? { ...updated, date: new Date(updated.date) } : r));
+            toast({ title: 'Request Approved', description: `Request for "${requestToApprove.productName}" has been approved.` });
+            setRequestToApprove(null);
+            // Re-fetch requests with role headers to get fresh data
+            const userH = { 'x-user-role': user.role, 'x-user-id': user.id ?? '', 'x-user-email': user.email ?? '', 'x-user-functional-group': user.functionalGroupName ?? '' };
+            const rRes = await fetch('/api/requests', { headers: userH });
+            if (rRes.ok) setProductRequests((await rRes.json()).map((r: any) => ({ ...r, date: new Date(r.date) })));
+        } catch (error: any) {
+            toast({ title: 'Approve Failed', description: error.message, variant: 'destructive' });
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    const handleFulfillLineItem = (request: ProductRequest, lineItem: RequestLineItem) => {
+        const product = products.find(p => p.id === request.productId);
+        if (product) {
+            setProductForTransaction(product);
+            setFulfillmentToUpdate({
+                id: `line:${request.id}:${lineItem.id}`,
+                requestId: request.id,
+                productId: request.productId,
+                productName: request.productName,
+                department: request.department,
+                totalQuantityRequested: lineItem.quantity,
+                dispensedItems: [],
+                requestLineItemId: lineItem.id,
+            });
+            setIsTransactionFormOpen(true);
+        }
+    };
+
     const handleConfirmRejectRequest = async () => {
-        if (!requestToReject) return;
+        if (!requestToReject || !user) return;
         if (!rejectionNote.trim()) {
             toast({ title: 'Note Required', description: 'Please provide a reason for rejecting the request.', variant: 'destructive' });
             return;
         }
         setIsSaving(true);
         try {
-            const res = await fetch(`/api/requests/${requestToReject.id}`, {
+            const res = await fetch(`/api/requests/${requestToReject.id}/reject`, {
                 method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ status: 'Rejected', rejectionNote }),
+                headers: { 'Content-Type': 'application/json', 'x-user-role': user.role, 'x-user-id': user.id ?? '' },
+                body: JSON.stringify({ rejectionNote }),
             });
             if (!res.ok) {
                 const body = await res.json().catch(() => ({}));
@@ -717,6 +1022,10 @@ export default function InventoryPage() {
             ));
             toast({ title: 'Request Rejected' });
             setRequestToReject(null);
+            // Re-fetch requests with role headers to get fresh data
+            const userH = { 'x-user-role': user.role, 'x-user-id': user.id ?? '', 'x-user-email': user.email ?? '', 'x-user-functional-group': user.functionalGroupName ?? '' };
+            const rRes = await fetch('/api/requests', { headers: userH });
+            if (rRes.ok) setProductRequests((await rRes.json()).map((r: any) => ({ ...r, date: new Date(r.date) })));
         } catch (error: any) {
             toast({ title: 'Reject Failed', description: error.message, variant: 'destructive' });
         } finally {
@@ -738,7 +1047,8 @@ export default function InventoryPage() {
                 throw new Error((body as any).error || 'Failed to cancel fulfillment');
             }
             setFulfillments(prev => prev.filter(f => f.id !== fulfillmentToCancel.id));
-            const rRes = await fetch('/api/requests');
+            const userHeaders3 = { 'x-user-role': user?.role ?? '', 'x-user-id': user?.id ?? '', 'x-user-email': user?.email ?? '', 'x-user-functional-group': user?.functionalGroupName ?? '' };
+            const rRes = await fetch('/api/requests', { headers: userHeaders3 });
             if (rRes.ok) setProductRequests((await rRes.json()).map((r: any) => ({ ...r, date: new Date(r.date) })));
             toast({ title: 'Fulfillment Cancelled', description: `The fulfillment for "${fulfillmentToCancel.productName}" has been cancelled.` });
             setFulfillmentToCancel(null);
@@ -983,15 +1293,17 @@ export default function InventoryPage() {
     };
 
     const getStatusBadge = (status: ProductRequestStatus) => {
-        const statusConfig = {
-            'Pending': { color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200', icon: Hourglass },
+        const statusConfig: Record<ProductRequestStatus, { color: string; icon: React.ElementType }> = {
+            'Pending Approval': { color: 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200', icon: Hourglass },
+            'Approved': { color: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200', icon: CheckCircle2 },
             'In Progress': { color: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200', icon: ArrowRightLeft },
             'Completed': { color: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200', icon: CheckCircle2 },
             'Rejected': { color: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200', icon: XCircle },
         };
-        const Icon = statusConfig[status].icon;
+        const cfg = statusConfig[status] ?? { color: 'bg-gray-100 text-gray-800', icon: Hourglass };
+        const Icon = cfg.icon;
         return (
-            <Badge className={cn('gap-1', statusConfig[status].color)}>
+            <Badge className={cn('gap-1', cfg.color)}>
                 <Icon className={cn("h-3 w-3")} />
                 {status}
             </Badge>
@@ -1008,16 +1320,14 @@ export default function InventoryPage() {
 
     if (!user) {
         return (
-            <div className="flex items-center justify-center min-h-screen bg-background">
-                <Card className="w-full max-w-sm">
-                    <CardHeader className="text-center">
-                        <div className="flex justify-center items-center gap-3 mb-4">
-                            <HullcLogo className="h-8 w-8 text-primary" />
-                            <CardTitle className="text-2xl">HULLC Inventory Management System</CardTitle>
-                        </div>
-                        <CardDescription>Sign in with your HULLC account.</CardDescription>
-                    </CardHeader>
-                    <CardContent>
+            <div className="flex items-center justify-center min-h-screen" style={{ backgroundColor: '#f0f4f4' }}>
+                <div className="w-full max-w-sm" style={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: 12 }}>
+                    <div className="p-6 pb-2 text-center">
+                        <h1 className="text-2xl font-bold mb-1" style={{ color: '#0f2a2a' }}>HULLC Inventory</h1>
+                        <p className="text-xs mb-1" style={{ color: '#64748b' }}>High Use Long Lead Consumables</p>
+                        <p className="text-sm mt-3" style={{ color: '#64748b' }}>Sign in with your HULLC account.</p>
+                    </div>
+                    <div className="p-6 pt-4">
                         <form onSubmit={handleLogin} className="flex flex-col gap-4">
                             <div className="flex flex-col gap-1.5">
                                 <Label htmlFor="login-email">Email</Label>
@@ -1051,13 +1361,13 @@ export default function InventoryPage() {
                                     {loginError}
                                 </p>
                             )}
-                            <Button type="submit" disabled={isLoginLoading} className="w-full">
+                            <Button type="submit" disabled={isLoginLoading} className="w-full" style={{ backgroundColor: '#1a7070' }}>
                                 {isLoginLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                                 Sign In
                             </Button>
                         </form>
-                    </CardContent>
-                </Card>
+                    </div>
+                </div>
             </div>
         );
     }
@@ -1069,41 +1379,64 @@ export default function InventoryPage() {
     const inventoryColSpan = user.role === 'Admin' ? 8 : 4;
     const requestsColSpan = 7;
 
+    const pageTitle: Record<string, { title: string; subtitle?: string }> = {
+        dashboard: { title: 'Dashboard', subtitle: 'Overview of your inventory system' },
+        inventory: { title: 'HULLC Inventory', subtitle: 'High Use Long Lead Consumables' },
+        requests: { title: 'Product Requests', subtitle: 'Manage and track product requests' },
+        approvals: { title: 'Approvals', subtitle: 'Pending requests awaiting your approval' },
+        transactions: { title: 'Transactions', subtitle: 'History of all inventory transactions' },
+        fulfillments: { title: 'Fulfillments', subtitle: 'Approved and in-progress fulfillments' },
+        configuration: { title: 'Configuration', subtitle: 'Manage users, groups, and projects' },
+    };
+
+    const currentPage = pageTitle[activeView] ?? pageTitle.inventory;
+
     return (
-        <div className="min-h-screen w-full bg-background flex flex-col items-center p-4 sm:p-6 lg:p-8">
+        <div className="min-h-screen w-full" style={{ backgroundColor: '#f0f4f4' }}>
             <input type="file" ref={fileInputRef} onChange={handleFileImport} style={{ display: 'none' }} accept=".csv" />
+            <Sidebar activeView={activeView} onNavigate={setActiveView} user={user} onLogout={handleLogout} />
+            <div className="content-with-sidebar">
+                {/* Top bar */}
+                <div className="sticky top-0 z-30 flex items-center px-8" style={{ height: 60, backgroundColor: '#fff', borderBottom: '1px solid #e2e8f0' }}>
+                    <div>
+                        <h1 className="text-lg font-semibold" style={{ color: '#0f2a2a' }}>{currentPage.title}</h1>
+                        {currentPage.subtitle && <p className="text-xs" style={{ color: '#64748b' }}>{currentPage.subtitle}</p>}
+                    </div>
+                </div>
+
             <TooltipProvider>
-                <main className="w-full max-w-7xl mx-auto">
-                    <div className="flex items-center gap-3 mb-8">
-                        <HullcLogo className="h-8 w-8 text-primary" />
-                        <h1 className="text-3xl font-bold text-foreground">Core Inventory</h1>
-                         <div className="ml-auto flex items-center gap-4 text-sm">
-                            <div className="text-right">
-                                <p className="font-semibold text-foreground">{user.fullName || user.role}</p>
-                                <p className="text-muted-foreground">{user.role} · Core System</p>
-                            </div>
-                            <Button variant="outline" size="sm" onClick={handleLogout}>
-                                <LogOut className="mr-2 h-4 w-4" />
-                                Logout
-                            </Button>
+                <main className="p-8">
+
+                {/* ── Dashboard View ──────────────────────────────────── */}
+                {activeView === 'dashboard' && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                        <div style={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: 12 }} className="p-6">
+                            <p className="text-xs font-medium uppercase tracking-wider" style={{ color: '#64748b' }}>Total Products</p>
+                            <p className="text-3xl font-bold mt-2" style={{ color: '#0f2a2a' }}>{products.length}</p>
+                        </div>
+                        <div style={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: 12 }} className="p-6">
+                            <p className="text-xs font-medium uppercase tracking-wider" style={{ color: '#64748b' }}>Total Stock</p>
+                            <p className="text-3xl font-bold mt-2" style={{ color: '#0f2a2a' }}>{products.reduce((s, p) => s + totalQuantity(p.lots), 0)}</p>
+                        </div>
+                        <div style={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: 12 }} className="p-6">
+                            <p className="text-xs font-medium uppercase tracking-wider" style={{ color: '#64748b' }}>Active Requests</p>
+                            <p className="text-3xl font-bold mt-2" style={{ color: '#0f2a2a' }}>{productRequests.filter(r => r.status !== 'Completed' && r.status !== 'Rejected').length}</p>
+                        </div>
+                        <div style={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: 12 }} className="p-6">
+                            <p className="text-xs font-medium uppercase tracking-wider" style={{ color: '#64748b' }}>Transactions</p>
+                            <p className="text-3xl font-bold mt-2" style={{ color: '#0f2a2a' }}>{transactions.length}</p>
                         </div>
                     </div>
+                )}
 
-                    <Tabs defaultValue="inventory">
-                        <TabsList className="mb-4">
-                            <TabsTrigger value="inventory">Inventory</TabsTrigger>
-                            {user.role === 'Admin' && <TabsTrigger value="requests">Product Requests <Badge className="ml-2 bg-primary/20 text-primary">{productRequests.filter(r => r.status === 'Pending').length}</Badge></TabsTrigger>}
-                            {user.role === 'Admin' && <TabsTrigger value="fulfillments">Fulfillments <Badge className="ml-2 bg-primary/20 text-primary">{fulfillments.length}</Badge></TabsTrigger>}
-                            {user.role === 'Admin' && <TabsTrigger value="transactions">Transactions</TabsTrigger>}
-                            {user.role === 'Admin' && <TabsTrigger value="user-management"><Users className="mr-1.5 h-4 w-4" />User Management</TabsTrigger>}
-                        </TabsList>
-                        <TabsContent value="inventory">
-                            <Card>
-                                <CardHeader>
+                {/* ── Inventory View ──────────────────────────────────── */}
+                {activeView === 'inventory' && (
+                            <div style={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: 12 }}>
+                                <div className="p-6 pb-4">
                                     <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                                         <div className="flex-1">
-                                            <CardTitle>Master Inventory</CardTitle>
-                                            <CardDescription>Manage all products and their stock.</CardDescription>
+                                            <h2 className="text-lg font-semibold" style={{ color: '#0f2a2a' }}>Master Inventory</h2>
+                                            <p className="text-sm" style={{ color: '#64748b' }}>Manage all products and their stock.</p>
                                         </div>
                                         <div className="flex flex-col sm:flex-row sm:justify-end gap-2 w-full sm:w-auto">
                                             <div className="relative">
@@ -1131,19 +1464,20 @@ export default function InventoryPage() {
                                             )}
                                         </div>
                                     </div>
-                                </CardHeader>
-                                <CardContent>
-                                    <div className="border rounded-lg overflow-hidden">
+                                </div>
+                                <div className="px-6 pb-6">
+                                    <div className="border rounded-lg overflow-hidden" style={{ borderColor: '#e2e8f0' }}>
                                         <Table>
                                             <TableHeader>
-                                                <TableRow>
+                                                <TableRow style={{ backgroundColor: '#f8fafc' }}>
                                                     {user.role === 'Admin' && <TableHead className="w-[50px]"></TableHead>}
-                                                    <TableHead>Product</TableHead>
-                                                    <TableHead>Vendor</TableHead>
-                                                    <TableHead>Vendor Part #</TableHead>
-                                                    {user.role === 'Admin' && <TableHead>Total Quantity</TableHead>}
-                                                    {user.role === 'Admin' && <TableHead>Needed</TableHead>}
-                                                    {user.role === 'Admin' && <TableHead>Storage Location</TableHead>}
+                                                    <TableHead className="text-[11.5px] font-semibold uppercase tracking-wider" style={{ color: '#64748b' }}>Product</TableHead>
+                                                    <TableHead className="text-[11.5px] font-semibold uppercase tracking-wider" style={{ color: '#64748b' }}>Vendor</TableHead>
+                                                    <TableHead className="text-[11.5px] font-semibold uppercase tracking-wider" style={{ color: '#64748b' }}>Vendor Part #</TableHead>
+                                                    <TableHead className="text-[11.5px] font-semibold uppercase tracking-wider" style={{ color: '#64748b' }}>UoM</TableHead>
+                                                    {user.role === 'Admin' && <TableHead className="text-[11.5px] font-semibold uppercase tracking-wider" style={{ color: '#64748b' }}>Total Quantity</TableHead>}
+                                                    {user.role === 'Admin' && <TableHead className="text-[11.5px] font-semibold uppercase tracking-wider" style={{ color: '#64748b' }}>Needed</TableHead>}
+                                                    {user.role === 'Admin' && <TableHead className="text-[11.5px] font-semibold uppercase tracking-wider" style={{ color: '#64748b' }}>Storage Location</TableHead>}
                                                     {user.role === 'Admin' ?
                                                         <TableHead className="w-[100px] text-right">Actions</TableHead> :
                                                         <TableHead className="w-[120px] text-right">Action</TableHead>
@@ -1181,6 +1515,7 @@ export default function InventoryPage() {
                                                                     </TableCell>
                                                                     <TableCell>{product.vendor}</TableCell>
                                                                     <TableCell>{product.vendorPartNumber}</TableCell>
+                                                                    <TableCell>{product.uom ?? '—'}</TableCell>
                                                                     {user.role === 'Admin' && (
                                                                         <TableCell>
                                                                             <div className="flex items-center gap-2">
@@ -1295,28 +1630,33 @@ export default function InventoryPage() {
                                             </TableBody>
                                         </Table>
                                     </div>
-                                 </CardContent>
-                            </Card>
-                        </TabsContent>
-                        {user.role === 'Admin' &&
-                            <TabsContent value="requests">
-                                <Card>
-                                    <CardHeader>
-                                        <CardTitle>Product Requests</CardTitle>
-                                        <CardDescription>Review and fulfill pending product requests from staff.</CardDescription>
-                                    </CardHeader>
-                                    <CardContent>
-                                        <div className="border rounded-lg overflow-hidden">
+                                </div>
+                            </div>
+                )}
+
+                {/* ── Requests View ──────────────────────────────────── */}
+                {activeView === 'requests' && (
+                                <div style={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: 12 }}>
+                                    <div className="p-6 pb-4">
+                                        <h2 className="text-lg font-semibold" style={{ color: '#0f2a2a' }}>Product Requests</h2>
+                                        <p className="text-sm" style={{ color: '#64748b' }}>
+                                            {user.role === 'Admin'
+                                                ? 'Approved requests ready for fulfillment. Expand each request to fulfill individual line items.'
+                                                : 'Your pending approval requests.'}
+                                        </p>
+                                    </div>
+                                    <div className="px-6 pb-6">
+                                        <div className="border rounded-lg overflow-hidden" style={{ borderColor: '#e2e8f0' }}>
                                         <Table>
                                             <TableHeader>
-                                                <TableRow>
+                                                <TableRow style={{ backgroundColor: '#f8fafc' }}>
                                                     <TableHead className="w-[50px]"></TableHead>
-                                                    <TableHead>Requestor</TableHead>
-                                                    <TableHead>Product</TableHead>
-                                                    <TableHead>Qty Req.</TableHead>
-                                                    <TableHead>Submitted</TableHead>
-                                                    <TableHead>Status</TableHead>
-                                                    <TableHead className="text-right">Actions</TableHead>
+                                                    <TableHead className="text-[11.5px] font-semibold uppercase tracking-wider" style={{ color: '#64748b' }}>Request ID</TableHead>
+                                                    <TableHead className="text-[11.5px] font-semibold uppercase tracking-wider" style={{ color: '#64748b' }}>Requestor</TableHead>
+                                                    <TableHead className="text-[11.5px] font-semibold uppercase tracking-wider" style={{ color: '#64748b' }}>Product</TableHead>
+                                                    <TableHead className="text-[11.5px] font-semibold uppercase tracking-wider" style={{ color: '#64748b' }}>Submitted</TableHead>
+                                                    <TableHead className="text-[11.5px] font-semibold uppercase tracking-wider" style={{ color: '#64748b' }}>Status</TableHead>
+                                                    <TableHead className="text-[11.5px] font-semibold uppercase tracking-wider text-right" style={{ color: '#64748b' }}>Actions</TableHead>
                                                 </TableRow>
                                             </TableHeader>
                                             <TableBody>
@@ -1333,43 +1673,83 @@ export default function InventoryPage() {
                                                                         </Button>
                                                                     </TableCell>
                                                                     <TableCell>
+                                                                        <button onClick={() => router.push(`/requests/${req.id}`)} className="text-sm font-medium hover:underline" style={{ color: '#1a7070' }}>
+                                                                            {(req as any).requestId ?? req.id.slice(0, 8)}
+                                                                        </button>
+                                                                    </TableCell>
+                                                                    <TableCell>
                                                                         <div>{req.requestorName}</div>
-                                                                        <div className="text-xs text-muted-foreground">{req.department}</div>
+                                                                        <div className="text-xs" style={{ color: '#64748b' }}>{req.department}</div>
                                                                     </TableCell>
                                                                     <TableCell>
                                                                         <div>{req.productName}</div>
-                                                                        <div className="text-xs text-muted-foreground">{req.productId}</div>
+                                                                        <div className="text-xs" style={{ color: '#64748b' }}>{req.productId}</div>
                                                                     </TableCell>
-                                                                    <TableCell>{req.quantity}</TableCell>
-                                                                    <TableCell>{format(req.date, 'PPP')}</TableCell>
+                                                                    <TableCell>{format(new Date(req.date), 'PPP')}</TableCell>
                                                                     <TableCell>{getStatusBadge(req.status)}</TableCell>
                                                                     <TableCell className="text-right">
-                                                                        {req.status === 'Pending' && (
-                                                                            <div className="flex gap-2 justify-end">
-                                                                                <Button size="sm" variant="outline" disabled={isSaving} onClick={() => handleRejectRequest(req)}>Reject</Button>
-                                                                                <Button size="sm" disabled={isSaving} onClick={() => handleFulfillRequest(req)}>Fulfill</Button>
-                                                                            </div>
+                                                                        {(req.status === 'Approved' || req.status === 'In Progress') && user.role === 'Admin' && (
+                                                                            <Button size="sm" variant="outline" disabled={isSaving} onClick={() => handleRejectRequest(req)}>Reject</Button>
                                                                         )}
                                                                     </TableCell>
                                                                 </TableRow>
                                                                 {isOpen && (
                                                                     <TableRow className="bg-muted/50 hover:bg-muted/50">
-                                                                        <TableCell colSpan={requestsColSpan} className="p-4">
-                                                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-2">
-                                                                                <div>
-                                                                                    <h4 className="font-semibold text-xs mb-1">Project</h4>
-                                                                                    <p className="text-sm">{req.project}</p>
+                                                                        <TableCell colSpan={6} className="p-4">
+                                                                            <div className="space-y-4">
+                                                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-2">
+                                                                                    <div>
+                                                                                        <h4 className="font-semibold text-xs mb-1">Project</h4>
+                                                                                        <p className="text-sm">{req.project ?? '—'}</p>
+                                                                                    </div>
+                                                                                    <div>
+                                                                                        <h4 className="font-semibold text-xs mb-1">Justification</h4>
+                                                                                        <p className="text-sm text-muted-foreground">{req.justification}</p>
+                                                                                    </div>
+                                                                                    {req.status === 'Rejected' && req.rejectionNote && (
+                                                                                        <div className="col-span-2">
+                                                                                            <h4 className="font-semibold text-xs mb-1 text-destructive">Rejection Note</h4>
+                                                                                            <p className="text-sm text-destructive/80">{req.rejectionNote}</p>
+                                                                                        </div>
+                                                                                    )}
                                                                                 </div>
-                                                                                 <div>
-                                                                                    <h4 className="font-semibold text-xs mb-1">Justification</h4>
-                                                                                    <p className="text-sm text-muted-foreground">{req.justification}</p>
-                                                                                </div>
-                                                                                 {req.status === 'Rejected' && req.rejectionNote && (
-                                                                                     <div className="col-span-2">
-                                                                                         <h4 className="font-semibold text-xs mb-1 text-destructive">Rejection Note</h4>
-                                                                                         <p className="text-sm text-destructive/80">{req.rejectionNote}</p>
-                                                                                     </div>
-                                                                                 )}
+                                                                                {(req.lineItems ?? []).length > 0 && (
+                                                                                    <div>
+                                                                                        <h4 className="font-semibold text-xs mb-2">Line Items</h4>
+                                                                                        <Table>
+                                                                                            <TableHeader>
+                                                                                                <TableRow>
+                                                                                                    <TableHead>Requested Date</TableHead>
+                                                                                                    <TableHead>Quantity</TableHead>
+                                                                                                    <TableHead>Status</TableHead>
+                                                                                                    {user.role === 'Admin' && <TableHead className="text-right">Action</TableHead>}
+                                                                                                </TableRow>
+                                                                                            </TableHeader>
+                                                                                            <TableBody>
+                                                                                                {(req.lineItems ?? []).map(li => (
+                                                                                                    <TableRow key={li.id}>
+                                                                                                        <TableCell>{li.requestedDate}</TableCell>
+                                                                                                        <TableCell>{li.quantity}</TableCell>
+                                                                                                        <TableCell>
+                                                                                                            <Badge className={li.status === 'Fulfilled' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}>
+                                                                                                                {li.status}
+                                                                                                            </Badge>
+                                                                                                        </TableCell>
+                                                                                                        {user.role === 'Admin' && (
+                                                                                                            <TableCell className="text-right">
+                                                                                                                {li.status === 'Pending' && (req.status === 'Approved' || req.status === 'In Progress') && (
+                                                                                                                    <Button size="sm" disabled={isSaving} onClick={() => handleFulfillLineItem(req, li)}>
+                                                                                                                        Fulfill
+                                                                                                                    </Button>
+                                                                                                                )}
+                                                                                                            </TableCell>
+                                                                                                        )}
+                                                                                                    </TableRow>
+                                                                                                ))}
+                                                                                            </TableBody>
+                                                                                        </Table>
+                                                                                    </div>
+                                                                                )}
                                                                             </div>
                                                                         </TableCell>
                                                                     </TableRow>
@@ -1379,32 +1759,245 @@ export default function InventoryPage() {
                                                     })
                                                 ) : (
                                                     <TableRow>
-                                                        <TableCell colSpan={requestsColSpan} className="h-24 text-center">No product requests have been submitted yet.</TableCell>
+                                                        <TableCell colSpan={7} className="h-24 text-center">No product requests found.</TableCell>
                                                     </TableRow>
                                                 )}
                                             </TableBody>
                                         </Table>
                                         </div>
-                                    </CardContent>
-                                </Card>
-                            </TabsContent>
-                        }
-                        {user.role === 'Admin' && (
-                            <TabsContent value="fulfillments">
-                                <Card>
-                                    <CardHeader>
-                                        <CardTitle>In-Progress Fulfillments</CardTitle>
-                                        <CardDescription>Manage requests that are being partially dispensed over time.</CardDescription>
-                                    </CardHeader>
-                                    <CardContent>
-                                        <div className="border rounded-lg overflow-hidden">
+                                    </div>
+                                </div>
+                )}
+
+                {/* ── Approvals View ─────────────────────────────────── */}
+                {activeView === 'approvals' && user.role === 'Director' && (
+                                <div style={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: 12 }}>
+                                    <div className="p-6 pb-4">
+                                        <h2 className="text-lg font-semibold" style={{ color: '#0f2a2a' }}>Pending Approvals</h2>
+                                        <p className="text-sm" style={{ color: '#64748b' }}>Product requests from your functional group awaiting your approval.</p>
+                                    </div>
+                                    <div className="px-6 pb-6">
+                                        <div className="border rounded-lg overflow-hidden" style={{ borderColor: '#e2e8f0' }}>
+                                        <Table>
+                                            <TableHeader>
+                                                <TableRow style={{ backgroundColor: '#f8fafc' }}>
+                                                    <TableHead className="w-[50px]"></TableHead>
+                                                    <TableHead className="text-[11.5px] font-semibold uppercase tracking-wider" style={{ color: '#64748b' }}>Request ID</TableHead>
+                                                    <TableHead className="text-[11.5px] font-semibold uppercase tracking-wider" style={{ color: '#64748b' }}>Requestor</TableHead>
+                                                    <TableHead className="text-[11.5px] font-semibold uppercase tracking-wider" style={{ color: '#64748b' }}>Product</TableHead>
+                                                    <TableHead className="text-[11.5px] font-semibold uppercase tracking-wider" style={{ color: '#64748b' }}>Total Items</TableHead>
+                                                    <TableHead className="text-[11.5px] font-semibold uppercase tracking-wider" style={{ color: '#64748b' }}>Submitted</TableHead>
+                                                    <TableHead className="text-[11.5px] font-semibold uppercase tracking-wider text-right" style={{ color: '#64748b' }}>Actions</TableHead>
+                                                </TableRow>
+                                            </TableHeader>
+                                            <TableBody>
+                                                {productRequests.filter(r => r.status === 'Pending Approval').length > 0 ? (
+                                                    productRequests.filter(r => r.status === 'Pending Approval').map(req => {
+                                                        const isOpen = openRequestIds.has(req.id);
+                                                        const totalItems = (req.lineItems ?? []).reduce((sum, li) => sum + li.quantity, 0);
+                                                        return (
+                                                            <React.Fragment key={req.id}>
+                                                                <TableRow data-state={isOpen ? 'open' : 'closed'}>
+                                                                    <TableCell>
+                                                                        <Button variant="ghost" size="sm" className="w-9 p-0 data-[state=open]:rotate-90" onClick={() => toggleRequestCollapse(req.id)} data-state={isOpen ? 'open' : 'closed'}>
+                                                                            <ChevronsUpDown className="h-4 w-4" />
+                                                                            <span className="sr-only">Toggle</span>
+                                                                        </Button>
+                                                                    </TableCell>
+                                                                    <TableCell>
+                                                                        <button onClick={() => router.push(`/requests/${req.id}`)} className="text-sm font-medium hover:underline" style={{ color: '#1a7070' }}>
+                                                                            {(req as any).requestId ?? req.id.slice(0, 8)}
+                                                                        </button>
+                                                                    </TableCell>
+                                                                    <TableCell>
+                                                                        <div>{req.requestorName}</div>
+                                                                        <div className="text-xs" style={{ color: '#64748b' }}>{req.requestorEmail}</div>
+                                                                    </TableCell>
+                                                                    <TableCell>
+                                                                        <div>{req.productName}</div>
+                                                                        <div className="text-xs" style={{ color: '#64748b' }}>{req.productId}</div>
+                                                                    </TableCell>
+                                                                    <TableCell>{totalItems}</TableCell>
+                                                                    <TableCell>{format(new Date(req.date), 'PPP')}</TableCell>
+                                                                    <TableCell className="text-right">
+                                                                        <div className="flex gap-2 justify-end">
+                                                                            <Button size="sm" variant="outline" disabled={isSaving} onClick={() => handleRejectRequest(req)}>Reject</Button>
+                                                                            <Button size="sm" disabled={isSaving} onClick={() => handleApproveRequest(req)}>Approve</Button>
+                                                                        </div>
+                                                                    </TableCell>
+                                                                </TableRow>
+                                                                {isOpen && (
+                                                                    <TableRow className="bg-muted/50 hover:bg-muted/50">
+                                                                        <TableCell colSpan={7} className="p-4">
+                                                                            <div className="space-y-4">
+                                                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-2">
+                                                                                    <div>
+                                                                                        <h4 className="font-semibold text-xs mb-1">Project</h4>
+                                                                                        <p className="text-sm">{req.project ?? '—'}</p>
+                                                                                    </div>
+                                                                                    <div>
+                                                                                        <h4 className="font-semibold text-xs mb-1">Justification</h4>
+                                                                                        <p className="text-sm text-muted-foreground">{req.justification}</p>
+                                                                                    </div>
+                                                                                </div>
+                                                                                {(req.lineItems ?? []).length > 0 && (
+                                                                                    <div>
+                                                                                        <h4 className="font-semibold text-xs mb-2">Requested Line Items</h4>
+                                                                                        <Table>
+                                                                                            <TableHeader>
+                                                                                                <TableRow>
+                                                                                                    <TableHead>Date Needed</TableHead>
+                                                                                                    <TableHead>Quantity</TableHead>
+                                                                                                </TableRow>
+                                                                                            </TableHeader>
+                                                                                            <TableBody>
+                                                                                                {(req.lineItems ?? []).map(li => (
+                                                                                                    <TableRow key={li.id}>
+                                                                                                        <TableCell>{li.requestedDate}</TableCell>
+                                                                                                        <TableCell>{li.quantity}</TableCell>
+                                                                                                    </TableRow>
+                                                                                                ))}
+                                                                                            </TableBody>
+                                                                                        </Table>
+                                                                                    </div>
+                                                                                )}
+                                                                            </div>
+                                                                        </TableCell>
+                                                                    </TableRow>
+                                                                )}
+                                                            </React.Fragment>
+                                                        );
+                                                    })
+                                                ) : (
+                                                    <TableRow>
+                                                        <TableCell colSpan={7} className="h-24 text-center">No pending approvals for your group.</TableCell>
+                                                    </TableRow>
+                                                )}
+                                            </TableBody>
+                                        </Table>
+                                        </div>
+                                    </div>
+                                </div>
+                )}
+
+                {/* ── Fulfillments View ──────────────────────────────── */}
+                {activeView === 'fulfillments' && user.role === 'Admin' && (
+                    <div className="space-y-6">
+                    {/* Approved/In-Progress requests with line-item fulfill */}
+                    <div style={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: 12 }}>
+                        <div className="p-6 pb-4">
+                            <h2 className="text-lg font-semibold" style={{ color: '#0f2a2a' }}>Requests Ready for Fulfillment</h2>
+                            <p className="text-sm" style={{ color: '#64748b' }}>Approved and in-progress requests with line items to fulfill.</p>
+                        </div>
+                        <div className="px-6 pb-6">
+                            <div className="border rounded-lg overflow-hidden" style={{ borderColor: '#e2e8f0' }}>
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow style={{ backgroundColor: '#f8fafc' }}>
+                                            <TableHead className="w-[50px]"></TableHead>
+                                            <TableHead className="text-[11.5px] font-semibold uppercase tracking-wider" style={{ color: '#64748b' }}>Request ID</TableHead>
+                                            <TableHead className="text-[11.5px] font-semibold uppercase tracking-wider" style={{ color: '#64748b' }}>Product</TableHead>
+                                            <TableHead className="text-[11.5px] font-semibold uppercase tracking-wider" style={{ color: '#64748b' }}>Requestor</TableHead>
+                                            <TableHead className="text-[11.5px] font-semibold uppercase tracking-wider" style={{ color: '#64748b' }}>Status</TableHead>
+                                            <TableHead className="text-[11.5px] font-semibold uppercase tracking-wider text-right" style={{ color: '#64748b' }}>Actions</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {productRequests.filter(r => r.status === 'Approved' || r.status === 'In Progress').length > 0 ? (
+                                            productRequests.filter(r => r.status === 'Approved' || r.status === 'In Progress').map(req => {
+                                                const isOpen = openRequestIds.has(req.id);
+                                                return (
+                                                    <React.Fragment key={req.id}>
+                                                        <TableRow data-state={isOpen ? 'open' : 'closed'}>
+                                                            <TableCell>
+                                                                <Button variant="ghost" size="sm" className="w-9 p-0" onClick={() => toggleRequestCollapse(req.id)}>
+                                                                    <ChevronsUpDown className="h-4 w-4" />
+                                                                </Button>
+                                                            </TableCell>
+                                                            <TableCell>
+                                                                <button onClick={() => router.push(`/requests/${req.id}`)} className="text-sm font-medium hover:underline" style={{ color: '#1a7070' }}>
+                                                                    {(req as any).requestId ?? req.id.slice(0, 8)}
+                                                                </button>
+                                                            </TableCell>
+                                                            <TableCell>
+                                                                <div>{req.productName}</div>
+                                                                <div className="text-xs" style={{ color: '#64748b' }}>{req.productId}</div>
+                                                            </TableCell>
+                                                            <TableCell>
+                                                                <div>{req.requestorName}</div>
+                                                                <div className="text-xs" style={{ color: '#64748b' }}>{req.department}</div>
+                                                            </TableCell>
+                                                            <TableCell>{getStatusBadge(req.status)}</TableCell>
+                                                            <TableCell className="text-right">
+                                                                <Button size="sm" variant="outline" disabled={isSaving} onClick={() => handleRejectRequest(req)}>Reject</Button>
+                                                            </TableCell>
+                                                        </TableRow>
+                                                        {isOpen && (
+                                                            <TableRow className="bg-muted/50 hover:bg-muted/50">
+                                                                <TableCell colSpan={6} className="p-4">
+                                                                    <h4 className="font-semibold text-xs mb-2">Line Items</h4>
+                                                                    <Table>
+                                                                        <TableHeader>
+                                                                            <TableRow>
+                                                                                <TableHead>Requested Date</TableHead>
+                                                                                <TableHead>Quantity</TableHead>
+                                                                                <TableHead>Status</TableHead>
+                                                                                <TableHead className="text-right">Action</TableHead>
+                                                                            </TableRow>
+                                                                        </TableHeader>
+                                                                        <TableBody>
+                                                                            {(req.lineItems ?? []).map(li => (
+                                                                                <TableRow key={li.id}>
+                                                                                    <TableCell>{li.requestedDate}</TableCell>
+                                                                                    <TableCell>{li.quantity}</TableCell>
+                                                                                    <TableCell>
+                                                                                        <Badge className={li.status === 'Fulfilled' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}>
+                                                                                            {li.status}
+                                                                                        </Badge>
+                                                                                    </TableCell>
+                                                                                    <TableCell className="text-right">
+                                                                                        {li.status === 'Pending' && (
+                                                                                            <Button size="sm" disabled={isSaving} onClick={() => handleFulfillLineItem(req, li)} style={{ backgroundColor: '#1a7070' }}>
+                                                                                                Fulfill
+                                                                                            </Button>
+                                                                                        )}
+                                                                                    </TableCell>
+                                                                                </TableRow>
+                                                                            ))}
+                                                                        </TableBody>
+                                                                    </Table>
+                                                                </TableCell>
+                                                            </TableRow>
+                                                        )}
+                                                    </React.Fragment>
+                                                );
+                                            })
+                                        ) : (
+                                            <TableRow>
+                                                <TableCell colSpan={6} className="h-24 text-center">No requests ready for fulfillment.</TableCell>
+                                            </TableRow>
+                                        )}
+                                    </TableBody>
+                                </Table>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Legacy fulfillments */}
+                    <div style={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: 12 }}>
+                        <div className="p-6 pb-4">
+                            <h2 className="text-lg font-semibold" style={{ color: '#0f2a2a' }}>Legacy Fulfillments</h2>
+                            <p className="text-sm" style={{ color: '#64748b' }}>In-progress fulfillments being partially dispensed over time.</p>
+                        </div>
+                        <div className="px-6 pb-6">
+                            <div className="border rounded-lg overflow-hidden" style={{ borderColor: '#e2e8f0' }}>
                                             <Table>
                                                 <TableHeader>
-                                                    <TableRow>
-                                                        <TableHead>Product</TableHead>
-                                                        <TableHead>Department</TableHead>
-                                                        <TableHead>Quantity</TableHead>
-                                                        <TableHead className="text-right">Actions</TableHead>
+                                                    <TableRow style={{ backgroundColor: '#f8fafc' }}>
+                                                        <TableHead className="text-[11.5px] font-semibold uppercase tracking-wider" style={{ color: '#64748b' }}>Product</TableHead>
+                                                        <TableHead className="text-[11.5px] font-semibold uppercase tracking-wider" style={{ color: '#64748b' }}>Department</TableHead>
+                                                        <TableHead className="text-[11.5px] font-semibold uppercase tracking-wider" style={{ color: '#64748b' }}>Quantity</TableHead>
+                                                        <TableHead className="text-[11.5px] font-semibold uppercase tracking-wider text-right" style={{ color: '#64748b' }}>Actions</TableHead>
                                                     </TableRow>
                                                 </TableHeader>
                                                 <TableBody>
@@ -1442,37 +2035,38 @@ export default function InventoryPage() {
                                                 </TableBody>
                                             </Table>
                                         </div>
-                                    </CardContent>
-                                </Card>
-                            </TabsContent>
-                        )}
-                        {user.role === 'Admin' &&
-                            <TabsContent value="transactions">
-                                <Card>
-                                    <CardHeader>
+                                        </div>
+                                    </div>
+                    </div>
+                )}
+
+                {/* ── Transactions View ──────────────────────────────── */}
+                {activeView === 'transactions' && user.role === 'Admin' && (
+                                <div style={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: 12 }}>
+                                    <div className="p-6 pb-4">
                                         <div className="flex justify-between items-center">
                                             <div>
-                                                <CardTitle>Transaction History</CardTitle>
-                                                <CardDescription>View a log of all inventory transactions.</CardDescription>
+                                                <h2 className="text-lg font-semibold" style={{ color: '#0f2a2a' }}>Transaction History</h2>
+                                                <p className="text-sm" style={{ color: '#64748b' }}>View a log of all inventory transactions.</p>
                                             </div>
                                             <Button variant="outline" onClick={handleExportTransactions}>
                                                 <Download className="mr-2 h-4 w-4" /> Export CSV
                                             </Button>
                                         </div>
-                                    </CardHeader>
-                                    <CardContent>
-                                        <div className="border rounded-lg overflow-hidden">
+                                    </div>
+                                    <div className="px-6 pb-6">
+                                        <div className="border rounded-lg overflow-hidden" style={{ borderColor: '#e2e8f0' }}>
                                         <Table>
                                             <TableHeader>
-                                                <TableRow>
+                                                <TableRow style={{ backgroundColor: '#f8fafc' }}>
                                                     <TableHead className="w-[50px]"></TableHead>
-                                                    <TableHead>Product</TableHead>
-                                                    <TableHead>Date</TableHead>
-                                                    <TableHead>Quantity Dispensed</TableHead>
-                                                    <TableHead>Requestor</TableHead>
-                                                    <TableHead>Department</TableHead>
-                                                    <TableHead>Notes</TableHead>
-                                                    <TableHead className="w-[100px] text-right">Actions</TableHead>
+                                                    <TableHead className="text-[11.5px] font-semibold uppercase tracking-wider" style={{ color: '#64748b' }}>Product</TableHead>
+                                                    <TableHead className="text-[11.5px] font-semibold uppercase tracking-wider" style={{ color: '#64748b' }}>Date</TableHead>
+                                                    <TableHead className="text-[11.5px] font-semibold uppercase tracking-wider" style={{ color: '#64748b' }}>Quantity Dispensed</TableHead>
+                                                    <TableHead className="text-[11.5px] font-semibold uppercase tracking-wider" style={{ color: '#64748b' }}>Requestor</TableHead>
+                                                    <TableHead className="text-[11.5px] font-semibold uppercase tracking-wider" style={{ color: '#64748b' }}>Department</TableHead>
+                                                    <TableHead className="text-[11.5px] font-semibold uppercase tracking-wider" style={{ color: '#64748b' }}>Notes</TableHead>
+                                                    <TableHead className="text-[11.5px] font-semibold uppercase tracking-wider text-right" style={{ color: '#64748b' }}>Actions</TableHead>
                                                 </TableRow>
                                             </TableHeader>
                                             <TableBody>
@@ -1526,29 +2120,27 @@ export default function InventoryPage() {
                                             </TableBody>
                                         </Table>
                                         </div>
-                                    </CardContent>
-                                </Card>
-                            </TabsContent>
-                        }
+                                    </div>
+                                </div>
+                )}
 
-                        {/* ── User Management Tab ───────────────────────────── */}
-                        {user.role === 'Admin' && (
-                            <TabsContent value="user-management">
+                {/* ── Config: Users ──────────────────────────────── */}
+                {(activeView === 'configuration' || activeView === 'config-users') && user.role === 'Admin' && (
                                 <div className="space-y-6">
                                     {/* Users table */}
-                                    <Card>
-                                        <CardHeader>
+                                    <div style={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: 12 }}>
+                                        <div className="p-6 pb-4">
                                             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                                                 <div>
-                                                    <CardTitle className="flex items-center gap-2"><UserCog className="h-5 w-5" /> Users</CardTitle>
-                                                    <CardDescription>Manage system users, roles, and functional group assignments.</CardDescription>
+                                                    <h2 className="text-lg font-semibold flex items-center gap-2" style={{ color: '#0f2a2a' }}><UserCog className="h-5 w-5" /> Users</h2>
+                                                    <p className="text-sm" style={{ color: '#64748b' }}>Manage system users, roles, and functional group assignments.</p>
                                                 </div>
-                                                <Button onClick={() => handleOpenUserForm(null)}>
+                                                <Button onClick={() => handleOpenUserForm(null)} style={{ backgroundColor: '#1a7070' }}>
                                                     <PlusCircle className="mr-2 h-4 w-4" /> Add User
                                                 </Button>
                                             </div>
-                                        </CardHeader>
-                                        <CardContent>
+                                        </div>
+                                        <div className="px-6 pb-6">
                                             <Table>
                                                 <TableHeader>
                                                     <TableRow>
@@ -1600,23 +2192,28 @@ export default function InventoryPage() {
                                                     ))}
                                                 </TableBody>
                                             </Table>
-                                        </CardContent>
-                                    </Card>
+                                        </div>
+                                    </div>
+                                </div>
+                )}
 
+                {/* ── Config: Functional Groups ──────────────────────────── */}
+                {(activeView === 'configuration' || activeView === 'config-groups') && user.role === 'Admin' && (
+                                <div className="space-y-6">
                                     {/* Functional Groups table */}
-                                    <Card>
-                                        <CardHeader>
+                                    <div style={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: 12 }}>
+                                        <div className="p-6 pb-4">
                                             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                                                 <div>
-                                                    <CardTitle className="flex items-center gap-2"><Building2 className="h-5 w-5" /> Functional Groups</CardTitle>
-                                                    <CardDescription>Manage HULLC functional groups. Deactivating a group does not remove existing user assignments.</CardDescription>
+                                                    <h2 className="text-lg font-semibold flex items-center gap-2" style={{ color: '#0f2a2a' }}><Building2 className="h-5 w-5" /> Functional Groups</h2>
+                                                    <p className="text-sm" style={{ color: '#64748b' }}>Manage HULLC functional groups. Deactivating a group does not remove existing user assignments.</p>
                                                 </div>
-                                                <Button onClick={() => handleOpenGroupForm(null)}>
+                                                <Button onClick={() => handleOpenGroupForm(null)} style={{ backgroundColor: '#1a7070' }}>
                                                     <PlusCircle className="mr-2 h-4 w-4" /> Add Group
                                                 </Button>
                                             </div>
-                                        </CardHeader>
-                                        <CardContent>
+                                        </div>
+                                        <div className="px-6 pb-6">
                                             <Table>
                                                 <TableHeader>
                                                     <TableRow>
@@ -1662,14 +2259,213 @@ export default function InventoryPage() {
                                                     ))}
                                                 </TableBody>
                                             </Table>
-                                        </CardContent>
-                                    </Card>
+                                        </div>
+                                    </div>
                                 </div>
-                            </TabsContent>
-                        )}
-                    </Tabs>
+                )}
+
+                {/* ── Config: Projects ──────────────────────────── */}
+                {(activeView === 'configuration' || activeView === 'config-projects') && user.role === 'Admin' && (
+                                <div className="space-y-6">
+                                    {/* Projects table */}
+                                    <div style={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: 12 }}>
+                                        <div className="p-6 pb-4">
+                                            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                                                <div>
+                                                    <h2 className="text-lg font-semibold flex items-center gap-2" style={{ color: '#0f2a2a' }}><Package className="h-5 w-5" /> Projects</h2>
+                                                    <p className="text-sm" style={{ color: '#64748b' }}>Manage projects available for product requests.</p>
+                                                </div>
+                                                <Button onClick={() => handleOpenProjectForm(null)} style={{ backgroundColor: '#1a7070' }}>
+                                                    <PlusCircle className="mr-2 h-4 w-4" /> Add Project
+                                                </Button>
+                                            </div>
+                                        </div>
+                                        <div className="px-6 pb-6">
+                                            <Table>
+                                                <TableHeader>
+                                                    <TableRow>
+                                                        <TableHead>Project Name</TableHead>
+                                                        <TableHead>Status</TableHead>
+                                                        <TableHead className="text-right">Actions</TableHead>
+                                                    </TableRow>
+                                                </TableHeader>
+                                                <TableBody>
+                                                    {appProjects.length === 0 && (
+                                                        <TableRow><TableCell colSpan={3} className="text-center text-muted-foreground py-8">No projects found.</TableCell></TableRow>
+                                                    )}
+                                                    {appProjects.map(p => (
+                                                        <TableRow key={p.id}>
+                                                            <TableCell className="font-medium">{p.name}</TableCell>
+                                                            <TableCell>
+                                                                <Badge className={p.isActive ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400'}>
+                                                                    {p.isActive ? <CheckCircle2 className="mr-1 h-3 w-3" /> : <XCircle className="mr-1 h-3 w-3" />}
+                                                                    {p.isActive ? 'Active' : 'Inactive'}
+                                                                </Badge>
+                                                            </TableCell>
+                                                            <TableCell className="text-right">
+                                                                <div className="flex justify-end gap-1">
+                                                                    <Tooltip>
+                                                                        <TooltipTrigger asChild>
+                                                                            <Button size="sm" variant="ghost" onClick={() => handleOpenProjectForm(p)}>
+                                                                                <Pencil className="h-4 w-4" />
+                                                                            </Button>
+                                                                        </TooltipTrigger>
+                                                                        <TooltipContent>Rename project</TooltipContent>
+                                                                    </Tooltip>
+                                                                    <Tooltip>
+                                                                        <TooltipTrigger asChild>
+                                                                            <Button size="sm" variant="ghost" onClick={() => handleToggleProjectStatus(p)}>
+                                                                                {p.isActive ? <XCircle className="h-4 w-4 text-destructive" /> : <CheckCircle2 className="h-4 w-4 text-green-600" />}
+                                                                            </Button>
+                                                                        </TooltipTrigger>
+                                                                        <TooltipContent>{p.isActive ? 'Deactivate project' : 'Activate project'}</TooltipContent>
+                                                                    </Tooltip>
+                                                                </div>
+                                                            </TableCell>
+                                                        </TableRow>
+                                                    ))}
+                                                </TableBody>
+                                            </Table>
+                                        </div>
+                                    </div>
+                                </div>
+                )}
+
+                {/* ── Config: Vendors ──────────────────────────── */}
+                {activeView === 'config-vendors' && user.role === 'Admin' && (
+                                <div className="space-y-6">
+                                    <div style={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: 12 }}>
+                                        <div className="p-6 pb-4">
+                                            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                                                <div>
+                                                    <h2 className="text-lg font-semibold flex items-center gap-2" style={{ color: '#0f2a2a' }}>Vendors</h2>
+                                                    <p className="text-sm" style={{ color: '#64748b' }}>Manage vendors/manufacturers for products.</p>
+                                                </div>
+                                                <Button onClick={() => handleOpenVendorForm(null)} style={{ backgroundColor: '#1a7070' }}>
+                                                    <PlusCircle className="mr-2 h-4 w-4" /> Add Vendor
+                                                </Button>
+                                            </div>
+                                        </div>
+                                        <div className="px-6 pb-6">
+                                            <Table>
+                                                <TableHeader>
+                                                    <TableRow>
+                                                        <TableHead>Vendor Name</TableHead>
+                                                        <TableHead>Status</TableHead>
+                                                        <TableHead className="text-right">Actions</TableHead>
+                                                    </TableRow>
+                                                </TableHeader>
+                                                <TableBody>
+                                                    {appVendors.length === 0 && (
+                                                        <TableRow><TableCell colSpan={3} className="text-center text-muted-foreground py-8">No vendors found.</TableCell></TableRow>
+                                                    )}
+                                                    {appVendors.map(v => (
+                                                        <TableRow key={v.id}>
+                                                            <TableCell className="font-medium">{v.name}</TableCell>
+                                                            <TableCell>
+                                                                <Badge className={v.isActive ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400'}>
+                                                                    {v.isActive ? <CheckCircle2 className="mr-1 h-3 w-3" /> : <XCircle className="mr-1 h-3 w-3" />}
+                                                                    {v.isActive ? 'Active' : 'Inactive'}
+                                                                </Badge>
+                                                            </TableCell>
+                                                            <TableCell className="text-right">
+                                                                <div className="flex justify-end gap-1">
+                                                                    <Tooltip>
+                                                                        <TooltipTrigger asChild>
+                                                                            <Button size="sm" variant="ghost" onClick={() => handleOpenVendorForm(v)}>
+                                                                                <Pencil className="h-4 w-4" />
+                                                                            </Button>
+                                                                        </TooltipTrigger>
+                                                                        <TooltipContent>Rename vendor</TooltipContent>
+                                                                    </Tooltip>
+                                                                    <Tooltip>
+                                                                        <TooltipTrigger asChild>
+                                                                            <Button size="sm" variant="ghost" onClick={() => handleToggleVendorStatus(v)}>
+                                                                                {v.isActive ? <XCircle className="h-4 w-4 text-destructive" /> : <CheckCircle2 className="h-4 w-4 text-green-600" />}
+                                                                            </Button>
+                                                                        </TooltipTrigger>
+                                                                        <TooltipContent>{v.isActive ? 'Deactivate vendor' : 'Activate vendor'}</TooltipContent>
+                                                                    </Tooltip>
+                                                                </div>
+                                                            </TableCell>
+                                                        </TableRow>
+                                                    ))}
+                                                </TableBody>
+                                            </Table>
+                                        </div>
+                                    </div>
+                                </div>
+                )}
+
+                {/* ── Config: Storage Locations ──────────────────────────── */}
+                {activeView === 'config-locations' && user.role === 'Admin' && (
+                                <div className="space-y-6">
+                                    <div style={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: 12 }}>
+                                        <div className="p-6 pb-4">
+                                            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                                                <div>
+                                                    <h2 className="text-lg font-semibold flex items-center gap-2" style={{ color: '#0f2a2a' }}>Storage Locations</h2>
+                                                    <p className="text-sm" style={{ color: '#64748b' }}>Manage storage locations for lot rows. Locations in use by active lots cannot be deactivated.</p>
+                                                </div>
+                                                <Button onClick={() => handleOpenLocationForm(null)} style={{ backgroundColor: '#1a7070' }}>
+                                                    <PlusCircle className="mr-2 h-4 w-4" /> Add Location
+                                                </Button>
+                                            </div>
+                                        </div>
+                                        <div className="px-6 pb-6">
+                                            <Table>
+                                                <TableHeader>
+                                                    <TableRow>
+                                                        <TableHead>Location Name</TableHead>
+                                                        <TableHead>Status</TableHead>
+                                                        <TableHead className="text-right">Actions</TableHead>
+                                                    </TableRow>
+                                                </TableHeader>
+                                                <TableBody>
+                                                    {appLocations.length === 0 && (
+                                                        <TableRow><TableCell colSpan={3} className="text-center text-muted-foreground py-8">No storage locations found.</TableCell></TableRow>
+                                                    )}
+                                                    {appLocations.map(l => (
+                                                        <TableRow key={l.id}>
+                                                            <TableCell className="font-medium">{l.name}</TableCell>
+                                                            <TableCell>
+                                                                <Badge className={l.isActive ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400'}>
+                                                                    {l.isActive ? <CheckCircle2 className="mr-1 h-3 w-3" /> : <XCircle className="mr-1 h-3 w-3" />}
+                                                                    {l.isActive ? 'Active' : 'Inactive'}
+                                                                </Badge>
+                                                            </TableCell>
+                                                            <TableCell className="text-right">
+                                                                <div className="flex justify-end gap-1">
+                                                                    <Tooltip>
+                                                                        <TooltipTrigger asChild>
+                                                                            <Button size="sm" variant="ghost" onClick={() => handleOpenLocationForm(l)}>
+                                                                                <Pencil className="h-4 w-4" />
+                                                                            </Button>
+                                                                        </TooltipTrigger>
+                                                                        <TooltipContent>Rename location</TooltipContent>
+                                                                    </Tooltip>
+                                                                    <Tooltip>
+                                                                        <TooltipTrigger asChild>
+                                                                            <Button size="sm" variant="ghost" onClick={() => handleToggleLocationStatus(l)}>
+                                                                                {l.isActive ? <XCircle className="h-4 w-4 text-destructive" /> : <CheckCircle2 className="h-4 w-4 text-green-600" />}
+                                                                            </Button>
+                                                                        </TooltipTrigger>
+                                                                        <TooltipContent>{l.isActive ? 'Deactivate location' : 'Activate location'}</TooltipContent>
+                                                                    </Tooltip>
+                                                                </div>
+                                                            </TableCell>
+                                                        </TableRow>
+                                                    ))}
+                                                </TableBody>
+                                            </Table>
+                                        </div>
+                                    </div>
+                                </div>
+                )}
+
                 </main>
             </TooltipProvider>
+            </div>
 
             {/* ── User Form Dialog ─────────────────────────────────────── */}
             <Dialog open={isUserFormOpen} onOpenChange={setIsUserFormOpen}>
@@ -1753,17 +2549,78 @@ export default function InventoryPage() {
                 </DialogContent>
             </Dialog>
 
-            <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
-                <DialogContent className="max-w-3xl flex flex-col max-h-[90vh]">
+            {/* ── Project Form Dialog ──────────────────────────────── */}
+            <Dialog open={isProjectFormOpen} onOpenChange={setIsProjectFormOpen}>
+                <DialogContent className="max-w-sm">
                     <DialogHeader>
-                        <DialogTitle>{productToEdit ? 'Edit Product' : 'Add New Product'}</DialogTitle>
+                        <DialogTitle>{projectToEdit ? 'Rename Project' : 'Add Project'}</DialogTitle>
+                        <DialogDescription>
+                            {projectToEdit ? 'Update the name of this project.' : 'Add a new project to the system.'}
+                        </DialogDescription>
                     </DialogHeader>
-                    <ProductForm
-                        product={productToEdit}
-                        onSave={handleSaveProduct}
-                        onCancel={() => setIsFormOpen(false)}
-                        isSaving={isSaving}
-                    />
+                    <form onSubmit={handleSaveProject} className="flex flex-col gap-4 pt-2">
+                        <div className="flex flex-col gap-1.5">
+                            <Label htmlFor="pf-name">Project Name</Label>
+                            <Input id="pf-name" value={projectFormName} onChange={e => setProjectFormName(e.target.value)} required placeholder="e.g., Project Alpha" />
+                        </div>
+                        <div className="flex justify-end gap-2">
+                            <Button type="button" variant="outline" onClick={() => setIsProjectFormOpen(false)}>Cancel</Button>
+                            <Button type="submit" disabled={isSaving}>
+                                {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                {projectToEdit ? 'Save Changes' : 'Create Project'}
+                            </Button>
+                        </div>
+                    </form>
+                </DialogContent>
+            </Dialog>
+
+            {/* ── Vendor Form Dialog ──────────────────────────────── */}
+            <Dialog open={isVendorFormOpen} onOpenChange={setIsVendorFormOpen}>
+                <DialogContent className="max-w-sm">
+                    <DialogHeader>
+                        <DialogTitle>{vendorToEdit ? 'Rename Vendor' : 'Add Vendor'}</DialogTitle>
+                        <DialogDescription>
+                            {vendorToEdit ? 'Update the name of this vendor.' : 'Add a new vendor to the system.'}
+                        </DialogDescription>
+                    </DialogHeader>
+                    <form onSubmit={handleSaveVendor} className="flex flex-col gap-4 pt-2">
+                        <div className="flex flex-col gap-1.5">
+                            <Label htmlFor="vf-name">Vendor Name</Label>
+                            <Input id="vf-name" value={vendorFormName} onChange={e => setVendorFormName(e.target.value)} required placeholder="e.g., Genentech" />
+                        </div>
+                        <div className="flex justify-end gap-2">
+                            <Button type="button" variant="outline" onClick={() => setIsVendorFormOpen(false)}>Cancel</Button>
+                            <Button type="submit" disabled={isSaving}>
+                                {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                {vendorToEdit ? 'Save Changes' : 'Create Vendor'}
+                            </Button>
+                        </div>
+                    </form>
+                </DialogContent>
+            </Dialog>
+
+            {/* ── Storage Location Form Dialog ──────────────────────── */}
+            <Dialog open={isLocationFormOpen} onOpenChange={setIsLocationFormOpen}>
+                <DialogContent className="max-w-sm">
+                    <DialogHeader>
+                        <DialogTitle>{locationToEdit ? 'Rename Storage Location' : 'Add Storage Location'}</DialogTitle>
+                        <DialogDescription>
+                            {locationToEdit ? 'Update the name of this storage location.' : 'Add a new storage location to the system.'}
+                        </DialogDescription>
+                    </DialogHeader>
+                    <form onSubmit={handleSaveLocation} className="flex flex-col gap-4 pt-2">
+                        <div className="flex flex-col gap-1.5">
+                            <Label htmlFor="lf-name">Location Name</Label>
+                            <Input id="lf-name" value={locationFormName} onChange={e => setLocationFormName(e.target.value)} required placeholder="e.g., Room 101, Shelf A" />
+                        </div>
+                        <div className="flex justify-end gap-2">
+                            <Button type="button" variant="outline" onClick={() => setIsLocationFormOpen(false)}>Cancel</Button>
+                            <Button type="submit" disabled={isSaving}>
+                                {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                                {locationToEdit ? 'Save Changes' : 'Create Location'}
+                            </Button>
+                        </div>
+                    </form>
                 </DialogContent>
             </Dialog>
 
@@ -1901,6 +2758,30 @@ export default function InventoryPage() {
                     <AlertDialogFooter>
                         <AlertDialogCancel onClick={() => setRequestToReject(null)}>Cancel</AlertDialogCancel>
                         <AlertDialogAction onClick={handleConfirmRejectRequest}>Reject Request</AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+
+            <AlertDialog open={!!requestToApprove} onOpenChange={(open) => !open && setRequestToApprove(null)}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Approve Request</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            Approve the request from {requestToApprove?.requestorName} for &quot;{requestToApprove?.productName}&quot;. You may add optional comments.
+                        </AlertDialogDescription>
+                        <div className="space-y-2 pt-2">
+                            <Label htmlFor="approve-comments" className="sr-only">Comments (optional)</Label>
+                            <Textarea
+                                id="approve-comments"
+                                placeholder="Optional comments for the requestor..."
+                                value={approveComments}
+                                onChange={(e) => setApproveComments(e.target.value)}
+                            />
+                        </div>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel onClick={() => setRequestToApprove(null)}>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={handleConfirmApproveRequest}>Confirm Approve</AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>

@@ -9,7 +9,7 @@ import { query, withTransaction } from '@/lib/db';
 
 interface FulfillmentRow {
   id: string;
-  request_id: string;
+  request_id: string | null;
   product_id: string;
   product_name: string;
   department: string;
@@ -73,7 +73,7 @@ const FULFILLMENT_SELECT_SQL = `
 function rowToFulfillment(row: FulfillmentRow) {
   return {
     id: row.id,
-    requestId: row.request_id,
+    requestId: row.request_id ?? null,
     productId: row.product_id,
     productName: row.product_name,
     department: row.department,
@@ -143,10 +143,9 @@ export async function POST(request: Request) {
         product_id: string;
         product_name: string;
         department: string;
-        quantity: number;
         status: string;
       }>(
-        `SELECT id, product_id, product_name, department, quantity, status
+        `SELECT id, product_id, product_name, department, status
          FROM product_requests WHERE id = $1 FOR UPDATE`,
         [requestId]
       );
@@ -157,27 +156,14 @@ export async function POST(request: Request) {
 
       const req = reqRows[0];
 
-      if (req.status !== 'Pending' && req.status !== 'In Progress') {
+      if (req.status !== 'Approved' && req.status !== 'In Progress') {
         throw Object.assign(
           new Error(`Request is "${req.status}" and cannot be fulfilled`),
           { code: 'INVALID_REQUEST_STATUS', status: req.status }
         );
       }
 
-      // 2. Reject duplicate fulfillments (the DB enforces UNIQUE on request_id, but
-      //    surface a clear error instead of a raw constraint violation)
-      const { rows: existing } = await client.query<{ id: string }>(
-        'SELECT id FROM fulfillments WHERE request_id = $1',
-        [requestId]
-      );
-      if (existing.length > 0) {
-        throw Object.assign(
-          new Error('A fulfillment already exists for this request'),
-          { code: 'FULFILLMENT_EXISTS', fulfillmentId: existing[0].id }
-        );
-      }
-
-      // 3. Create the fulfillment record
+      // 2. Create the fulfillment record (legacy flow - no line item link)
       const fulfillmentId = uuidv4();
       await client.query(
         `INSERT INTO fulfillments
@@ -186,11 +172,11 @@ export async function POST(request: Request) {
         [
           fulfillmentId, requestId,
           req.product_id, req.product_name,
-          req.department, req.quantity,
+          req.department, 0,
         ]
       );
 
-      // 4. Advance request to In Progress (idempotent if already there)
+      // 3. Advance request to In Progress (idempotent if already there)
       await client.query(
         `UPDATE product_requests SET status = 'In Progress' WHERE id = $1`,
         [requestId]

@@ -28,6 +28,7 @@ export const ProductFormSchema = z.object({
   name: z.string().min(1, "Product name is required."),
   vendor: z.string().min(1, "Vendor is required."),
   vendorPartNumber: z.string().min(1, "Vendor part number is required."),
+  uom: z.string().optional(),
   reorderThreshold: z.coerce.number().min(0, "Reorder threshold must be zero or more.").nullable().default(null),
   lots: z.array(LotSchema),
 });
@@ -95,36 +96,67 @@ export const TransactionSchema = z.object({
 export const DEPARTMENTS = ["HULLC", "Cardiology", "Neurology", "Oncology", "Pediatrics", "Research & Development"] as const;
 export const PROJECTS = ["Project Alpha", "Project Beta", "Clinical Trial Gamma", "Pre-clinical Study Delta"] as const;
 
+export const LineItemFormSchema = z.object({
+  requestedDate: z.string().min(1, "Date is required."),
+  quantity: z.coerce.number().min(1, "Quantity must be at least 1."),
+});
+
 export const ProductRequestFormSchema = z.object({
   requestorName: z.string().min(1, "Your name is required."),
   requestorEmail: z.string().email("Please enter a valid NIH email address."),
-  department: z.enum(DEPARTMENTS, { required_error: "Please select a department." }),
-  quantity: z.coerce.number().min(1, "Quantity must be at least 1."),
-  project: z.enum(PROJECTS, { required_error: "Please select a project." }),
+  department: z.string().min(1, "Department is required."),
+  project: z.string().optional(),
   justification: z.string().min(1, "Justification is required."),
   sopRead: z.boolean().refine(val => val === true, {
     message: "You must confirm you have read the SOP.",
   }),
+  lineItems: z.array(LineItemFormSchema).min(1, "At least one line item is required."),
 });
 
-export const ProductRequestStatusSchema = z.enum(['Pending', 'In Progress', 'Completed', 'Rejected']);
+export const ProductRequestStatusSchema = z.enum(['Pending Approval', 'Approved', 'In Progress', 'Completed', 'Rejected']);
 
-export const ProductRequestSchema = ProductRequestFormSchema.extend({
-    id: z.string(),
-    productId: z.string(),
-    productName: z.string(),
-    date: z.date(),
-    status: ProductRequestStatusSchema,
-    rejectionNote: z.string().optional(),
+export const RequestLineItemSchema = z.object({
+  id: z.string(),
+  requestId: z.string(),
+  requestedDate: z.union([z.string(), z.date()]).transform(v => v instanceof Date ? v.toISOString().split('T')[0] : v),
+  quantity: z.number(),
+  status: z.string(),
+  fulfilledQuantity: z.number(),
+  fulfillmentId: z.string().nullable(),
+  createdAt: z.union([z.string(), z.date()]).transform(v => v instanceof Date ? v.toISOString() : v),
+});
+
+export const ProductRequestSchema = z.object({
+  id: z.string(),
+  requestId: z.string().optional(),
+  requestNumber: z.number().optional(),
+  productId: z.string(),
+  productName: z.string(),
+  requestorName: z.string(),
+  requestorEmail: z.string(),
+  department: z.string(),
+  project: z.string().nullable().optional(),
+  justification: z.string(),
+  sopRead: z.boolean(),
+  status: ProductRequestStatusSchema,
+  rejectionNote: z.string().optional(),
+  directorId: z.string().nullable().optional(),
+  directorApprovedAt: z.string().nullable().optional(),
+  directorRejectionNote: z.string().nullable().optional(),
+  rejectedBy: z.string().nullable().optional(),
+  rejectionStage: z.string().nullable().optional(),
+  date: z.union([z.string(), z.date()]).transform(v => v instanceof Date ? v.toISOString() : v),
+  lineItems: z.array(RequestLineItemSchema).default([]),
 });
 
 export const FulfillmentSchema = z.object({
     id: z.string(),
-    requestId: z.string(),
+    requestId: z.string().nullable(),
     productId: z.string(),
     productName: z.string(),
     department: z.string(),
     totalQuantityRequested: z.number(),
+    requestLineItemId: z.string().nullable().optional(),
     dispensedItems: z.array(TransactionSchema),
 });
 
@@ -139,6 +171,8 @@ export type TransactionFormData = {
     notes: string;
     items: { lotId: string; quantityTaken: number; }[];
 };
+export type LineItemFormData = z.infer<typeof LineItemFormSchema>;
+export type RequestLineItem = z.infer<typeof RequestLineItemSchema>;
 export type ProductRequestFormData = z.infer<typeof ProductRequestFormSchema>;
 export type ProductRequest = z.infer<typeof ProductRequestSchema>;
 export type ProductRequestStatus = z.infer<typeof ProductRequestStatusSchema>;
