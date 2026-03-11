@@ -96,8 +96,8 @@ function NewProductFormPage() {
       </div>
 
       <div className="p-8 max-w-4xl">
-        <div className="mb-4 flex items-center gap-2" style={{ backgroundColor: '#fefce8', border: '1px solid #fde68a', borderRadius: 8, padding: '10px 16px', fontSize: 13, color: '#92400e' }}>
-          <span style={{ color: '#ef4444' }}>*</span> Required fields are marked with an asterisk
+        <div className="mb-4 flex items-center gap-2" style={{ backgroundColor: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 8, padding: '10px 16px', fontSize: 13, color: '#1e3a5f' }}>
+          <span style={{ color: '#ef4444', fontWeight: 700 }}>*</span> Required fields are marked with an asterisk
         </div>
         <ProductForm
           product={null}

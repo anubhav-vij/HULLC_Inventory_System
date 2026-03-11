@@ -20,6 +20,7 @@ import {
   BarChart3,
   PackagePlus,
   PackageMinus,
+  PieChart,
 } from "lucide-react";
 import type { User } from "@/lib/types";
 
@@ -55,8 +56,9 @@ const NAV_ITEMS: NavItem[] = [
     id: "metrics",
     label: "Metrics",
     icon: BarChart3,
-    roles: ["Admin"],
+    roles: ["Admin", "Chief"],
     children: [
+      { id: "metrics-dashboard", label: "Charts Dashboard", icon: PieChart },
       { id: "metrics-received", label: "Inventory Received", icon: PackagePlus },
       { id: "metrics-disbursed", label: "Inventory Disbursed", icon: PackageMinus },
     ],
@@ -68,6 +70,8 @@ interface SidebarProps {
   onNavigate: (view: string) => void;
   user: User;
   onLogout: () => void;
+  mobileOpen?: boolean;
+  onMobileClose?: () => void;
 }
 
 function getInitials(name?: string, email?: string): string {
@@ -128,7 +132,7 @@ function NavButton({
   );
 }
 
-export function Sidebar({ activeView, onNavigate, user, onLogout }: SidebarProps) {
+export function Sidebar({ activeView, onNavigate, user, onLogout, mobileOpen, onMobileClose }: SidebarProps) {
   const [openMenus, setOpenMenus] = useState<Set<string>>(() => {
     const initial = new Set<string>();
     // Auto-expand the group that contains the active view
@@ -157,9 +161,16 @@ export function Sidebar({ activeView, onNavigate, user, onLogout }: SidebarProps
 
   const isConfigChild = activeView.startsWith("config-");
 
+  const handleNavClick = (view: string) => {
+    onNavigate(view);
+    onMobileClose?.();
+  };
+
   return (
+    <>
+    {mobileOpen && <div className="sidebar-overlay md:hidden" onClick={onMobileClose} />}
     <aside
-      className="sidebar-fixed flex flex-col"
+      className={cn("sidebar-fixed flex flex-col", mobileOpen && "sidebar-open")}
       style={{ backgroundColor: "#0d3d3d" }}
     >
       {/* Logo area */}
@@ -224,7 +235,7 @@ export function Sidebar({ activeView, onNavigate, user, onLogout }: SidebarProps
                       return (
                         <button
                           key={child.id}
-                          onClick={() => onNavigate(child.id)}
+                          onClick={() => handleNavClick(child.id)}
                           className={cn(
                             "w-full flex items-center gap-3 px-5 py-2 text-[13px] transition-colors text-left",
                             isChildActive
@@ -270,7 +281,7 @@ export function Sidebar({ activeView, onNavigate, user, onLogout }: SidebarProps
               key={item.id}
               item={item}
               isActive={isActive}
-              onClick={() => onNavigate(item.id)}
+              onClick={() => handleNavClick(item.id)}
             />
           );
         })}
@@ -314,5 +325,6 @@ export function Sidebar({ activeView, onNavigate, user, onLogout }: SidebarProps
         </button>
       </div>
     </aside>
+    </>
   );
 }

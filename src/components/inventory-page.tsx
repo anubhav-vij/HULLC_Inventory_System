@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
-import { ChevronsUpDown, MoreHorizontal, Package, Pencil, PlusCircle, Warehouse, ArrowRightLeft, CloudUpload, Loader2, AlertTriangle, Download, Trash2, CheckCircle2, XCircle, Hourglass, FileText, Search, LogOut, Users, Building2, UserCog, ShieldAlert, ChevronRight } from 'lucide-react';
+import { ChevronsUpDown, MoreHorizontal, Package, Pencil, PlusCircle, Warehouse, ArrowRightLeft, CloudUpload, Loader2, AlertTriangle, Download, Trash2, CheckCircle2, XCircle, Hourglass, FileText, Search, LogOut, Users, Building2, UserCog, ShieldAlert, ChevronRight, Printer, Menu } from 'lucide-react';
 import { ProductForm } from './product-form';
 import { TransactionForm } from './transaction-form';
 import { RequestForm } from './request-form';
@@ -26,6 +26,7 @@ import { cn } from '@/lib/utils';
 import { deleteFile, getFile } from '@/lib/file-store';
 import { Input } from '@/components/ui/input';
 import { DepartmentalPage } from './departmental-page';
+import { MaterialAuditReport } from './material-audit-report';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Textarea } from './ui/textarea';
 import { Label } from './ui/label';
@@ -81,6 +82,7 @@ export default function InventoryPage() {
     const [fulfillmentToCancel, setFulfillmentToCancel] = useState<Fulfillment | null>(null);
     const [rejectionNote, setRejectionNote] = useState('');
     const [searchQuery, setSearchQuery] = useState('');
+    const [locationFilter, setLocationFilter] = useState('');
 
     // Filter state
     const [txDateFrom, setTxDateFrom] = useState('');
@@ -125,6 +127,12 @@ export default function InventoryPage() {
     const [locationToEdit, setLocationToEdit] = useState<{ id: string; name: string; isActive: boolean } | null>(null);
     const [locationFormName, setLocationFormName] = useState('');
 
+    // Audit report state
+    const [auditProduct, setAuditProduct] = useState<Product | null>(null);
+
+    // Mobile sidebar state
+    const [sidebarOpen, setSidebarOpen] = useState(false);
+
     const [activeView, setActiveView] = useState('inventory');
 
     const { toast } = useToast();
@@ -146,18 +154,24 @@ export default function InventoryPage() {
     }, [productRequests]);
 
     const filteredProducts = useMemo(() => {
-        if (!searchQuery) {
-            return products;
+        let result = products;
+        if (locationFilter) {
+            result = result.filter(product =>
+                product.lots.some(l => l.location === locationFilter)
+            );
         }
-        const q = searchQuery.toLowerCase();
-        return products.filter(product =>
-            product.name.toLowerCase().includes(q) ||
-            product.manufacturerPartNumber.toLowerCase().includes(q) ||
-            product.id.toLowerCase().includes(q) ||
-            (product.manufacturer ?? '').toLowerCase().includes(q) ||
-            product.lots.some(l => l.lotNumber.toLowerCase().includes(q))
-        );
-    }, [products, searchQuery]);
+        if (searchQuery) {
+            const q = searchQuery.toLowerCase();
+            result = result.filter(product =>
+                product.name.toLowerCase().includes(q) ||
+                product.manufacturerPartNumber.toLowerCase().includes(q) ||
+                product.id.toLowerCase().includes(q) ||
+                (product.manufacturer ?? '').toLowerCase().includes(q) ||
+                product.lots.some(l => l.lotNumber.toLowerCase().includes(q))
+            );
+        }
+        return result;
+    }, [products, searchQuery, locationFilter]);
 
     const filteredTransactions = useMemo(() => {
         let result = transactions;
@@ -1475,22 +1489,28 @@ export default function InventoryPage() {
         <div className="min-h-screen w-full" style={{ backgroundColor: '#eef2f7' }}>
             <input type="file" ref={fileInputRef} onChange={handleFileImport} style={{ display: 'none' }} accept=".xlsx,.xls,.csv" />
             <Sidebar activeView={activeView} onNavigate={(view) => {
+                if (view === 'metrics-dashboard') { router.push('/metrics/dashboard'); return; }
                 if (view === 'metrics-received') { router.push('/metrics/received'); return; }
                 if (view === 'metrics-disbursed') { router.push('/metrics/disbursed'); return; }
                 setActiveView(view);
-            }} user={user} onLogout={handleLogout} />
+            }} user={user} onLogout={handleLogout} mobileOpen={sidebarOpen} onMobileClose={() => setSidebarOpen(false)} />
             <div className="content-with-sidebar">
                 {/* Top bar */}
-                <div className="sticky top-0 z-30 flex items-center justify-between px-8" style={{ height: 60, backgroundColor: '#fff', borderBottom: '1px solid #e2e8f0' }}>
-                    <div>
-                        <h1 className="text-lg font-semibold" style={{ color: '#0f172a' }}>{currentPage.title}</h1>
-                        {currentPage.subtitle && <p className="text-xs" style={{ color: '#64748b' }}>{currentPage.subtitle}</p>}
+                <div className="sticky top-0 z-30 flex items-center justify-between px-4 md:px-8" style={{ height: 60, backgroundColor: '#fff', borderBottom: '1px solid #e2e8f0' }}>
+                    <div className="flex items-center gap-3">
+                        <Button variant="ghost" size="icon" className="md:hidden" onClick={() => setSidebarOpen(true)}>
+                            <Menu className="h-5 w-5" />
+                        </Button>
+                        <div>
+                            <h1 className="text-base md:text-lg font-semibold" style={{ color: '#0f172a' }}>{currentPage.title}</h1>
+                            {currentPage.subtitle && <p className="text-xs hidden sm:block" style={{ color: '#64748b' }}>{currentPage.subtitle}</p>}
+                        </div>
                     </div>
                     <Badge variant="outline" className="text-xs font-medium" style={{ color: '#1e40af', borderColor: '#1e40af' }}>{user.role}</Badge>
                 </div>
 
             <TooltipProvider>
-                <main className="p-8">
+                <main className="p-4 md:p-8">
 
                 {/* ── Dashboard View ──────────────────────────────────── */}
                 {activeView === 'dashboard' && (() => {
@@ -1626,10 +1646,10 @@ export default function InventoryPage() {
                 {/* ── Inventory View ──────────────────────────────────── */}
                 {activeView === 'inventory' && (
                             <div style={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: 12 }}>
-                                <div className="p-6 pb-4">
+                                <div className="p-4 md:p-6 pb-4">
                                     <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                                         <div className="flex-1">
-                                            <h2 className="text-lg font-semibold" style={{ color: '#0f172a' }}>Master Inventory</h2>
+                                            <h2 className="text-base md:text-lg font-semibold" style={{ color: '#0f172a' }}>Master Inventory</h2>
                                             <p className="text-sm" style={{ color: '#64748b' }}>Manage all products and their stock.</p>
                                         </div>
                                         <div className="flex flex-col sm:flex-row sm:justify-end gap-2 w-full sm:w-auto">
@@ -1643,6 +1663,19 @@ export default function InventoryPage() {
                                                     onChange={(e) => setSearchQuery(e.target.value)}
                                                 />
                                             </div>
+                                            {hasFullView && appLocations.length > 0 && (
+                                                <Select value={locationFilter} onValueChange={(v) => setLocationFilter(v === 'all' ? '' : v)}>
+                                                    <SelectTrigger className="w-full sm:w-[200px]">
+                                                        <SelectValue placeholder="All Locations" />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        <SelectItem value="all">All Locations</SelectItem>
+                                                        {appLocations.filter(l => l.isActive).map(l => (
+                                                            <SelectItem key={l.id} value={l.name}>{l.name}</SelectItem>
+                                                        ))}
+                                                    </SelectContent>
+                                                </Select>
+                                            )}
                                             {hasFullView && (
                                                 <div className="flex gap-2">
                                                     <Button variant="outline" onClick={handleExportInventory}>
@@ -1654,7 +1687,7 @@ export default function InventoryPage() {
                                                                 <CloudUpload className="mr-2 h-4 w-4" /> <span className="hidden sm:inline">Import</span>
                                                             </Button>
                                                             <Button onClick={handleAddNew}>
-                                                                <PlusCircle className="mr-2 h-4 w-4" /> Add Product
+                                                                <PlusCircle className="mr-2 h-4 w-4" /> <span className="hidden sm:inline">Add Product</span><span className="sm:hidden">Add</span>
                                                             </Button>
                                                         </>
                                                     )}
@@ -1663,8 +1696,53 @@ export default function InventoryPage() {
                                         </div>
                                     </div>
                                 </div>
-                                <div className="px-6 pb-6">
-                                    <div className="border rounded-lg overflow-hidden" style={{ borderColor: '#e2e8f0' }}>
+                                <div className="px-4 md:px-6 pb-6">
+                                    {/* Mobile card view */}
+                                    <div className="md:hidden space-y-3">
+                                        {filteredProducts.length > 0 ? filteredProducts.map(product => {
+                                            const stock = totalQuantity(product.lots);
+                                            const demand = productDemand.get(product.id) || 0;
+                                            const needed = Math.max(0, demand - stock);
+                                            return (
+                                                <div key={product.id} className="rounded-lg border p-4" style={{ backgroundColor: '#fff', borderColor: '#e2e8f0' }}>
+                                                    <div className="flex items-start justify-between mb-2">
+                                                        <div>
+                                                            <p className="font-medium text-sm" style={{ color: '#0f172a' }}>{product.name}</p>
+                                                            <p className="text-xs text-muted-foreground">{product.id}</p>
+                                                        </div>
+                                                        {hasFullView && (
+                                                            <Badge variant={needsReorder(product) ? "destructive" : "secondary"} className="text-xs">{stock}</Badge>
+                                                        )}
+                                                    </div>
+                                                    <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs mb-3" style={{ color: '#475569' }}>
+                                                        <div><span className="font-medium">Mfr:</span> {product.manufacturer || '—'}</div>
+                                                        <div><span className="font-medium">Part #:</span> {product.manufacturerPartNumber || '—'}</div>
+                                                        <div><span className="font-medium">UoM:</span> {product.uom || '—'}</div>
+                                                        {hasFullView && needed > 0 && <div><span className="font-medium text-destructive">Needed:</span> {needed}</div>}
+                                                    </div>
+                                                    <div className="flex gap-2">
+                                                        {canEdit ? (
+                                                            <>
+                                                                <Button size="sm" variant="outline" className="text-xs h-7" onClick={() => handleEdit(product)}>Edit</Button>
+                                                                <Button size="sm" variant="outline" className="text-xs h-7" onClick={() => handleNewTransaction(product)}>Transaction</Button>
+                                                                <Button size="sm" variant="ghost" className="text-xs h-7" onClick={() => setAuditProduct(product)}><Printer className="h-3 w-3" /></Button>
+                                                            </>
+                                                        ) : hasFullView ? (
+                                                            <Button size="sm" variant="ghost" className="text-xs h-7" onClick={() => setAuditProduct(product)}><Printer className="h-3 w-3 mr-1" /> Audit</Button>
+                                                        ) : (
+                                                            <Button size="sm" className="text-xs h-7" onClick={() => handleRequestProduct(product)}>Request Item</Button>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            );
+                                        }) : (
+                                            <div className="text-center py-12 text-muted-foreground">
+                                                {searchQuery ? 'No products found.' : 'No products yet.'}
+                                            </div>
+                                        )}
+                                    </div>
+                                    {/* Desktop table view */}
+                                    <div className="hidden md:block border rounded-lg overflow-hidden" style={{ borderColor: '#e2e8f0' }}>
                                         <Table>
                                             <TableHeader>
                                                 <TableRow style={{ backgroundColor: '#f8fafc' }}>
@@ -1760,13 +1838,18 @@ export default function InventoryPage() {
                                                                                 <DropdownMenuContent align="end">
                                                                                     <DropdownMenuItem onClick={() => handleEdit(product)}><Pencil className="mr-2 h-4 w-4" /> Edit</DropdownMenuItem>
                                                                                     <DropdownMenuItem onClick={() => handleNewTransaction(product)}><ArrowRightLeft className="mr-2 h-4 w-4" /> New Transaction</DropdownMenuItem>
+                                                                                    <DropdownMenuItem onClick={() => setAuditProduct(product)}><Printer className="mr-2 h-4 w-4" /> Print Audit</DropdownMenuItem>
                                                                                     <DropdownMenuSeparator />
                                                                                     <DropdownMenuItem onClick={() => handleDeleteProduct(product)} className="text-destructive focus:text-destructive focus:bg-destructive/10"><Trash2 className="mr-2 h-4 w-4" /> Delete</DropdownMenuItem>
                                                                                 </DropdownMenuContent>
                                                                             </DropdownMenu>
                                                                         </TableCell>
                                                                     ) : hasFullView ? (
-                                                                        <TableCell />
+                                                                        <TableCell className="text-right">
+                                                                            <Button variant="ghost" size="sm" onClick={() => setAuditProduct(product)} title="Print Audit Report">
+                                                                                <Printer className="h-4 w-4" />
+                                                                            </Button>
+                                                                        </TableCell>
                                                                     ) : (
                                                                         <TableCell className="text-right">
                                                                             <Button size="sm" onClick={() => handleRequestProduct(product)}>
@@ -3137,6 +3220,15 @@ export default function InventoryPage() {
                     </AlertDialogFooter>
                 </AlertDialogContent>
             </AlertDialog>
+
+            {/* Material Audit Report (Phase 12) */}
+            {auditProduct && (
+                <MaterialAuditReport
+                    product={auditProduct}
+                    generatedBy={user.fullName ?? user.email ?? 'Unknown'}
+                    onClose={() => setAuditProduct(null)}
+                />
+            )}
         </div>
     );
 }

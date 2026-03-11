@@ -126,7 +126,7 @@ export function ProductForm({ product, onSave, onCancel, isSaving, isAdmin = tru
 
   const labelStyle = { color: '#475569', fontSize: '11px', textTransform: 'uppercase' as const, letterSpacing: '0.05em', fontWeight: 600 };
   const cardStyle = { backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: '12px' };
-  const cardHeaderStyle = { backgroundColor: '#f1f5f9', borderBottom: '1px solid #e2e8f0', borderRadius: '12px 12px 0 0', padding: '14px 16px' };
+  const cardHeaderStyle = { backgroundColor: '#1e3a5f', borderBottom: '1px solid #1e3a5f', borderRadius: '12px 12px 0 0', padding: '14px 16px' };
   const inputStyle = { backgroundColor: '#fff', border: '1px solid #cbd5e1', borderRadius: '8px' };
   const reqMark = <span style={{ color: '#ef4444' }}> *</span>;
 
@@ -137,7 +137,7 @@ export function ProductForm({ product, onSave, onCancel, isSaving, isAdmin = tru
           {/* Product Information Card */}
           <div style={cardStyle}>
             <div style={cardHeaderStyle}>
-              <h3 style={{ color: '#0f172a', fontSize: '15px', fontWeight: 700, margin: 0 }}>Product Information</h3>
+              <h3 style={{ color: '#ffffff', fontSize: '15px', fontWeight: 700, margin: 0 }}>Product Information</h3>
             </div>
             <div style={{ backgroundColor: '#f8fafc', padding: 20, borderRadius: '0 0 12px 12px' }} className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <FormField
@@ -286,7 +286,7 @@ export function ProductForm({ product, onSave, onCancel, isSaving, isAdmin = tru
           {/* Lots Card */}
           <div style={cardStyle}>
             <div style={cardHeaderStyle} className="flex items-center justify-between">
-              <h3 style={{ color: '#0f172a', fontSize: '15px', fontWeight: 700, margin: 0 }}>Lots</h3>
+              <h3 style={{ color: '#ffffff', fontSize: '15px', fontWeight: 700, margin: 0 }}>Lots</h3>
             </div>
             <div style={{ backgroundColor: '#f8fafc', padding: 20, borderRadius: '0 0 12px 12px' }}>
               {form.formState.errors.lots?.message && (

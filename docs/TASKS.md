@@ -112,6 +112,21 @@ each phase sequentially, marking `[~]` while in progress and `[x]` when complete
 - [x] Migration 012: backfilled all existing requests with HULLC-YYYY-XXXX IDs
 - [x] Request ID sequence table populated (year 2026, last_number 10)
 
+### Session 14 — Phases 12, 13, 14 (2026-03-11)
+- [x] Fixed form page styling: yellow required-field banners → blue/indigo, low-contrast card headers → dark navy with white text (6 files)
+- [x] Phase 12: Printable Audit Reports — `MaterialAuditReport` component using `createPortal` into `#material-audit-print-root`
+- [x] Print button in Admin dropdown menu and as standalone button for ProjectManager/Chief
+- [x] Report: HULLC header, product details table, lots table, transaction history, confidential footer
+- [x] Phase 13: Metrics Charts Dashboard at `/metrics/dashboard` (Admin & Chief only)
+- [x] API: `GET /api/metrics/dashboard` with optional date range filtering (5 queries in parallel)
+- [x] 5 recharts: transactions/day (line), transactions/week (bar), requests by group (horizontal bar), requests by status (donut), products cumulative (line)
+- [x] Global date range picker, Excel export of all chart data
+- [x] Added "Charts Dashboard" to Metrics sidebar group
+- [x] Phase 14: Mobile responsiveness — sidebar slides in/out with hamburger toggle + overlay
+- [x] Mobile card view for inventory (below md breakpoint), desktop table preserved
+- [x] Responsive padding (p-4 md:p-8), responsive text sizes, collapsible labels on buttons
+- [x] CSS: sidebar-open class, sidebar-overlay, tablet sidebar width adjustment
+
 ---
 
 ## Phase 1 — User Management
@@ -315,12 +330,12 @@ each phase sequentially, marking `[~]` while in progress and `[x]` when complete
 
 > Generates a formatted, printable audit trail per product for compliance and documentation.
 
-- [ ] Add Print Audit Report button to each product row (Admin, ProjectManager, Chief)
-- [ ] Report includes: product details, all lots with current quantities, full transaction history (newest first)
-- [ ] Render as isolated print view via React `createPortal` (same pattern as Lab Inventory Tracker)
-- [ ] Include HULLC header, generation date, generated-by user name, and page numbers
-- [ ] Print CSS: collapse app layout, show only report content
-- [ ] Add confidential footer on every page
+- [x] Add Print Audit Report button to each product row (Admin, ProjectManager, Chief)
+- [x] Report includes: product details, all lots with current quantities, full transaction history (newest first)
+- [x] Render as isolated print view via React `createPortal` (same pattern as Lab Inventory Tracker)
+- [x] Include HULLC header, generation date, generated-by user name, and page numbers
+- [x] Print CSS: collapse app layout, show only report content
+- [x] Add confidential footer on every page
 
 ---
 
@@ -328,14 +343,14 @@ each phase sequentially, marking `[~]` while in progress and `[x]` when complete
 
 > Gives Admins statistical insight into inventory activity over time.
 
-- [ ] Add Metrics tab (Admin and Chief only)
-- [ ] Global date range picker — all charts filter to selected range; show all-time when no range set
-- [ ] Chart: transactions per day for last 30 days (line chart)
-- [ ] Chart: transactions per week for last 12 weeks (bar chart)
-- [ ] Chart: requests by functional group (bar chart)
-- [ ] Chart: requests by status — Pending Approval / Approved / In Progress / Completed / Rejected (donut chart)
-- [ ] Chart: products added over time — cumulative (line chart)
-- [ ] Export metrics summary to Excel
+- [x] Add Metrics tab (Admin and Chief only)
+- [x] Global date range picker — all charts filter to selected range; show all-time when no range set
+- [x] Chart: transactions per day for last 30 days (line chart)
+- [x] Chart: transactions per week for last 12 weeks (bar chart)
+- [x] Chart: requests by functional group (bar chart)
+- [x] Chart: requests by status — Pending Approval / Approved / In Progress / Completed / Rejected (donut chart)
+- [x] Chart: products added over time — cumulative (line chart)
+- [x] Export metrics summary to Excel
 
 ---
 
@@ -343,11 +358,11 @@ each phase sequentially, marking `[~]` while in progress and `[x]` when complete
 
 > Ensures the application is usable on tablets and mobile devices for lab staff away from their desks.
 
-- [ ] Build mobile card list view for Inventory table (shown on small screens, full table on desktop)
-- [ ] Make product detail/lot view responsive (stack fields vertically on mobile)
-- [ ] Add horizontal overflow scroll to main tab bar on small screens
-- [ ] Test request submission flow on mobile screen size
-- [ ] Verify all forms are usable on touch screens (input sizes, spacing)
+- [x] Build mobile card list view for Inventory table (shown on small screens, full table on desktop)
+- [x] Make product detail/lot view responsive (stack fields vertically on mobile)
+- [x] Add horizontal overflow scroll to main tab bar on small screens
+- [x] Test request submission flow on mobile screen size
+- [x] Verify all forms are usable on touch screens (input sizes, spacing)
 
 ---
 

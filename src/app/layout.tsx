@@ -22,6 +22,8 @@ export default function RootLayout({
       <body className="font-body antialiased h-full bg-background">
         {children}
         <Toaster />
+        <div id="material-audit-print-root" />
+        <div id="transfer-sheet-print-root" />
       </body>
     </html>
   );

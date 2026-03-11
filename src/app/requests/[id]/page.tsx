@@ -449,12 +449,12 @@ function RequestDetailContent() {
       <div className="max-w-4xl mx-auto p-6 space-y-6">
         {/* Request Details card */}
         <div style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 12 }}>
-          <div style={{ backgroundColor: '#f1f5f9', borderBottom: '1px solid #e2e8f0', borderRadius: '12px 12px 0 0', padding: '16px 24px' }} className="flex items-start justify-between">
+          <div style={{ backgroundColor: '#1e3a5f', borderBottom: '1px solid #1e3a5f', borderRadius: '12px 12px 0 0', padding: '16px 24px' }} className="flex items-start justify-between">
             <div>
-              <h1 className="text-xl font-semibold" style={{ color: '#0f172a' }}>
+              <h1 className="text-xl font-semibold" style={{ color: '#ffffff' }}>
                 {requestDisplayId}
               </h1>
-              <p className="text-sm mt-0.5" style={{ color: '#64748b' }}>
+              <p className="text-sm mt-0.5" style={{ color: '#cbd5e1' }}>
                 Submitted {format(new Date(request.date), "PPP")}
               </p>
             </div>
@@ -555,11 +555,11 @@ function RequestDetailContent() {
         >
           <div
             className="px-6 py-3"
-            style={{ backgroundColor: '#f1f5f9', borderBottom: "1px solid #e2e8f0" }}
+            style={{ backgroundColor: '#1e3a5f', borderBottom: "1px solid #1e3a5f" }}
           >
             <h3
               className="text-sm font-semibold"
-              style={{ color: "#0f172a" }}
+              style={{ color: "#ffffff" }}
             >
               Line Items
             </h3>
@@ -707,8 +707,8 @@ function RequestDetailContent() {
         {/* Director / Sci-Ops Action card */}
         {canApproveReject && (
           <div style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 12 }}>
-            <div style={{ backgroundColor: '#f1f5f9', borderBottom: '1px solid #e2e8f0', borderRadius: '12px 12px 0 0', padding: '12px 20px' }}>
-              <h3 className="text-sm font-semibold" style={{ color: '#0f172a' }}>
+            <div style={{ backgroundColor: '#1e3a5f', borderBottom: '1px solid #1e3a5f', borderRadius: '12px 12px 0 0', padding: '12px 20px' }}>
+              <h3 className="text-sm font-semibold" style={{ color: '#ffffff' }}>
                 {canSciOpsApproveReject ? 'Sci-Ops Director Action' : 'Director Action'}
               </h3>
             </div>

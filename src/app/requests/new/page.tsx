@@ -213,15 +213,15 @@ function NewRequestForm() {
       </div>
 
       <div className="p-8 max-w-3xl">
-        <div className="mb-4 flex items-center gap-2" style={{ backgroundColor: '#fefce8', border: '1px solid #fde68a', borderRadius: 8, padding: '10px 16px', fontSize: 13, color: '#92400e' }}>
-          <span style={{ color: '#ef4444' }}>*</span> Required fields are marked with an asterisk
+        <div className="mb-4 flex items-center gap-2" style={{ backgroundColor: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: 8, padding: '10px 16px', fontSize: 13, color: '#1e3a5f' }}>
+          <span style={{ color: '#ef4444', fontWeight: 700 }}>*</span> Required fields are marked with an asterisk
         </div>
         <form onSubmit={handleSubmit}>
           <div className="space-y-6">
             {/* Product Info */}
             <div style={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: 12 }}>
-              <div style={{ backgroundColor: '#f1f5f9', borderBottom: '1px solid #e2e8f0', borderRadius: '12px 12px 0 0', padding: '14px 16px' }}>
-                <h3 style={{ color: '#0f172a', fontSize: '15px', fontWeight: 700, margin: 0 }}>Product</h3>
+              <div style={{ backgroundColor: '#1e3a5f', borderBottom: '1px solid #1e3a5f', borderRadius: '12px 12px 0 0', padding: '14px 16px' }}>
+                <h3 style={{ color: '#ffffff', fontSize: '15px', fontWeight: 700, margin: 0 }}>Product</h3>
               </div>
               <div style={{ backgroundColor: '#f8fafc', padding: 20, borderRadius: '0 0 12px 12px' }} className="flex flex-col gap-4">
                 <div className="flex flex-col gap-1.5">
@@ -243,8 +243,8 @@ function NewRequestForm() {
 
             {/* Requestor Info */}
             <div style={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: 12 }}>
-              <div style={{ backgroundColor: '#f1f5f9', borderBottom: '1px solid #e2e8f0', borderRadius: '12px 12px 0 0', padding: '14px 16px' }}>
-                <h3 style={{ color: '#0f172a', fontSize: '15px', fontWeight: 700, margin: 0 }}>Requestor Information</h3>
+              <div style={{ backgroundColor: '#1e3a5f', borderBottom: '1px solid #1e3a5f', borderRadius: '12px 12px 0 0', padding: '14px 16px' }}>
+                <h3 style={{ color: '#ffffff', fontSize: '15px', fontWeight: 700, margin: 0 }}>Requestor Information</h3>
               </div>
               <div style={{ backgroundColor: '#f8fafc', padding: 20, borderRadius: '0 0 12px 12px' }} className="flex flex-col gap-4">
                 <div className="flex flex-col gap-1.5">
@@ -264,8 +264,8 @@ function NewRequestForm() {
 
             {/* Request Details */}
             <div style={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: 12 }}>
-              <div style={{ backgroundColor: '#f1f5f9', borderBottom: '1px solid #e2e8f0', borderRadius: '12px 12px 0 0', padding: '14px 16px' }}>
-                <h3 style={{ color: '#0f172a', fontSize: '15px', fontWeight: 700, margin: 0 }}>Request Details</h3>
+              <div style={{ backgroundColor: '#1e3a5f', borderBottom: '1px solid #1e3a5f', borderRadius: '12px 12px 0 0', padding: '14px 16px' }}>
+                <h3 style={{ color: '#ffffff', fontSize: '15px', fontWeight: 700, margin: 0 }}>Request Details</h3>
               </div>
               <div style={{ backgroundColor: '#f8fafc', padding: 20, borderRadius: '0 0 12px 12px' }} className="flex flex-col gap-4">
                 <div className="flex flex-col gap-1.5">
@@ -312,10 +312,10 @@ function NewRequestForm() {
 
             {/* Line Items */}
             <div style={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: 12 }}>
-                <div style={{ backgroundColor: '#f1f5f9', borderBottom: '1px solid #e2e8f0', borderRadius: '12px 12px 0 0', padding: '14px 16px' }} className="flex justify-between items-center">
+                <div style={{ backgroundColor: '#1e3a5f', borderBottom: '1px solid #1e3a5f', borderRadius: '12px 12px 0 0', padding: '14px 16px' }} className="flex justify-between items-center">
                   <div>
-                    <h3 style={{ color: '#0f172a', fontSize: '15px', fontWeight: 700, margin: 0 }}>Requested Quantities</h3>
-                    <p style={{ color: '#64748b', fontSize: '13px', marginTop: 2 }}>Add one row per date you need items delivered.</p>
+                    <h3 style={{ color: '#ffffff', fontSize: '15px', fontWeight: 700, margin: 0 }}>Requested Quantities</h3>
+                    <p style={{ color: '#cbd5e1', fontSize: '13px', marginTop: 2 }}>Add one row per date you need items delivered.</p>
                   </div>
                   <Button type="button" variant="outline" size="sm" onClick={addLineItem}>
                     <PlusCircle className="mr-2 h-4 w-4" />
