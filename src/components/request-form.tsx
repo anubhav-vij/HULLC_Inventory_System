@@ -46,10 +46,10 @@ export function RequestForm({ product, onSave, onCancel, isSaving }: RequestForm
               <p>{product.name}</p>
               <p className="font-medium">Product ID:</p>
               <p>{product.id}</p>
-              <p className="font-medium">Vendor:</p>
-              <p>{product.vendor}</p>
-              <p className="font-medium">Vendor Part #:</p>
-              <p>{product.vendorPartNumber}</p>
+              <p className="font-medium">Manufacturer:</p>
+              <p>{product.manufacturer}</p>
+              <p className="font-medium">Manufacturer Part #:</p>
+              <p>{product.manufacturerPartNumber}</p>
             </div>
           </CardContent>
         </Card>

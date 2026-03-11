@@ -138,7 +138,7 @@ export async function PUT(request: Request, { params }: RouteContext) {
         );
       }
 
-      const rejectionStage = role === 'Director' ? 'director' : 'admin';
+      const rejectionStage = req.status === 'Pending SciOps Approval' ? 'sciops' : (role === 'Director' ? 'director' : 'admin');
       const directorNote = role === 'Director' ? rejectionNote : null;
 
       await client.query(

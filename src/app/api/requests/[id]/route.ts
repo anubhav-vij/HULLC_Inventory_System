@@ -77,6 +77,12 @@ function rowToRequest(row: RequestRow) {
     directorRejectionNote: row.director_rejection_note ?? null,
     rejectedBy: row.rejected_by ?? null,
     rejectionStage: row.rejection_stage ?? null,
+    somApprovalStatus: (row as any).som_approval_status ?? null,
+    sciopsDirectorApprovedAt: (row as any).sciops_director_approved_at ? (row as any).sciops_director_approved_at.toISOString() : null,
+    sciopsDirectorApprovedBy: (row as any).sciops_director_approved_by ?? null,
+    somApprovalRequired: (row as any).som_approval_required ?? false,
+    manufacturerPartNumber: (row as any).product_manufacturer_part_number ?? null,
+    uom: (row as any).product_uom ?? null,
     date: row.date,
     lineItems: (row.line_items ?? []).map(li => ({
       id: li.id,
@@ -96,7 +102,8 @@ function rowToRequest(row: RequestRow) {
 // ---------------------------------------------------------------------------
 
 const VALID_TRANSITIONS: Record<string, string[]> = {
-  'Pending Approval': ['Approved', 'Rejected'],
+  'Pending Approval': ['Approved', 'Pending SciOps Approval', 'Rejected'],
+  'Pending SciOps Approval': ['Approved', 'Rejected'],
   'Approved':         ['In Progress', 'Rejected'],
   'In Progress':      ['Completed', 'Rejected'],
   'Completed':        [],
@@ -129,11 +136,16 @@ export async function GET(_request: Request, { params }: RouteContext) {
 
   try {
     const { rows } = await query<RequestRow>(
-      `SELECT pr.*, ${LINE_ITEMS_SUBQUERY}
+      `SELECT pr.*,
+              COALESCE(p_prod.som_approval_required, false) AS som_approval_required,
+              p_prod.manufacturer_part_number AS product_manufacturer_part_number,
+              p_prod.uom AS product_uom,
+              ${LINE_ITEMS_SUBQUERY}
        FROM product_requests pr
        LEFT JOIN request_line_items rli ON rli.request_id = pr.id
+       LEFT JOIN products p_prod ON p_prod.id = pr.product_id
        WHERE pr.id = $1
-       GROUP BY pr.id`,
+       GROUP BY pr.id, p_prod.som_approval_required, p_prod.manufacturer_part_number, p_prod.uom`,
       [id]
     );
 
@@ -260,7 +272,7 @@ export async function DELETE(_request: Request, { params }: RouteContext) {
 
       const { status } = rows[0];
 
-      if (status === 'In Progress' || status === 'Approved' || status === 'Completed') {
+      if (status === 'In Progress' || status === 'Approved' || status === 'Completed' || status === 'Pending SciOps Approval') {
         return { found: true, deletable: false, status };
       }
 

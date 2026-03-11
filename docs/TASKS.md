@@ -76,6 +76,22 @@ each phase sequentially, marking `[~]` while in progress and `[x]` when complete
 - [x] Deactivation returns 409 if referenced by active lots (quantity > 0)
 - [x] Product form lot rows use storage location dropdown (falls back to text input if none exist)
 
+### Session 9 — Manufacturer Rename, SOM Workflow, Form Contrast (2026-03-11)
+- [x] Migration 009: renamed `vendors` → `manufacturers` (table + all product columns), added `alternate_names`
+- [x] Manufacturers API: `GET/POST /api/manufacturers`, `PUT /api/manufacturers/[id]` with alternate names
+- [x] All vendor references renamed to manufacturer throughout codebase (types, queries, API, UI, sidebar)
+- [x] Migration 010: added `vwr_part_number`, `som_approval_required`, `cost_per_unit` to products; SOM columns to requests; extended request_status enum
+- [x] ProductForm redesigned: manufacturer dropdown, VWR Part #, SOM approval toggle, cost per unit (Admin only), lots as 2-column card grid
+- [x] SOM two-stage approval: Director approve → Pending SciOps Approval (if SOM product) → Sci-Ops Director approve → Approved
+- [x] API: `PUT /api/requests/[id]/sciops-approve` and `sciops-reject` — validates Scientific Operations group membership
+- [x] Director Approvals tab shows both Pending Approval and Pending SciOps Approval with status column
+- [x] Approve/Reject handlers route to correct endpoint (regular or sciops) based on request status
+- [x] Inline validation errors on `/requests/new` replace toast-based validation (project, justification, SOP, dates, quantities)
+- [x] Date validation fix: `toLocaleDateString('en-CA')` for local timezone instead of UTC
+- [x] Request display: manufacturer part # replaces internal product ID in all request tables
+- [x] Request detail page: shows UoM, manufacturer part #, SOM badge, rejection stage in rejection note
+- [x] Form contrast applied: `/requests/new`, `/requests/[id]`, `/products/new`, `/products/[id]/edit` — #f8fafc cards, #f1f5f9 headers, white inputs, #475569 labels
+
 ---
 
 ## Phase 1 — User Management

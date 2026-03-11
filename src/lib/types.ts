@@ -26,9 +26,12 @@ export const NewLotSchema = LotSchema.extend({
 
 export const ProductFormSchema = z.object({
   name: z.string().min(1, "Product name is required."),
-  vendor: z.string().min(1, "Vendor is required."),
-  vendorPartNumber: z.string().min(1, "Vendor part number is required."),
+  manufacturer: z.string().min(1, "Manufacturer is required."),
+  manufacturerPartNumber: z.string().min(1, "Manufacturer part number is required."),
+  vwrPartNumber: z.string().optional(),
   uom: z.string().optional(),
+  somApprovalRequired: z.boolean().default(false),
+  costPerUnit: z.coerce.number().min(0).nullable().default(null),
   reorderThreshold: z.coerce.number().min(0, "Reorder threshold must be zero or more.").nullable().default(null),
   lots: z.array(LotSchema),
 });
@@ -113,7 +116,7 @@ export const ProductRequestFormSchema = z.object({
   lineItems: z.array(LineItemFormSchema).min(1, "At least one line item is required."),
 });
 
-export const ProductRequestStatusSchema = z.enum(['Pending Approval', 'Approved', 'In Progress', 'Completed', 'Rejected']);
+export const ProductRequestStatusSchema = z.enum(['Pending Approval', 'Approved', 'Pending SciOps Approval', 'In Progress', 'Completed', 'Rejected']);
 
 export const RequestLineItemSchema = z.object({
   id: z.string(),
@@ -145,6 +148,10 @@ export const ProductRequestSchema = z.object({
   directorRejectionNote: z.string().nullable().optional(),
   rejectedBy: z.string().nullable().optional(),
   rejectionStage: z.string().nullable().optional(),
+  somApprovalStatus: z.string().nullable().optional(),
+  sciopsDirectorApprovedAt: z.string().nullable().optional(),
+  sciopsDirectorApprovedBy: z.string().nullable().optional(),
+  somApprovalRequired: z.boolean().optional(),
   date: z.union([z.string(), z.date()]).transform(v => v instanceof Date ? v.toISOString() : v),
   lineItems: z.array(RequestLineItemSchema).default([]),
 });
@@ -214,8 +221,8 @@ export type User = {
 export type DepartmentalProduct = {
     id: string;
     name: string;
-    vendor: string;
-    vendorPartNumber: string;
+    manufacturer: string;
+    manufacturerPartNumber: string;
     quantity: number;
 };
 

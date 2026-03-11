@@ -105,11 +105,12 @@ export default function InventoryPage() {
     const [projectToEdit, setProjectToEdit] = useState<{ id: string; name: string; isActive: boolean } | null>(null);
     const [projectFormName, setProjectFormName] = useState('');
 
-    // Vendors state
-    const [appVendors, setAppVendors] = useState<{ id: string; name: string; isActive: boolean }[]>([]);
-    const [isVendorFormOpen, setIsVendorFormOpen] = useState(false);
-    const [vendorToEdit, setVendorToEdit] = useState<{ id: string; name: string; isActive: boolean } | null>(null);
-    const [vendorFormName, setVendorFormName] = useState('');
+    // Manufacturers state
+    const [appManufacturers, setAppManufacturers] = useState<{ id: string; name: string; alternateNames?: string; isActive: boolean }[]>([]);
+    const [isManufacturerFormOpen, setIsManufacturerFormOpen] = useState(false);
+    const [manufacturerToEdit, setManufacturerToEdit] = useState<{ id: string; name: string; alternateNames?: string; isActive: boolean } | null>(null);
+    const [manufacturerFormName, setManufacturerFormName] = useState('');
+    const [manufacturerFormAltNames, setManufacturerFormAltNames] = useState('');
 
     // Storage Locations state
     const [appLocations, setAppLocations] = useState<{ id: string; name: string; isActive: boolean }[]>([]);
@@ -128,7 +129,7 @@ export default function InventoryPage() {
         const demandMap = new Map<string, number>();
 
         productRequests.forEach(req => {
-            if (req.status === 'Pending Approval' || req.status === 'Approved' || req.status === 'In Progress') {
+            if (req.status === 'Pending Approval' || req.status === 'Pending SciOps Approval' || req.status === 'Approved' || req.status === 'In Progress') {
                 const lineItemTotal = (req.lineItems ?? []).reduce((sum, li) => sum + li.quantity, 0);
                 demandMap.set(req.productId, (demandMap.get(req.productId) || 0) + lineItemTotal);
             }
@@ -144,7 +145,7 @@ export default function InventoryPage() {
         const lowercasedQuery = searchQuery.toLowerCase();
         return products.filter(product =>
             product.name.toLowerCase().includes(lowercasedQuery) ||
-            product.vendorPartNumber.toLowerCase().includes(lowercasedQuery) ||
+            product.manufacturerPartNumber.toLowerCase().includes(lowercasedQuery) ||
             product.id.toLowerCase().includes(lowercasedQuery)
         );
     }, [products, searchQuery]);
@@ -237,17 +238,17 @@ export default function InventoryPage() {
 
                 // Load user management data for Admin
                 if (user.role === 'Admin') {
-                    const [usersRes, groupsRes, projectsRes, vendorsRes, locationsRes] = await Promise.all([
+                    const [usersRes, groupsRes, projectsRes, mfrsRes, locationsRes] = await Promise.all([
                         fetch('/api/users', { headers: adminHeaders }),
                         fetch('/api/functional-groups?active=false'),
                         fetch('/api/projects', { headers: adminHeaders }),
-                        fetch('/api/vendors', { headers: adminHeaders }),
+                        fetch('/api/manufacturers', { headers: adminHeaders }),
                         fetch('/api/storage-locations', { headers: adminHeaders }),
                     ]);
                     if (usersRes.ok) setAppUsers(await usersRes.json());
                     if (groupsRes.ok) setFunctionalGroups(await groupsRes.json());
                     if (projectsRes.ok) setAppProjects(await projectsRes.json());
-                    if (vendorsRes.ok) setAppVendors(await vendorsRes.json());
+                    if (mfrsRes.ok) setAppManufacturers(await mfrsRes.json());
                     if (locationsRes.ok) setAppLocations(await locationsRes.json());
                 }
             } catch (error: any) {
@@ -488,43 +489,44 @@ export default function InventoryPage() {
         }
     };
 
-    // ─── Vendor Management handlers ──────────────────────────────────────────
+    // ─── Manufacturer Management handlers ──────────────────────────────────────────
 
-    const handleOpenVendorForm = (v: { id: string; name: string; isActive: boolean } | null) => {
-        setVendorToEdit(v);
-        setVendorFormName(v ? v.name : '');
-        setIsVendorFormOpen(true);
+    const handleOpenManufacturerForm = (m: { id: string; name: string; alternateNames?: string; isActive: boolean } | null) => {
+        setManufacturerToEdit(m);
+        setManufacturerFormName(m ? m.name : '');
+        setManufacturerFormAltNames(m?.alternateNames ?? '');
+        setIsManufacturerFormOpen(true);
     };
 
-    const handleSaveVendor = async (e: React.FormEvent) => {
+    const handleSaveManufacturer = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsSaving(true);
         try {
-            const isEdit = !!vendorToEdit;
+            const isEdit = !!manufacturerToEdit;
             const res = isEdit
-                ? await fetch(`/api/vendors/${vendorToEdit!.id}`, {
+                ? await fetch(`/api/manufacturers/${manufacturerToEdit!.id}`, {
                     method: 'PUT',
                     headers: adminHeaders(),
-                    body: JSON.stringify({ name: vendorFormName }),
+                    body: JSON.stringify({ name: manufacturerFormName, alternateNames: manufacturerFormAltNames }),
                   })
-                : await fetch('/api/vendors', {
+                : await fetch('/api/manufacturers', {
                     method: 'POST',
                     headers: adminHeaders(),
-                    body: JSON.stringify({ name: vendorFormName }),
+                    body: JSON.stringify({ name: manufacturerFormName, alternateNames: manufacturerFormAltNames }),
                   });
             if (!res.ok) {
                 const body = await res.json().catch(() => ({}));
-                throw new Error((body as any).error || 'Failed to save vendor');
+                throw new Error((body as any).error || 'Failed to save manufacturer');
             }
             const saved = await res.json();
             if (isEdit) {
-                setAppVendors(prev => prev.map(v => v.id === saved.id ? saved : v));
-                toast({ title: 'Vendor Updated' });
+                setAppManufacturers(prev => prev.map(m => m.id === saved.id ? saved : m));
+                toast({ title: 'Manufacturer Updated' });
             } else {
-                setAppVendors(prev => [...prev, saved]);
-                toast({ title: 'Vendor Created' });
+                setAppManufacturers(prev => [...prev, saved]);
+                toast({ title: 'Manufacturer Created' });
             }
-            setIsVendorFormOpen(false);
+            setIsManufacturerFormOpen(false);
         } catch (error: any) {
             toast({ title: 'Error', description: error.message, variant: 'destructive' });
         } finally {
@@ -532,18 +534,18 @@ export default function InventoryPage() {
         }
     };
 
-    const handleToggleVendorStatus = async (v: { id: string; name: string; isActive: boolean }) => {
+    const handleToggleManufacturerStatus = async (m: { id: string; name: string; isActive: boolean }) => {
         setIsSaving(true);
         try {
-            const res = await fetch(`/api/vendors/${v.id}`, {
+            const res = await fetch(`/api/manufacturers/${m.id}`, {
                 method: 'PUT',
                 headers: adminHeaders(),
-                body: JSON.stringify({ isActive: !v.isActive }),
+                body: JSON.stringify({ isActive: !m.isActive }),
             });
-            if (!res.ok) throw new Error('Failed to update vendor');
+            if (!res.ok) throw new Error('Failed to update manufacturer');
             const updated = await res.json();
-            setAppVendors(prev => prev.map(vn => vn.id === updated.id ? updated : vn));
-            toast({ title: v.isActive ? 'Vendor Deactivated' : 'Vendor Activated' });
+            setAppManufacturers(prev => prev.map(mf => mf.id === updated.id ? updated : mf));
+            toast({ title: m.isActive ? 'Manufacturer Deactivated' : 'Manufacturer Activated' });
         } catch (error: any) {
             toast({ title: 'Error', description: error.message, variant: 'destructive' });
         } finally {
@@ -763,8 +765,8 @@ export default function InventoryPage() {
             const newDeptProduct: DepartmentalProduct = {
                 id: coreProduct.id,
                 name: coreProduct.name,
-                vendor: coreProduct.vendor,
-                vendorPartNumber: coreProduct.vendorPartNumber,
+                manufacturer: coreProduct.manufacturer,
+                manufacturerPartNumber: coreProduct.manufacturerPartNumber,
                 quantity: quantity,
             };
             deptProducts.push(newDeptProduct);
@@ -956,10 +958,14 @@ export default function InventoryPage() {
     const handleConfirmApproveRequest = async () => {
         if (!requestToApprove || !user) return;
         setIsSaving(true);
+        const isSciOps = requestToApprove.status === 'Pending SciOps Approval';
+        const endpoint = isSciOps
+            ? `/api/requests/${requestToApprove.id}/sciops-approve`
+            : `/api/requests/${requestToApprove.id}/approve`;
         try {
-            const res = await fetch(`/api/requests/${requestToApprove.id}/approve`, {
+            const res = await fetch(endpoint, {
                 method: 'PUT',
-                headers: { 'Content-Type': 'application/json', 'x-user-role': user.role, 'x-user-id': user.id ?? '' },
+                headers: { 'Content-Type': 'application/json', 'x-user-role': user.role, 'x-user-id': user.id ?? '', 'x-user-functional-group': user.functionalGroupId ?? '' },
                 body: JSON.stringify({ comments: approveComments.trim() || undefined }),
             });
             if (!res.ok) {
@@ -1006,10 +1012,14 @@ export default function InventoryPage() {
             return;
         }
         setIsSaving(true);
+        const isSciOps = requestToReject.status === 'Pending SciOps Approval';
+        const endpoint = isSciOps
+            ? `/api/requests/${requestToReject.id}/sciops-reject`
+            : `/api/requests/${requestToReject.id}/reject`;
         try {
-            const res = await fetch(`/api/requests/${requestToReject.id}/reject`, {
+            const res = await fetch(endpoint, {
                 method: 'PUT',
-                headers: { 'Content-Type': 'application/json', 'x-user-role': user.role, 'x-user-id': user.id ?? '' },
+                headers: { 'Content-Type': 'application/json', 'x-user-role': user.role, 'x-user-id': user.id ?? '', 'x-user-functional-group': user.functionalGroupId ?? '' },
                 body: JSON.stringify({ rejectionNote }),
             });
             if (!res.ok) {
@@ -1074,7 +1084,7 @@ export default function InventoryPage() {
             complete: async (results) => {
                 try {
                     const requiredHeaders = [
-                        'product_id', 'product_name', 'vendor', 'vendor_part_number', 'location',
+                        'product_id', 'product_name', 'manufacturer', 'manufacturer_part_number', 'location',
                         'lot_number', 'quantity', 'receipt_date', 'expiration_date', 'reorder_threshold', 'notes'
                     ];
                     const headers = results.meta.fields || [];
@@ -1085,7 +1095,7 @@ export default function InventoryPage() {
                     const importedProductsMap = new Map<string, any>();
                     for (const row of results.data) {
                         const {
-                            product_id, product_name, vendor, vendor_part_number, location,
+                            product_id, product_name, manufacturer, manufacturer_part_number, location,
                             lot_number, quantity, receipt_date, expiration_date, reorder_threshold, notes
                         } = row;
                         if (!product_id || !product_name || !lot_number) continue;
@@ -1105,8 +1115,8 @@ export default function InventoryPage() {
                             importedProductsMap.set(product_id, {
                                 id: product_id,
                                 name: product_name,
-                                vendor,
-                                vendorPartNumber: vendor_part_number,
+                                manufacturer,
+                                manufacturerPartNumber: manufacturer_part_number,
                                 reorderThreshold: reorder_threshold ? parseInt(reorder_threshold, 10) : null,
                                 lots: [lot],
                             });
@@ -1178,8 +1188,8 @@ export default function InventoryPage() {
             product.lots.map(lot => ({
                 'product_id': product.id,
                 'product_name': product.name,
-                'vendor': product.vendor,
-                'vendor_part_number': product.vendorPartNumber,
+                'manufacturer': product.manufacturer,
+                'manufacturer_part_number': product.manufacturerPartNumber,
                 'reorder_threshold': product.reorderThreshold ?? '',
                 'lot_id': lot.id,
                 'lot_number': lot.lotNumber,
@@ -1295,6 +1305,7 @@ export default function InventoryPage() {
     const getStatusBadge = (status: ProductRequestStatus) => {
         const statusConfig: Record<ProductRequestStatus, { color: string; icon: React.ElementType }> = {
             'Pending Approval': { color: 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200', icon: Hourglass },
+            'Pending SciOps Approval': { color: 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200', icon: Hourglass },
             'Approved': { color: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200', icon: CheckCircle2 },
             'In Progress': { color: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200', icon: ArrowRightLeft },
             'Completed': { color: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200', icon: CheckCircle2 },
@@ -1472,8 +1483,9 @@ export default function InventoryPage() {
                                                 <TableRow style={{ backgroundColor: '#f8fafc' }}>
                                                     {user.role === 'Admin' && <TableHead className="w-[50px]"></TableHead>}
                                                     <TableHead className="text-[11.5px] font-semibold uppercase tracking-wider" style={{ color: '#64748b' }}>Product</TableHead>
-                                                    <TableHead className="text-[11.5px] font-semibold uppercase tracking-wider" style={{ color: '#64748b' }}>Vendor</TableHead>
-                                                    <TableHead className="text-[11.5px] font-semibold uppercase tracking-wider" style={{ color: '#64748b' }}>Vendor Part #</TableHead>
+                                                    <TableHead className="text-[11.5px] font-semibold uppercase tracking-wider" style={{ color: '#64748b' }}>Manufacturer</TableHead>
+                                                    <TableHead className="text-[11.5px] font-semibold uppercase tracking-wider" style={{ color: '#64748b' }}>Mfr Part #</TableHead>
+                                                    <TableHead className="text-[11.5px] font-semibold uppercase tracking-wider" style={{ color: '#64748b' }}>VWR Part #</TableHead>
                                                     <TableHead className="text-[11.5px] font-semibold uppercase tracking-wider" style={{ color: '#64748b' }}>UoM</TableHead>
                                                     {user.role === 'Admin' && <TableHead className="text-[11.5px] font-semibold uppercase tracking-wider" style={{ color: '#64748b' }}>Total Quantity</TableHead>}
                                                     {user.role === 'Admin' && <TableHead className="text-[11.5px] font-semibold uppercase tracking-wider" style={{ color: '#64748b' }}>Needed</TableHead>}
@@ -1513,8 +1525,9 @@ export default function InventoryPage() {
                                                                     <TableCell className="font-medium">
                                                                         <div className="flex items-center gap-3"><Package className="h-5 w-5 text-muted-foreground"/><div><div>{product.name}</div><div className="text-xs text-muted-foreground">{product.id}</div></div></div>
                                                                     </TableCell>
-                                                                    <TableCell>{product.vendor}</TableCell>
-                                                                    <TableCell>{product.vendorPartNumber}</TableCell>
+                                                                    <TableCell>{product.manufacturer}</TableCell>
+                                                                    <TableCell>{product.manufacturerPartNumber}</TableCell>
+                                                                    <TableCell>{(product as any).vwrPartNumber ?? ''}</TableCell>
                                                                     <TableCell>{product.uom ?? '—'}</TableCell>
                                                                     {user.role === 'Admin' && (
                                                                         <TableCell>
@@ -1683,7 +1696,7 @@ export default function InventoryPage() {
                                                                     </TableCell>
                                                                     <TableCell>
                                                                         <div>{req.productName}</div>
-                                                                        <div className="text-xs" style={{ color: '#64748b' }}>{req.productId}</div>
+                                                                        <div className="text-xs" style={{ color: '#64748b' }}>{(req as any).manufacturerPartNumber || '\u2014'}</div>
                                                                     </TableCell>
                                                                     <TableCell>{format(new Date(req.date), 'PPP')}</TableCell>
                                                                     <TableCell>{getStatusBadge(req.status)}</TableCell>
@@ -1787,12 +1800,13 @@ export default function InventoryPage() {
                                                     <TableHead className="text-[11.5px] font-semibold uppercase tracking-wider" style={{ color: '#64748b' }}>Product</TableHead>
                                                     <TableHead className="text-[11.5px] font-semibold uppercase tracking-wider" style={{ color: '#64748b' }}>Total Items</TableHead>
                                                     <TableHead className="text-[11.5px] font-semibold uppercase tracking-wider" style={{ color: '#64748b' }}>Submitted</TableHead>
+                                                    <TableHead className="text-[11.5px] font-semibold uppercase tracking-wider" style={{ color: '#64748b' }}>Status</TableHead>
                                                     <TableHead className="text-[11.5px] font-semibold uppercase tracking-wider text-right" style={{ color: '#64748b' }}>Actions</TableHead>
                                                 </TableRow>
                                             </TableHeader>
                                             <TableBody>
-                                                {productRequests.filter(r => r.status === 'Pending Approval').length > 0 ? (
-                                                    productRequests.filter(r => r.status === 'Pending Approval').map(req => {
+                                                {productRequests.filter(r => r.status === 'Pending Approval' || r.status === 'Pending SciOps Approval').length > 0 ? (
+                                                    productRequests.filter(r => r.status === 'Pending Approval' || r.status === 'Pending SciOps Approval').map(req => {
                                                         const isOpen = openRequestIds.has(req.id);
                                                         const totalItems = (req.lineItems ?? []).reduce((sum, li) => sum + li.quantity, 0);
                                                         return (
@@ -1815,10 +1829,11 @@ export default function InventoryPage() {
                                                                     </TableCell>
                                                                     <TableCell>
                                                                         <div>{req.productName}</div>
-                                                                        <div className="text-xs" style={{ color: '#64748b' }}>{req.productId}</div>
+                                                                        <div className="text-xs" style={{ color: '#64748b' }}>{(req as any).manufacturerPartNumber || '\u2014'}</div>
                                                                     </TableCell>
                                                                     <TableCell>{totalItems}</TableCell>
                                                                     <TableCell>{format(new Date(req.date), 'PPP')}</TableCell>
+                                                                    <TableCell>{getStatusBadge(req.status)}</TableCell>
                                                                     <TableCell className="text-right">
                                                                         <div className="flex gap-2 justify-end">
                                                                             <Button size="sm" variant="outline" disabled={isSaving} onClick={() => handleRejectRequest(req)}>Reject</Button>
@@ -1828,7 +1843,7 @@ export default function InventoryPage() {
                                                                 </TableRow>
                                                                 {isOpen && (
                                                                     <TableRow className="bg-muted/50 hover:bg-muted/50">
-                                                                        <TableCell colSpan={7} className="p-4">
+                                                                        <TableCell colSpan={8} className="p-4">
                                                                             <div className="space-y-4">
                                                                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-2">
                                                                                     <div>
@@ -1870,7 +1885,7 @@ export default function InventoryPage() {
                                                     })
                                                 ) : (
                                                     <TableRow>
-                                                        <TableCell colSpan={7} className="h-24 text-center">No pending approvals for your group.</TableCell>
+                                                        <TableCell colSpan={8} className="h-24 text-center">No pending approvals for your group.</TableCell>
                                                     </TableRow>
                                                 )}
                                             </TableBody>
@@ -1921,7 +1936,7 @@ export default function InventoryPage() {
                                                             </TableCell>
                                                             <TableCell>
                                                                 <div>{req.productName}</div>
-                                                                <div className="text-xs" style={{ color: '#64748b' }}>{req.productId}</div>
+                                                                <div className="text-xs" style={{ color: '#64748b' }}>{(req as any).manufacturerPartNumber || '\u2014'}</div>
                                                             </TableCell>
                                                             <TableCell>
                                                                 <div>{req.requestorName}</div>
@@ -2331,18 +2346,18 @@ export default function InventoryPage() {
                                 </div>
                 )}
 
-                {/* ── Config: Vendors ──────────────────────────── */}
-                {activeView === 'config-vendors' && user.role === 'Admin' && (
+                {/* ── Config: Manufacturers ──────────────────────────── */}
+                {activeView === 'config-manufacturers' && user.role === 'Admin' && (
                                 <div className="space-y-6">
                                     <div style={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: 12 }}>
                                         <div className="p-6 pb-4">
                                             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                                                 <div>
-                                                    <h2 className="text-lg font-semibold flex items-center gap-2" style={{ color: '#0f2a2a' }}>Vendors</h2>
-                                                    <p className="text-sm" style={{ color: '#64748b' }}>Manage vendors/manufacturers for products.</p>
+                                                    <h2 className="text-lg font-semibold flex items-center gap-2" style={{ color: '#0f2a2a' }}>Manufacturers</h2>
+                                                    <p className="text-sm" style={{ color: '#64748b' }}>Manage manufacturers for products.</p>
                                                 </div>
-                                                <Button onClick={() => handleOpenVendorForm(null)} style={{ backgroundColor: '#1a7070' }}>
-                                                    <PlusCircle className="mr-2 h-4 w-4" /> Add Vendor
+                                                <Button onClick={() => handleOpenManufacturerForm(null)} style={{ backgroundColor: '#1a7070' }}>
+                                                    <PlusCircle className="mr-2 h-4 w-4" /> Add Manufacturer
                                                 </Button>
                                             </div>
                                         </div>
@@ -2350,41 +2365,46 @@ export default function InventoryPage() {
                                             <Table>
                                                 <TableHeader>
                                                     <TableRow>
-                                                        <TableHead>Vendor Name</TableHead>
+                                                        <TableHead>Manufacturer Name</TableHead>
                                                         <TableHead>Status</TableHead>
                                                         <TableHead className="text-right">Actions</TableHead>
                                                     </TableRow>
                                                 </TableHeader>
                                                 <TableBody>
-                                                    {appVendors.length === 0 && (
-                                                        <TableRow><TableCell colSpan={3} className="text-center text-muted-foreground py-8">No vendors found.</TableCell></TableRow>
+                                                    {appManufacturers.length === 0 && (
+                                                        <TableRow><TableCell colSpan={3} className="text-center text-muted-foreground py-8">No manufacturers found.</TableCell></TableRow>
                                                     )}
-                                                    {appVendors.map(v => (
-                                                        <TableRow key={v.id}>
-                                                            <TableCell className="font-medium">{v.name}</TableCell>
+                                                    {appManufacturers.map(m => (
+                                                        <TableRow key={m.id}>
                                                             <TableCell>
-                                                                <Badge className={v.isActive ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400'}>
-                                                                    {v.isActive ? <CheckCircle2 className="mr-1 h-3 w-3" /> : <XCircle className="mr-1 h-3 w-3" />}
-                                                                    {v.isActive ? 'Active' : 'Inactive'}
+                                                                <span className="font-medium">{m.name}</span>
+                                                                {m.alternateNames && (
+                                                                    <p className="text-xs mt-0.5" style={{ color: '#94a3b8' }}>{m.alternateNames}</p>
+                                                                )}
+                                                            </TableCell>
+                                                            <TableCell>
+                                                                <Badge className={m.isActive ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400'}>
+                                                                    {m.isActive ? <CheckCircle2 className="mr-1 h-3 w-3" /> : <XCircle className="mr-1 h-3 w-3" />}
+                                                                    {m.isActive ? 'Active' : 'Inactive'}
                                                                 </Badge>
                                                             </TableCell>
                                                             <TableCell className="text-right">
                                                                 <div className="flex justify-end gap-1">
                                                                     <Tooltip>
                                                                         <TooltipTrigger asChild>
-                                                                            <Button size="sm" variant="ghost" onClick={() => handleOpenVendorForm(v)}>
+                                                                            <Button size="sm" variant="ghost" onClick={() => handleOpenManufacturerForm(m)}>
                                                                                 <Pencil className="h-4 w-4" />
                                                                             </Button>
                                                                         </TooltipTrigger>
-                                                                        <TooltipContent>Rename vendor</TooltipContent>
+                                                                        <TooltipContent>Edit manufacturer</TooltipContent>
                                                                     </Tooltip>
                                                                     <Tooltip>
                                                                         <TooltipTrigger asChild>
-                                                                            <Button size="sm" variant="ghost" onClick={() => handleToggleVendorStatus(v)}>
-                                                                                {v.isActive ? <XCircle className="h-4 w-4 text-destructive" /> : <CheckCircle2 className="h-4 w-4 text-green-600" />}
+                                                                            <Button size="sm" variant="ghost" onClick={() => handleToggleManufacturerStatus(m)}>
+                                                                                {m.isActive ? <XCircle className="h-4 w-4 text-destructive" /> : <CheckCircle2 className="h-4 w-4 text-green-600" />}
                                                                             </Button>
                                                                         </TooltipTrigger>
-                                                                        <TooltipContent>{v.isActive ? 'Deactivate vendor' : 'Activate vendor'}</TooltipContent>
+                                                                        <TooltipContent>{m.isActive ? 'Deactivate manufacturer' : 'Activate manufacturer'}</TooltipContent>
                                                                     </Tooltip>
                                                                 </div>
                                                             </TableCell>
@@ -2478,35 +2498,35 @@ export default function InventoryPage() {
                     </DialogHeader>
                     <form onSubmit={handleSaveUser} className="flex flex-col gap-4 pt-2">
                         <div className="flex flex-col gap-1.5">
-                            <Label htmlFor="uf-fullname">Full Name</Label>
-                            <Input id="uf-fullname" value={userFormData.fullName} onChange={e => setUserFormData(p => ({ ...p, fullName: e.target.value }))} required placeholder="Jane Smith" />
+                            <Label htmlFor="uf-fullname" style={{ color: '#475569', fontSize: 11, textTransform: 'uppercase', fontWeight: 600 }}>Full Name<span style={{ color: '#ef4444' }}> *</span></Label>
+                            <Input id="uf-fullname" value={userFormData.fullName} onChange={e => setUserFormData(p => ({ ...p, fullName: e.target.value }))} required placeholder="Jane Smith" style={{ backgroundColor: '#fff', border: '1px solid #cbd5e1', borderRadius: 8 }} />
                         </div>
                         <div className="flex flex-col gap-1.5">
-                            <Label htmlFor="uf-email">Email</Label>
-                            <Input id="uf-email" type="email" value={userFormData.email} onChange={e => setUserFormData(p => ({ ...p, email: e.target.value }))} required placeholder="jane@nih.gov" />
+                            <Label htmlFor="uf-email" style={{ color: '#475569', fontSize: 11, textTransform: 'uppercase', fontWeight: 600 }}>Email<span style={{ color: '#ef4444' }}> *</span></Label>
+                            <Input id="uf-email" type="email" value={userFormData.email} onChange={e => setUserFormData(p => ({ ...p, email: e.target.value }))} required placeholder="jane@nih.gov" style={{ backgroundColor: '#fff', border: '1px solid #cbd5e1', borderRadius: 8 }} />
                         </div>
                         {!userToEdit && (
                             <div className="flex flex-col gap-1.5">
-                                <Label htmlFor="uf-password">Temporary Password</Label>
-                                <Input id="uf-password" type="password" value={userFormData.password} onChange={e => setUserFormData(p => ({ ...p, password: e.target.value }))} required minLength={8} placeholder="Min. 8 characters" />
+                                <Label htmlFor="uf-password" style={{ color: '#475569', fontSize: 11, textTransform: 'uppercase', fontWeight: 600 }}>Temporary Password<span style={{ color: '#ef4444' }}> *</span></Label>
+                                <Input id="uf-password" type="password" value={userFormData.password} onChange={e => setUserFormData(p => ({ ...p, password: e.target.value }))} required minLength={8} placeholder="Min. 8 characters" style={{ backgroundColor: '#fff', border: '1px solid #cbd5e1', borderRadius: 8 }} />
                             </div>
                         )}
                         <div className="flex flex-col gap-1.5">
-                            <Label htmlFor="uf-role">Role</Label>
+                            <Label htmlFor="uf-role" style={{ color: '#475569', fontSize: 11, textTransform: 'uppercase', fontWeight: 600 }}>Role</Label>
                             <Select value={userFormData.role} onValueChange={v => setUserFormData(p => ({ ...p, role: v as UserRole }))}>
-                                <SelectTrigger id="uf-role"><SelectValue /></SelectTrigger>
+                                <SelectTrigger id="uf-role" style={{ backgroundColor: '#fff', border: '1px solid #cbd5e1', borderRadius: 8 }}><SelectValue /></SelectTrigger>
                                 <SelectContent>
                                     {USER_ROLES.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}
                                 </SelectContent>
                             </Select>
                         </div>
                         <div className="flex flex-col gap-1.5">
-                            <Label htmlFor="uf-group">Functional Group</Label>
+                            <Label htmlFor="uf-group" style={{ color: '#475569', fontSize: 11, textTransform: 'uppercase', fontWeight: 600 }}>Functional Group</Label>
                             {userFormData.role === 'Director' && (
                                 <p className="text-xs text-amber-600 flex items-center gap-1"><ShieldAlert className="h-3 w-3" /> Only one active Director is allowed per group.</p>
                             )}
                             <Select value={userFormData.functionalGroupId || 'none'} onValueChange={v => setUserFormData(p => ({ ...p, functionalGroupId: v === 'none' ? '' : v }))}>
-                                <SelectTrigger id="uf-group"><SelectValue placeholder="None" /></SelectTrigger>
+                                <SelectTrigger id="uf-group" style={{ backgroundColor: '#fff', border: '1px solid #cbd5e1', borderRadius: 8 }}><SelectValue placeholder="None" /></SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value="none">None</SelectItem>
                                     {functionalGroups.filter(g => g.isActive).map(g => <SelectItem key={g.id} value={g.id}>{g.name}</SelectItem>)}
@@ -2535,8 +2555,8 @@ export default function InventoryPage() {
                     </DialogHeader>
                     <form onSubmit={handleSaveGroup} className="flex flex-col gap-4 pt-2">
                         <div className="flex flex-col gap-1.5">
-                            <Label htmlFor="gf-name">Group Name</Label>
-                            <Input id="gf-name" value={groupFormName} onChange={e => setGroupFormName(e.target.value)} required placeholder="e.g., Formulation Development" />
+                            <Label htmlFor="gf-name" style={{ color: '#475569', fontSize: 11, textTransform: 'uppercase', fontWeight: 600 }}>Group Name<span style={{ color: '#ef4444' }}> *</span></Label>
+                            <Input id="gf-name" value={groupFormName} onChange={e => setGroupFormName(e.target.value)} required placeholder="e.g., Formulation Development" style={{ backgroundColor: '#fff', border: '1px solid #cbd5e1', borderRadius: 8 }} />
                         </div>
                         <div className="flex justify-end gap-2">
                             <Button type="button" variant="outline" onClick={() => setIsGroupFormOpen(false)}>Cancel</Button>
@@ -2560,8 +2580,8 @@ export default function InventoryPage() {
                     </DialogHeader>
                     <form onSubmit={handleSaveProject} className="flex flex-col gap-4 pt-2">
                         <div className="flex flex-col gap-1.5">
-                            <Label htmlFor="pf-name">Project Name</Label>
-                            <Input id="pf-name" value={projectFormName} onChange={e => setProjectFormName(e.target.value)} required placeholder="e.g., Project Alpha" />
+                            <Label htmlFor="pf-name" style={{ color: '#475569', fontSize: 11, textTransform: 'uppercase', fontWeight: 600 }}>Project Name<span style={{ color: '#ef4444' }}> *</span></Label>
+                            <Input id="pf-name" value={projectFormName} onChange={e => setProjectFormName(e.target.value)} required placeholder="e.g., Project Alpha" style={{ backgroundColor: '#fff', border: '1px solid #cbd5e1', borderRadius: 8 }} />
                         </div>
                         <div className="flex justify-end gap-2">
                             <Button type="button" variant="outline" onClick={() => setIsProjectFormOpen(false)}>Cancel</Button>
@@ -2574,25 +2594,30 @@ export default function InventoryPage() {
                 </DialogContent>
             </Dialog>
 
-            {/* ── Vendor Form Dialog ──────────────────────────────── */}
-            <Dialog open={isVendorFormOpen} onOpenChange={setIsVendorFormOpen}>
+            {/* ── Manufacturer Form Dialog ──────────────────────────────── */}
+            <Dialog open={isManufacturerFormOpen} onOpenChange={setIsManufacturerFormOpen}>
                 <DialogContent className="max-w-sm">
                     <DialogHeader>
-                        <DialogTitle>{vendorToEdit ? 'Rename Vendor' : 'Add Vendor'}</DialogTitle>
+                        <DialogTitle>{manufacturerToEdit ? 'Edit Manufacturer' : 'Add Manufacturer'}</DialogTitle>
                         <DialogDescription>
-                            {vendorToEdit ? 'Update the name of this vendor.' : 'Add a new vendor to the system.'}
+                            {manufacturerToEdit ? 'Update the manufacturer details.' : 'Add a new manufacturer to the system.'}
                         </DialogDescription>
                     </DialogHeader>
-                    <form onSubmit={handleSaveVendor} className="flex flex-col gap-4 pt-2">
+                    <form onSubmit={handleSaveManufacturer} className="flex flex-col gap-4 pt-2">
                         <div className="flex flex-col gap-1.5">
-                            <Label htmlFor="vf-name">Vendor Name</Label>
-                            <Input id="vf-name" value={vendorFormName} onChange={e => setVendorFormName(e.target.value)} required placeholder="e.g., Genentech" />
+                            <Label htmlFor="mf-name" style={{ color: '#475569', fontSize: 11, textTransform: 'uppercase', fontWeight: 600 }}>Manufacturer Name<span style={{ color: '#ef4444' }}> *</span></Label>
+                            <Input id="mf-name" value={manufacturerFormName} onChange={e => setManufacturerFormName(e.target.value)} required placeholder="e.g., Genentech" style={{ backgroundColor: '#fff', border: '1px solid #cbd5e1', borderRadius: 8 }} />
+                        </div>
+                        <div className="flex flex-col gap-1.5">
+                            <Label htmlFor="mf-altnames" style={{ color: '#475569', fontSize: 11, textTransform: 'uppercase', fontWeight: 600 }}>Alternate Names (optional)</Label>
+                            <Input id="mf-altnames" value={manufacturerFormAltNames} onChange={e => setManufacturerFormAltNames(e.target.value)} placeholder="e.g., Roche, Hoffman-La Roche" style={{ backgroundColor: '#fff', border: '1px solid #cbd5e1', borderRadius: 8 }} />
+                            <p className="text-xs" style={{ color: '#94a3b8' }}>Comma-separated alternate names</p>
                         </div>
                         <div className="flex justify-end gap-2">
-                            <Button type="button" variant="outline" onClick={() => setIsVendorFormOpen(false)}>Cancel</Button>
+                            <Button type="button" variant="outline" onClick={() => setIsManufacturerFormOpen(false)}>Cancel</Button>
                             <Button type="submit" disabled={isSaving}>
                                 {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                                {vendorToEdit ? 'Save Changes' : 'Create Vendor'}
+                                {manufacturerToEdit ? 'Save Changes' : 'Create Manufacturer'}
                             </Button>
                         </div>
                     </form>
@@ -2610,8 +2635,8 @@ export default function InventoryPage() {
                     </DialogHeader>
                     <form onSubmit={handleSaveLocation} className="flex flex-col gap-4 pt-2">
                         <div className="flex flex-col gap-1.5">
-                            <Label htmlFor="lf-name">Location Name</Label>
-                            <Input id="lf-name" value={locationFormName} onChange={e => setLocationFormName(e.target.value)} required placeholder="e.g., Room 101, Shelf A" />
+                            <Label htmlFor="lf-name" style={{ color: '#475569', fontSize: 11, textTransform: 'uppercase', fontWeight: 600 }}>Location Name<span style={{ color: '#ef4444' }}> *</span></Label>
+                            <Input id="lf-name" value={locationFormName} onChange={e => setLocationFormName(e.target.value)} required placeholder="e.g., Room 101, Shelf A" style={{ backgroundColor: '#fff', border: '1px solid #cbd5e1', borderRadius: 8 }} />
                         </div>
                         <div className="flex justify-end gap-2">
                             <Button type="button" variant="outline" onClick={() => setIsLocationFormOpen(false)}>Cancel</Button>
@@ -2692,7 +2717,7 @@ export default function InventoryPage() {
                     </DialogHeader>
                     <div className="text-sm bg-muted p-4 rounded-md overflow-x-auto">
                         <code className="font-mono whitespace-nowrap">
-                            product_id,product_name,vendor,vendor_part_number,location,lot_number,quantity,receipt_date,expiration_date,reorder_threshold,notes
+                            product_id,product_name,manufacturer,manufacturer_part_number,location,lot_number,quantity,receipt_date,expiration_date,reorder_threshold,notes
                         </code>
                     </div>
                     <p className="text-sm text-muted-foreground">

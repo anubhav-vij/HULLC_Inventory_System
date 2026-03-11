@@ -172,11 +172,20 @@ export async function PUT(request: Request, { params }: RouteContext) {
         );
       }
 
+      // Check if the product requires SOM approval
+      const { rows: productRows } = await client.query<{ som_approval_required: boolean }>(
+        'SELECT som_approval_required FROM products WHERE id = (SELECT product_id FROM product_requests WHERE id = $1)',
+        [id]
+      );
+      const somRequired = productRows.length > 0 && productRows[0].som_approval_required;
+      const newStatus = somRequired ? 'Pending SciOps Approval' : 'Approved';
+
       await client.query(
         `UPDATE product_requests
-         SET status = 'Approved', director_id = $1, director_approved_at = NOW(), director_comments = $2
-         WHERE id = $3`,
-        [userId, comments, id]
+         SET status = $1, director_id = $2, director_approved_at = NOW(), director_comments = $3,
+             som_approval_status = CASE WHEN $4 THEN 'pending' ELSE som_approval_status END
+         WHERE id = $5`,
+        [newStatus, userId, comments, somRequired, id]
       );
 
       const { rows: full } = await client.query<RequestRow>(

@@ -52,7 +52,7 @@ export function DepartmentalPage({ user, onLogout }: DepartmentalPageProps) {
         const lowercasedQuery = searchQuery.toLowerCase();
         return products.filter(p =>
             p.name.toLowerCase().includes(lowercasedQuery) ||
-            p.vendorPartNumber.toLowerCase().includes(lowercasedQuery) ||
+            p.manufacturerPartNumber.toLowerCase().includes(lowercasedQuery) ||
             p.id.toLowerCase().includes(lowercasedQuery)
         );
     }, [products, searchQuery]);
@@ -275,7 +275,7 @@ export function DepartmentalPage({ user, onLogout }: DepartmentalPageProps) {
                                                         <TableCell className="font-medium">
                                                             <div className="flex items-center gap-3"><Package className="h-5 w-5 text-muted-foreground"/><div><div>{product.name}</div><div className="text-xs text-muted-foreground">{product.id}</div></div></div>
                                                         </TableCell>
-                                                        <TableCell>{product.vendorPartNumber}</TableCell>
+                                                        <TableCell>{product.manufacturerPartNumber}</TableCell>
                                                         <TableCell><Badge variant={product.quantity === 0 ? "destructive" : "secondary"}>{product.quantity}</Badge></TableCell>
                                                         <TableCell className="text-right">
                                                             {isAdmin ? (

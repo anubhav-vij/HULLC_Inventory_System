@@ -44,7 +44,7 @@ const NAV_ITEMS: NavItem[] = [
       { id: "config-users", label: "Users", icon: Users },
       { id: "config-groups", label: "Functional Groups", icon: Building2 },
       { id: "config-projects", label: "Projects", icon: FolderKanban },
-      { id: "config-vendors", label: "Vendors", icon: Factory },
+      { id: "config-manufacturers", label: "Manufacturers", icon: Factory },
       { id: "config-locations", label: "Storage Locations", icon: MapPin },
     ],
   },

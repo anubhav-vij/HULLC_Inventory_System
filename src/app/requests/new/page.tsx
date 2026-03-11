@@ -40,8 +40,9 @@ function NewRequestForm() {
   const [justification, setJustification] = useState('');
   const [sopRead, setSopRead] = useState(false);
   const [lineItemErrors, setLineItemErrors] = useState<Record<string, string>>({});
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = new Date().toLocaleDateString('en-CA');
 
   const [lineItems, setLineItems] = useState<LineItem[]>([
     { id: crypto.randomUUID(), requestedDate: '', quantity: 1 },
@@ -114,45 +115,42 @@ function NewRequestForm() {
     e.preventDefault();
     if (!user || !product) return;
 
+    const errors: Record<string, string> = {};
+
     if (!project) {
-      toast({ title: 'Validation Error', description: 'Please select a project.', variant: 'destructive' });
-      return;
+      errors.project = 'Please select a project.';
     }
 
     if (!justification.trim()) {
-      toast({ title: 'Validation Error', description: 'Justification is required.', variant: 'destructive' });
-      return;
+      errors.justification = 'Justification is required.';
     }
 
     if (!sopRead) {
-      toast({ title: 'Validation Error', description: 'You must confirm you have read the SOP.', variant: 'destructive' });
-      return;
+      errors.sopRead = 'You must confirm you have read the SOP.';
     }
 
     if (lineItems.length === 0) {
-      toast({ title: 'Validation Error', description: 'At least one line item is required.', variant: 'destructive' });
-      return;
+      errors.lineItems = 'At least one line item is required.';
     }
 
+    const newLineItemErrors: Record<string, string> = {};
+    const todayDate = new Date().toLocaleDateString('en-CA');
     for (const li of lineItems) {
       if (!li.requestedDate) {
-        toast({ title: 'Validation Error', description: 'All line items must have a date.', variant: 'destructive' });
-        return;
+        newLineItemErrors[li.id] = 'Date is required.';
+      } else if (li.requestedDate < todayDate) {
+        newLineItemErrors[li.id] = 'Date must be today or in the future.';
       }
       if (li.quantity < 1) {
-        toast({ title: 'Validation Error', description: 'All quantities must be at least 1.', variant: 'destructive' });
-        return;
+        newLineItemErrors[`${li.id}-qty`] = 'Quantity must be at least 1.';
       }
     }
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    for (const li of lineItems) {
-      const d = new Date(li.requestedDate);
-      if (d < today) {
-        toast({ title: 'Validation Error', description: 'Requested dates must be today or in the future.', variant: 'destructive' });
-        return;
-      }
+    setFormErrors(errors);
+    setLineItemErrors(newLineItemErrors);
+
+    if (Object.keys(errors).length > 0 || Object.keys(newLineItemErrors).length > 0) {
+      return;
     }
 
     setIsSaving(true);
@@ -215,52 +213,65 @@ function NewRequestForm() {
       </div>
 
       <div className="p-8 max-w-3xl">
+        <div className="mb-4 flex items-center gap-2" style={{ backgroundColor: '#fefce8', border: '1px solid #fde68a', borderRadius: 8, padding: '10px 16px', fontSize: 13, color: '#92400e' }}>
+          <span style={{ color: '#ef4444' }}>*</span> Required fields are marked with an asterisk
+        </div>
         <form onSubmit={handleSubmit}>
           <div className="space-y-6">
             {/* Product Info */}
-            <div style={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: 12 }} className="p-6">
-              <h2 className="text-lg font-semibold mb-1" style={{ color: '#0f2a2a' }}>Product</h2>
-              <p className="text-sm mb-4" style={{ color: '#64748b' }}>The product you are requesting.</p>
-              <div className="flex flex-col gap-4">
+            <div style={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: 12 }}>
+              <div style={{ backgroundColor: '#f1f5f9', borderBottom: '1px solid #e2e8f0', borderRadius: '12px 12px 0 0', padding: '14px 16px' }}>
+                <h3 style={{ color: '#0f2a2a', fontSize: '15px', fontWeight: 700, margin: 0 }}>Product</h3>
+              </div>
+              <div style={{ backgroundColor: '#f8fafc', padding: 20, borderRadius: '0 0 12px 12px' }} className="flex flex-col gap-4">
                 <div className="flex flex-col gap-1.5">
-                  <Label>Product Name</Label>
-                  <Input value={product.name} readOnly className="bg-muted" />
+                  <Label style={{ color: '#475569', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>Product Name</Label>
+                  <Input value={product.name} readOnly style={{ backgroundColor: '#fff', border: '1px solid #cbd5e1', borderRadius: 8 }} className="bg-muted" />
                 </div>
                 <div className="flex flex-col gap-1.5">
-                  <Label>Product ID</Label>
-                  <Input value={product.id} readOnly className="bg-muted" />
+                  <Label style={{ color: '#475569', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>Manufacturer Part #</Label>
+                  <Input value={(product as any).manufacturerPartNumber ?? ''} readOnly style={{ backgroundColor: '#fff', border: '1px solid #cbd5e1', borderRadius: 8 }} className="bg-muted" />
                 </div>
+                {(product as any).somApprovalRequired && (
+                  <div>
+                    <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium" style={{ backgroundColor: '#fff7ed', color: '#c2410c' }}>SOM</span>
+                    <span className="text-xs ml-2" style={{ color: '#64748b' }}>This product requires SOM approval</span>
+                  </div>
+                )}
               </div>
             </div>
 
             {/* Requestor Info */}
-            <div style={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: 12 }} className="p-6">
-              <h2 className="text-lg font-semibold mb-1" style={{ color: '#0f2a2a' }}>Requestor Information</h2>
-              <p className="text-sm mb-4" style={{ color: '#64748b' }}>Your details from your account.</p>
-              <div className="flex flex-col gap-4">
+            <div style={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: 12 }}>
+              <div style={{ backgroundColor: '#f1f5f9', borderBottom: '1px solid #e2e8f0', borderRadius: '12px 12px 0 0', padding: '14px 16px' }}>
+                <h3 style={{ color: '#0f2a2a', fontSize: '15px', fontWeight: 700, margin: 0 }}>Requestor Information</h3>
+              </div>
+              <div style={{ backgroundColor: '#f8fafc', padding: 20, borderRadius: '0 0 12px 12px' }} className="flex flex-col gap-4">
                 <div className="flex flex-col gap-1.5">
-                  <Label>Name</Label>
-                  <Input value={user.fullName ?? ''} readOnly className="bg-muted" />
+                  <Label style={{ color: '#475569', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>Name</Label>
+                  <Input value={user.fullName ?? ''} readOnly style={{ backgroundColor: '#fff', border: '1px solid #cbd5e1', borderRadius: 8 }} className="bg-muted" />
                 </div>
                 <div className="flex flex-col gap-1.5">
-                  <Label>Email</Label>
-                  <Input value={user.email ?? ''} readOnly className="bg-muted" />
+                  <Label style={{ color: '#475569', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>Email</Label>
+                  <Input value={user.email ?? ''} readOnly style={{ backgroundColor: '#fff', border: '1px solid #cbd5e1', borderRadius: 8 }} className="bg-muted" />
                 </div>
                 <div className="flex flex-col gap-1.5">
-                  <Label>Functional Group / Department</Label>
-                  <Input value={user.functionalGroupName ?? user.department ?? ''} readOnly className="bg-muted" />
+                  <Label style={{ color: '#475569', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>Functional Group / Department</Label>
+                  <Input value={user.functionalGroupName ?? user.department ?? ''} readOnly style={{ backgroundColor: '#fff', border: '1px solid #cbd5e1', borderRadius: 8 }} className="bg-muted" />
                 </div>
               </div>
             </div>
 
             {/* Request Details */}
-            <div style={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: 12 }} className="p-6">
-              <h2 className="text-lg font-semibold mb-4" style={{ color: '#0f2a2a' }}>Request Details</h2>
-              <div className="flex flex-col gap-4">
+            <div style={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: 12 }}>
+              <div style={{ backgroundColor: '#f1f5f9', borderBottom: '1px solid #e2e8f0', borderRadius: '12px 12px 0 0', padding: '14px 16px' }}>
+                <h3 style={{ color: '#0f2a2a', fontSize: '15px', fontWeight: 700, margin: 0 }}>Request Details</h3>
+              </div>
+              <div style={{ backgroundColor: '#f8fafc', padding: 20, borderRadius: '0 0 12px 12px' }} className="flex flex-col gap-4">
                 <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="project">Project *</Label>
-                  <Select value={project} onValueChange={setProject}>
-                    <SelectTrigger id="project">
+                  <Label htmlFor="project" style={{ color: '#475569', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>Project<span style={{ color: '#ef4444' }}> *</span></Label>
+                  <Select value={project} onValueChange={(v) => { setProject(v); setFormErrors(prev => { const next = { ...prev }; delete next.project; return next; }); }}>
+                    <SelectTrigger id="project" style={{ backgroundColor: '#fff', border: '1px solid #cbd5e1', borderRadius: 8 }}>
                       <SelectValue placeholder="Select a project..." />
                     </SelectTrigger>
                     <SelectContent>
@@ -269,91 +280,102 @@ function NewRequestForm() {
                       ))}
                     </SelectContent>
                   </Select>
+                  {formErrors.project && <p className="text-xs text-destructive mt-0.5">{formErrors.project}</p>}
                 </div>
                 <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="justification">Justification *</Label>
+                  <Label htmlFor="justification" style={{ color: '#475569', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>Justification<span style={{ color: '#ef4444' }}> *</span></Label>
                   <Textarea
                     id="justification"
                     value={justification}
-                    onChange={e => setJustification(e.target.value)}
+                    onChange={e => { setJustification(e.target.value); if (e.target.value.trim()) setFormErrors(prev => { const next = { ...prev }; delete next.justification; return next; }); }}
                     placeholder="Explain why you need this product..."
                     rows={4}
-                    required
+                    style={{ backgroundColor: '#fff', border: '1px solid #cbd5e1', borderRadius: 8 }}
                   />
+                  {formErrors.justification && <p className="text-xs text-destructive mt-0.5">{formErrors.justification}</p>}
                 </div>
-                <div className="flex items-center gap-2">
-                  <Checkbox
-                    id="sop-read"
-                    checked={sopRead}
-                    onCheckedChange={v => setSopRead(v === true)}
-                  />
-                  <Label htmlFor="sop-read" className="cursor-pointer">
-                    I confirm that I have read and understood the Standard Operating Procedure (SOP) for this product.
-                  </Label>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      id="sop-read"
+                      checked={sopRead}
+                      onCheckedChange={v => { setSopRead(v === true); if (v === true) setFormErrors(prev => { const next = { ...prev }; delete next.sopRead; return next; }); }}
+                    />
+                    <Label htmlFor="sop-read" className="cursor-pointer" style={{ color: '#475569', fontSize: '13px' }}>
+                      I confirm that I have read and understood the Standard Operating Procedure (SOP) for this product.<span style={{ color: '#ef4444' }}> *</span>
+                    </Label>
+                  </div>
+                  {formErrors.sopRead && <p className="text-xs text-destructive mt-1 ml-6">{formErrors.sopRead}</p>}
                 </div>
               </div>
             </div>
 
             {/* Line Items */}
-            <div style={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: 12 }} className="p-6">
-                <div className="flex justify-between items-center mb-4">
+            <div style={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: 12 }}>
+                <div style={{ backgroundColor: '#f1f5f9', borderBottom: '1px solid #e2e8f0', borderRadius: '12px 12px 0 0', padding: '14px 16px' }} className="flex justify-between items-center">
                   <div>
-                    <h2 className="text-lg font-semibold" style={{ color: '#0f2a2a' }}>Requested Quantities</h2>
-                    <p className="text-sm" style={{ color: '#64748b' }}>Add one row per date you need items delivered.</p>
+                    <h3 style={{ color: '#0f2a2a', fontSize: '15px', fontWeight: 700, margin: 0 }}>Requested Quantities</h3>
+                    <p style={{ color: '#64748b', fontSize: '13px', marginTop: 2 }}>Add one row per date you need items delivered.</p>
                   </div>
                   <Button type="button" variant="outline" size="sm" onClick={addLineItem}>
                     <PlusCircle className="mr-2 h-4 w-4" />
                     Add Row
                   </Button>
                 </div>
-                <div className="border rounded-lg overflow-hidden">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Requested Date *</TableHead>
-                        <TableHead>Quantity *</TableHead>
-                        <TableHead className="w-[50px]"></TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {lineItems.map(li => (
-                        <TableRow key={li.id}>
-                          <TableCell>
-                            <Input
-                              type="date"
-                              value={li.requestedDate}
-                              min={todayStr}
-                              onChange={e => updateLineItem(li.id, 'requestedDate', e.target.value)}
-                              required
-                            />
-                            {lineItemErrors[li.id] && (
-                              <p className="text-xs text-destructive mt-1">{lineItemErrors[li.id]}</p>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            <Input
-                              type="number"
-                              min={1}
-                              value={li.quantity}
-                              onChange={e => updateLineItem(li.id, 'quantity', parseInt(e.target.value, 10) || 1)}
-                              required
-                            />
-                          </TableCell>
-                          <TableCell>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => removeLineItem(li.id)}
-                              disabled={lineItems.length === 1}
-                            >
-                              <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
-                          </TableCell>
+                <div style={{ backgroundColor: '#f8fafc', padding: 20, borderRadius: '0 0 12px 12px' }}>
+                  {formErrors.lineItems && <p className="text-xs text-destructive mb-2">{formErrors.lineItems}</p>}
+                  <div className="border rounded-lg overflow-hidden" style={{ border: '1px solid #e2e8f0' }}>
+                    <Table>
+                      <TableHeader>
+                        <TableRow style={{ backgroundColor: '#f1f5f9' }}>
+                          <TableHead style={{ color: '#475569', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>Requested Date<span style={{ color: '#ef4444' }}> *</span></TableHead>
+                          <TableHead style={{ color: '#475569', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>Quantity<span style={{ color: '#ef4444' }}> *</span></TableHead>
+                          <TableHead className="w-[50px]"></TableHead>
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                      </TableHeader>
+                      <TableBody>
+                        {lineItems.map(li => (
+                          <TableRow key={li.id} style={{ backgroundColor: '#fff' }}>
+                            <TableCell>
+                              <Input
+                                type="date"
+                                value={li.requestedDate}
+                                min={todayStr}
+                                onChange={e => updateLineItem(li.id, 'requestedDate', e.target.value)}
+                                style={{ backgroundColor: '#fff', border: '1px solid #cbd5e1', borderRadius: 8 }}
+                              />
+                              {lineItemErrors[li.id] && (
+                                <p className="text-xs text-destructive mt-1">{lineItemErrors[li.id]}</p>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              <Input
+                                type="number"
+                                min={1}
+                                value={li.quantity}
+                                onChange={e => updateLineItem(li.id, 'quantity', parseInt(e.target.value, 10) || 1)}
+                                style={{ backgroundColor: '#fff', border: '1px solid #cbd5e1', borderRadius: 8 }}
+                              />
+                              {lineItemErrors[`${li.id}-qty`] && (
+                                <p className="text-xs text-destructive mt-1">{lineItemErrors[`${li.id}-qty`]}</p>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => removeLineItem(li.id)}
+                                disabled={lineItems.length === 1}
+                              >
+                                <Trash2 className="h-4 w-4 text-destructive" />
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
                 </div>
             </div>
 

@@ -17,6 +17,8 @@ function getStatusBadgeClass(status: string): string {
   switch (status) {
     case "Pending Approval":
       return "bg-orange-100 text-orange-800";
+    case "Pending SciOps Approval":
+      return "bg-amber-100 text-amber-800";
     case "Approved":
       return "bg-purple-100 text-purple-800";
     case "In Progress":
@@ -299,13 +301,20 @@ function RequestDetailContent() {
     if (!user || !request) return;
     setRejectionError("");
     setIsSaving(true);
+
+    const isSciOps = request.status === "Pending SciOps Approval";
+    const endpoint = isSciOps
+      ? `/api/requests/${request.id}/sciops-approve`
+      : `/api/requests/${request.id}/approve`;
+
     try {
-      const res = await fetch(`/api/requests/${request.id}/approve`, {
+      const res = await fetch(endpoint, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
           "x-user-role": user.role,
           "x-user-id": user.id ?? "",
+          "x-user-functional-group": user.functionalGroupId ?? "",
         },
         body: JSON.stringify({
           comments: directorComments.trim() || undefined,
@@ -340,13 +349,20 @@ function RequestDetailContent() {
     }
     setRejectionError("");
     setIsSaving(true);
+
+    const isSciOps = request.status === "Pending SciOps Approval";
+    const endpoint = isSciOps
+      ? `/api/requests/${request.id}/sciops-reject`
+      : `/api/requests/${request.id}/reject`;
+
     try {
-      const res = await fetch(`/api/requests/${request.id}/reject`, {
+      const res = await fetch(endpoint, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
           "x-user-role": user.role,
           "x-user-id": user.id ?? "",
+          "x-user-functional-group": user.functionalGroupId ?? "",
         },
         body: JSON.stringify({ rejectionNote: directorComments.trim() }),
       });
@@ -386,12 +402,16 @@ function RequestDetailContent() {
 
   const requestDisplayId =
     request.requestId ?? request.id.slice(0, 8).toUpperCase();
-  const canApproveReject =
+  const canDirectorApproveReject =
     user.role === "Director" && request.status === "Pending Approval";
+  const canSciOpsApproveReject =
+    user.role === "Director" && request.status === "Pending SciOps Approval";
+  const canApproveReject = canDirectorApproveReject || canSciOpsApproveReject;
   const isAdmin = user.role === "Admin";
   const showFulfillButton =
     isAdmin &&
     (request.status === "Approved" || request.status === "In Progress");
+  const isSomRequest = !!(request as any).somApprovalRequired;
 
   return (
     <div
@@ -428,88 +448,81 @@ function RequestDetailContent() {
 
       <div className="max-w-4xl mx-auto p-6 space-y-6">
         {/* Request Details card */}
-        <div
-          className="bg-white p-6"
-          style={{
-            border: "1px solid #e2e8f0",
-            borderRadius: "12px",
-          }}
-        >
-          <div className="flex items-start justify-between mb-6">
+        <div style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 12 }}>
+          <div style={{ backgroundColor: '#f1f5f9', borderBottom: '1px solid #e2e8f0', borderRadius: '12px 12px 0 0', padding: '16px 24px' }} className="flex items-start justify-between">
             <div>
-              <h1
-                className="text-xl font-semibold"
-                style={{ color: "#0f2a2a" }}
-              >
+              <h1 className="text-xl font-semibold" style={{ color: '#0f2a2a' }}>
                 {requestDisplayId}
               </h1>
-              <p className="text-sm mt-0.5" style={{ color: "#64748b" }}>
-                Submitted{" "}
-                {format(new Date(request.date), "PPP")}
+              <p className="text-sm mt-0.5" style={{ color: '#64748b' }}>
+                Submitted {format(new Date(request.date), "PPP")}
               </p>
             </div>
-            <StatusBadge status={request.status} />
+            <div className="flex items-center gap-2">
+              {isSomRequest && (
+                <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium" style={{ backgroundColor: '#fff7ed', color: '#c2410c' }}>SOM</span>
+              )}
+              <StatusBadge status={request.status} />
+            </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+          <div className="p-6 grid grid-cols-1 sm:grid-cols-2 gap-5">
             <div>
-              <p
-                className="text-xs font-medium uppercase tracking-wide mb-1"
-                style={{ color: "#64748b" }}
-              >
+              <p className="text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: '#475569', fontSize: '11px', letterSpacing: '0.05em' }}>
                 Product
               </p>
-              <p className="text-sm" style={{ color: "#0f2a2a" }}>
+              <p className="text-sm font-medium" style={{ color: '#0f2a2a' }}>
                 {request.productName}
-              </p>
-              <p className="text-xs" style={{ color: "#64748b" }}>
-                {request.productId}
               </p>
             </div>
             <div>
-              <p
-                className="text-xs font-medium uppercase tracking-wide mb-1"
-                style={{ color: "#64748b" }}
-              >
+              <p className="text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: '#475569', fontSize: '11px', letterSpacing: '0.05em' }}>
+                Manufacturer Part #
+              </p>
+              <p className="text-sm" style={{ color: '#0f2a2a' }}>
+                {(request as any).manufacturerPartNumber || '\u2014'}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: '#475569', fontSize: '11px', letterSpacing: '0.05em' }}>
                 Requestor
               </p>
-              <p className="text-sm" style={{ color: "#0f2a2a" }}>
+              <p className="text-sm" style={{ color: '#0f2a2a' }}>
                 {request.requestorName}
               </p>
-              <p className="text-xs" style={{ color: "#64748b" }}>
+              <p className="text-xs" style={{ color: '#64748b' }}>
                 {request.requestorEmail}
               </p>
             </div>
             <div>
-              <p
-                className="text-xs font-medium uppercase tracking-wide mb-1"
-                style={{ color: "#64748b" }}
-              >
+              <p className="text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: '#475569', fontSize: '11px', letterSpacing: '0.05em' }}>
                 Department
               </p>
-              <p className="text-sm" style={{ color: "#0f2a2a" }}>
+              <p className="text-sm" style={{ color: '#0f2a2a' }}>
                 {request.department}
               </p>
             </div>
             <div>
-              <p
-                className="text-xs font-medium uppercase tracking-wide mb-1"
-                style={{ color: "#64748b" }}
-              >
+              <p className="text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: '#475569', fontSize: '11px', letterSpacing: '0.05em' }}>
                 Project
               </p>
-              <p className="text-sm" style={{ color: "#0f2a2a" }}>
-                {request.project ?? "\u2014"}
+              <p className="text-sm" style={{ color: '#0f2a2a' }}>
+                {request.project ?? '\u2014'}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: '#475569', fontSize: '11px', letterSpacing: '0.05em' }}>
+                UoM
+              </p>
+              <p className="text-sm" style={{ color: '#0f2a2a' }}>
+                {(request as any).uom || '\u2014'}
               </p>
             </div>
             <div className="sm:col-span-2">
-              <p
-                className="text-xs font-medium uppercase tracking-wide mb-1"
-                style={{ color: "#64748b" }}
-              >
+              <p className="text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: '#475569', fontSize: '11px', letterSpacing: '0.05em' }}>
                 Justification
               </p>
-              <p className="text-sm" style={{ color: "#0f2a2a" }}>
+              <p className="text-sm" style={{ color: '#0f2a2a' }}>
                 {request.justification}
               </p>
             </div>
@@ -517,6 +530,11 @@ function RequestDetailContent() {
               <div className="sm:col-span-2 bg-red-50 rounded-lg p-3">
                 <p className="text-xs font-medium text-red-600 uppercase tracking-wide mb-1">
                   Rejection Note
+                  {(request as any).rejectionStage && (
+                    <span className="ml-1 normal-case font-normal">
+                      ({(request as any).rejectionStage === 'sciops' ? 'Sci-Ops Director' : (request as any).rejectionStage === 'director' ? 'Director' : 'Admin'})
+                    </span>
+                  )}
                 </p>
                 <p className="text-sm text-red-700">
                   {request.rejectionNote}
@@ -528,22 +546,23 @@ function RequestDetailContent() {
 
         {/* Line Items card */}
         <div
-          className="bg-white overflow-hidden"
+          className="overflow-hidden"
           style={{
+            backgroundColor: '#f8fafc',
             border: "1px solid #e2e8f0",
             borderRadius: "12px",
           }}
         >
           <div
-            className="px-6 py-4"
-            style={{ borderBottom: "1px solid #e2e8f0" }}
+            className="px-6 py-3"
+            style={{ backgroundColor: '#f1f5f9', borderBottom: "1px solid #e2e8f0" }}
           >
-            <h2
-              className="text-base font-semibold"
+            <h3
+              className="text-sm font-semibold"
               style={{ color: "#0f2a2a" }}
             >
               Line Items
-            </h2>
+            </h3>
           </div>
           <table className="w-full text-sm">
             <thead>
@@ -685,30 +704,22 @@ function RequestDetailContent() {
           )}
         </div>
 
-        {/* Director Action card */}
+        {/* Director / Sci-Ops Action card */}
         {canApproveReject && (
-          <div
-            className="bg-white p-6"
-            style={{
-              border: "1px solid #e2e8f0",
-              borderRadius: "12px",
-            }}
-          >
-            <h2
-              className="text-base font-semibold mb-4"
-              style={{ color: "#0f2a2a" }}
-            >
-              Director Action
-            </h2>
-            <div className="space-y-4">
+          <div style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 12 }}>
+            <div style={{ backgroundColor: '#f1f5f9', borderBottom: '1px solid #e2e8f0', borderRadius: '12px 12px 0 0', padding: '12px 20px' }}>
+              <h3 className="text-sm font-semibold" style={{ color: '#0f2a2a' }}>
+                {canSciOpsApproveReject ? 'Sci-Ops Director Action' : 'Director Action'}
+              </h3>
+            </div>
+            <div className="p-5 space-y-4">
               <div>
                 <Label
                   htmlFor="director-comments"
-                  className="text-sm font-medium mb-1 block"
-                  style={{ color: "#0f2a2a" }}
+                  style={{ color: '#475569', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}
                 >
                   Comments{" "}
-                  <span style={{ color: "#64748b", fontWeight: 400 }}>
+                  <span style={{ color: '#94a3b8', fontWeight: 400, textTransform: 'none', fontSize: '11px' }}>
                     (optional for approve, required for reject)
                   </span>
                 </Label>
@@ -721,9 +732,11 @@ function RequestDetailContent() {
                     if (rejectionError) setRejectionError("");
                   }}
                   rows={3}
+                  className="mt-1.5"
+                  style={{ backgroundColor: '#fff', border: '1px solid #e2e8f0' }}
                 />
                 {rejectionError && (
-                  <p className="text-sm text-red-600 mt-1">
+                  <p className="text-xs text-destructive mt-1">
                     {rejectionError}
                   </p>
                 )}

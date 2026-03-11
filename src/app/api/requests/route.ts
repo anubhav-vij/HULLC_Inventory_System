@@ -58,6 +58,12 @@ function rowToRequest(row: RequestRow) {
     directorRejectionNote: row.director_rejection_note ?? null,
     rejectedBy: row.rejected_by ?? null,
     rejectionStage: row.rejection_stage ?? null,
+    somApprovalStatus: (row as any).som_approval_status ?? null,
+    sciopsDirectorApprovedAt: (row as any).sciops_director_approved_at ? (row as any).sciops_director_approved_at.toISOString() : null,
+    sciopsDirectorApprovedBy: (row as any).sciops_director_approved_by ?? null,
+    somApprovalRequired: (row as any).som_approval_required ?? false,
+    manufacturerPartNumber: (row as any).product_manufacturer_part_number ?? null,
+    uom: (row as any).product_uom ?? null,
     date: row.date,
     lineItems: (row.line_items ?? []).map(li => ({
       id: li.id,
@@ -126,10 +132,11 @@ export async function GET(request: Request) {
     const params: unknown[] = [];
 
     if (role === 'Admin') {
-      // Admin sees everything except Pending Approval (those go to Director)
-      whereClause = "WHERE pr.status IN ('Approved', 'In Progress', 'Completed', 'Rejected')";
+      // Admin sees everything except Pending Approval and Pending SciOps (those go to Directors)
+      whereClause = "WHERE pr.status IN ('Approved', 'Pending SciOps Approval', 'In Progress', 'Completed', 'Rejected')";
     } else if (role === 'Director') {
       // Director sees Pending Approval requests for their functional group
+      // Sci-Ops Director also sees Pending SciOps Approval requests
       if (userId) {
         const { rows: userRows } = await query<{ functional_group_id: string }>(
           'SELECT functional_group_id FROM users WHERE id = $1',
@@ -142,8 +149,15 @@ export async function GET(request: Request) {
             [fgId]
           );
           if (groupRows.length > 0) {
-            params.push(groupRows[0].name);
-            whereClause = "WHERE pr.status = 'Pending Approval' AND LOWER(pr.department) = LOWER($1)";
+            const groupName = groupRows[0].name;
+            const isSciOps = groupName === 'Scientific Operations';
+            params.push(groupName);
+            if (isSciOps) {
+              // Sci-Ops Director sees own group's Pending Approval AND all Pending SciOps Approval
+              whereClause = "WHERE (pr.status = 'Pending Approval' AND LOWER(pr.department) = LOWER($1)) OR pr.status = 'Pending SciOps Approval'";
+            } else {
+              whereClause = "WHERE pr.status = 'Pending Approval' AND LOWER(pr.department) = LOWER($1)";
+            }
           } else {
             whereClause = "WHERE 1=0";
           }
@@ -177,11 +191,15 @@ export async function GET(request: Request) {
     const sql = `
       SELECT
         pr.*,
+        COALESCE(p_prod.som_approval_required, false) AS som_approval_required,
+        p_prod.manufacturer_part_number AS product_manufacturer_part_number,
+        p_prod.uom AS product_uom,
         ${LINE_ITEMS_SUBQUERY}
       FROM product_requests pr
       LEFT JOIN request_line_items rli ON rli.request_id = pr.id
+      LEFT JOIN products p_prod ON p_prod.id = pr.product_id
       ${whereClause}
-      GROUP BY pr.id
+      GROUP BY pr.id, p_prod.som_approval_required, p_prod.manufacturer_part_number, p_prod.uom
       ORDER BY pr.date DESC
     `;
 

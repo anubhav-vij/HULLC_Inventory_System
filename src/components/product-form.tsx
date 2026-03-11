@@ -15,12 +15,11 @@ import { CalendarIcon, Loader2, PlusCircle, Trash2, FileUp, X, Paperclip } from 
 import { cn } from "@/lib/utils";
 import { format, isValid } from "date-fns";
 import { type Product, ProductFormSchema, type ProductFormData, ProductFormCreateSchema } from "@/lib/types";
-import { Separator } from "./ui/separator";
 import { deleteFile, storeFile } from '@/lib/file-store';
 import { useToast } from '@/hooks/use-toast';
 import { Textarea } from './ui/textarea';
 
-interface VendorOption { id: string; name: string; isActive: boolean; }
+interface ManufacturerOption { id: string; name: string; isActive: boolean; }
 interface LocationOption { id: string; name: string; isActive: boolean; }
 
 type ProductFormProps = {
@@ -28,19 +27,20 @@ type ProductFormProps = {
   onSave: (data: ProductFormData) => void;
   onCancel: () => void;
   isSaving: boolean;
+  isAdmin?: boolean;
 };
 
 const VALID_FILE_TYPES = "application/pdf,image/jpeg,image/tiff";
 
-export function ProductForm({ product, onSave, onCancel, isSaving }: ProductFormProps) {
+export function ProductForm({ product, onSave, onCancel, isSaving, isAdmin = true }: ProductFormProps) {
   const { toast } = useToast();
-  const [vendors, setVendors] = useState<VendorOption[]>([]);
+  const [manufacturers, setManufacturers] = useState<ManufacturerOption[]>([]);
   const [locations, setLocations] = useState<LocationOption[]>([]);
 
   useEffect(() => {
-    fetch('/api/vendors')
+    fetch('/api/manufacturers')
       .then(res => res.ok ? res.json() : [])
-      .then(data => setVendors(data.filter((v: VendorOption) => v.isActive)))
+      .then(data => setManufacturers(data.filter((v: ManufacturerOption) => v.isActive)))
       .catch(() => {});
     fetch('/api/storage-locations')
       .then(res => res.ok ? res.json() : [])
@@ -62,9 +62,12 @@ export function ProductForm({ product, onSave, onCancel, isSaving }: ProductForm
       }))
     } : {
       name: "",
-      vendor: "",
-      vendorPartNumber: "",
+      manufacturer: "",
+      manufacturerPartNumber: "",
+      vwrPartNumber: "",
       uom: "",
+      somApprovalRequired: false,
+      costPerUnit: null,
       reorderThreshold: null,
       lots: [{ lotNumber: "", quantity: 1, receiptDate: new Date(), expirationDate: null, location: "", file: null, notes: "" }],
     },
@@ -74,7 +77,7 @@ export function ProductForm({ product, onSave, onCancel, isSaving }: ProductForm
     control: form.control,
     name: "lots",
   });
-  
+
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>, index: number) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -82,19 +85,12 @@ export function ProductForm({ product, onSave, onCancel, isSaving }: ProductForm
       try {
         await storeFile(fileId, file);
         const currentLot = fields[index];
-        
-        // If there was an old file, delete it
         if (currentLot.file?.id) {
           await deleteFile(currentLot.file.id);
         }
-
         update(index, {
           ...currentLot,
-          file: {
-            id: fileId,
-            name: file.name,
-            type: file.type,
-          }
+          file: { id: fileId, name: file.name, type: file.type }
         });
         toast({ title: "File Uploaded", description: `${file.name} has been saved.` });
       } catch (error) {
@@ -124,120 +120,205 @@ export function ProductForm({ product, onSave, onCancel, isSaving }: ProductForm
     remove(index);
   }
 
-
   const onSubmit = (data: ProductFormData) => {
     onSave(data);
   };
+
+  const labelStyle = { color: '#475569', fontSize: '11px', textTransform: 'uppercase' as const, letterSpacing: '0.05em', fontWeight: 600 };
+  const cardStyle = { backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: '12px' };
+  const cardHeaderStyle = { backgroundColor: '#f1f5f9', borderBottom: '1px solid #e2e8f0', borderRadius: '12px 12px 0 0', padding: '14px 16px' };
+  const inputStyle = { backgroundColor: '#fff', border: '1px solid #cbd5e1', borderRadius: '8px' };
+  const reqMark = <span style={{ color: '#ef4444' }}> *</span>;
 
   return (
     <Form {...form}>
       <form id="product-form" onSubmit={form.handleSubmit(onSubmit)} className="flex flex-col flex-1 min-h-0">
         <div className="flex-1 overflow-y-auto pr-6 -mr-6 space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <FormField
-              control={form.control}
-              name="name"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Product Name</FormLabel>
-                  <FormControl><Input placeholder="e.g., Acetaminophen 500mg" {...field} /></FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="vendor"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Vendor/Manufacturer</FormLabel>
-                  {vendors.length > 0 ? (
-                    <Select value={field.value || ''} onValueChange={field.onChange}>
+          {/* Product Information Card */}
+          <div style={cardStyle}>
+            <div style={cardHeaderStyle}>
+              <h3 style={{ color: '#0f2a2a', fontSize: '15px', fontWeight: 700, margin: 0 }}>Product Information</h3>
+            </div>
+            <div style={{ backgroundColor: '#f8fafc', padding: 20, borderRadius: '0 0 12px 12px' }} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel style={labelStyle}>Product Name{reqMark}</FormLabel>
+                    <FormControl><Input placeholder="e.g., Acetaminophen 500mg" {...field} style={inputStyle} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="manufacturer"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel style={labelStyle}>Manufacturer{reqMark}</FormLabel>
+                    {manufacturers.length > 0 ? (
+                      <Select value={field.value || ''} onValueChange={field.onChange}>
+                        <FormControl>
+                          <SelectTrigger style={inputStyle}>
+                            <SelectValue placeholder="Select a manufacturer..." />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {manufacturers.map(m => (
+                            <SelectItem key={m.id} value={m.name}>{m.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <FormControl><Input placeholder="e.g., Genentech" {...field} style={inputStyle} /></FormControl>
+                    )}
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="manufacturerPartNumber"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel style={labelStyle}>Manufacturer Part #</FormLabel>
+                    <FormControl><Input placeholder="e.g., ABC-12345" {...field} style={inputStyle} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="vwrPartNumber"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel style={labelStyle}>VWR Part #</FormLabel>
+                    <FormControl><Input placeholder="e.g., VWR-67890" {...field} value={field.value ?? ''} style={inputStyle} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="uom"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel style={labelStyle}>Unit of Measure</FormLabel>
+                    <FormControl><Input placeholder="e.g., mL, tablets, vials" {...field} value={field.value ?? ''} style={inputStyle} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="somApprovalRequired"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel style={labelStyle}>SOM Approval Required{reqMark}</FormLabel>
+                    <Select value={field.value ? 'yes' : 'no'} onValueChange={v => field.onChange(v === 'yes')}>
                       <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select a vendor..." />
+                        <SelectTrigger style={inputStyle}>
+                          <SelectValue />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        {vendors.map(v => (
-                          <SelectItem key={v.id} value={v.name}>{v.name}</SelectItem>
-                        ))}
+                        <SelectItem value="no">No</SelectItem>
+                        <SelectItem value="yes">Yes</SelectItem>
                       </SelectContent>
                     </Select>
-                  ) : (
-                    <FormControl><Input placeholder="e.g., Genentech" {...field} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              {isAdmin && (
+                <FormField
+                  control={form.control}
+                  name="costPerUnit"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel style={labelStyle}>Cost per Each Item</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="number"
+                          step="0.01"
+                          placeholder="e.g., 12.50"
+                          {...field}
+                          value={field.value ?? ''}
+                          onChange={e => {
+                            const value = e.target.value;
+                            field.onChange(value === '' ? null : parseFloat(value));
+                          }}
+                          style={inputStyle}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
                   )}
-                  <FormMessage />
-                </FormItem>
+                />
               )}
-            />
-            <FormField
-              control={form.control}
-              name="vendorPartNumber"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Vendor Part #</FormLabel>
-                  <FormControl><Input placeholder="e.g., ABC-12345" {...field} /></FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="uom"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Unit of Measure</FormLabel>
-                  <FormControl><Input placeholder="e.g., mL, tablets, vials" {...field} value={field.value ?? ''} /></FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="reorderThreshold"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Reorder Threshold</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="number"
-                      placeholder="e.g., 10"
-                      {...field}
-                      value={field.value ?? ''}
-                      onChange={e => {
-                          const value = e.target.value;
-                          field.onChange(value === '' ? null : parseInt(value, 10));
-                      }}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+              <FormField
+                control={form.control}
+                name="reorderThreshold"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel style={labelStyle}>Reorder Threshold</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        placeholder="e.g., 10"
+                        {...field}
+                        value={field.value ?? ''}
+                        onChange={e => {
+                            const value = e.target.value;
+                            field.onChange(value === '' ? null : parseInt(value, 10));
+                        }}
+                        style={inputStyle}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
           </div>
 
-          <Separator />
-
-          <div>
-            <h3 className="text-lg font-medium mb-2">Lots</h3>
-            {form.formState.errors.lots?.message && (
-              <p className="text-sm font-medium text-destructive mb-2">
-                {form.formState.errors.lots.message as string}
-              </p>
-            )}
-            <div className="space-y-4 max-h-96 overflow-y-auto pr-2">
-              {fields.map((field, index) => (
-                <div key={field.id} className="p-4 border rounded-lg bg-background space-y-4">
-                  <input type="hidden" {...form.register(`lots.${index}.id`)} />
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
+          {/* Lots Card */}
+          <div style={cardStyle}>
+            <div style={cardHeaderStyle} className="flex items-center justify-between">
+              <h3 style={{ color: '#0f2a2a', fontSize: '15px', fontWeight: 700, margin: 0 }}>Lots</h3>
+            </div>
+            <div style={{ backgroundColor: '#f8fafc', padding: 20, borderRadius: '0 0 12px 12px' }}>
+              {form.formState.errors.lots?.message && (
+                <p className="text-sm font-medium text-destructive mb-3">
+                  {form.formState.errors.lots.message as string}
+                </p>
+              )}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {fields.map((field, index) => (
+                  <div key={field.id} style={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: '10px' }} className="p-4 space-y-3 relative">
+                    <input type="hidden" {...form.register(`lots.${index}.id`)} />
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium" style={{ backgroundColor: '#e0f2f1', color: '#1a7070' }}>
+                        Lot {index + 1}
+                      </span>
+                      {fields.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveLot(index)}
+                          className="p-1 rounded hover:bg-red-50 transition-colors"
+                        >
+                          <Trash2 className="h-3.5 w-3.5 text-red-400 hover:text-red-600" />
+                        </button>
+                      )}
+                    </div>
                     <FormField
                       control={form.control}
                       name={`lots.${index}.lotNumber`}
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Lot #</FormLabel>
-                          <FormControl><Input placeholder="e.g., Lot 123" {...field} /></FormControl>
+                          <FormLabel style={labelStyle}>Lot #</FormLabel>
+                          <FormControl><Input placeholder="e.g., Lot 123" {...field} style={inputStyle} /></FormControl>
                           <FormMessage />
                         </FormItem>
                       )}
@@ -247,36 +328,10 @@ export function ProductForm({ product, onSave, onCancel, isSaving }: ProductForm
                       name={`lots.${index}.quantity`}
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Quantity</FormLabel>
-                          <FormControl><Input type="number" placeholder="e.g., 100" {...field} onChange={e => field.onChange(parseInt(e.target.value) || 0)} /></FormControl>
+                          <FormLabel style={labelStyle}>Quantity</FormLabel>
+                          <FormControl><Input type="number" placeholder="e.g., 100" {...field} onChange={e => field.onChange(parseInt(e.target.value) || 0)} style={inputStyle} /></FormControl>
                           <FormMessage />
                         </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name={`lots.${index}.location`}
-                      render={({ field }) => (
-                          <FormItem>
-                              <FormLabel>Storage Location</FormLabel>
-                              {locations.length > 0 ? (
-                                <Select value={field.value || ''} onValueChange={field.onChange}>
-                                  <FormControl>
-                                    <SelectTrigger>
-                                      <SelectValue placeholder="Select location..." />
-                                    </SelectTrigger>
-                                  </FormControl>
-                                  <SelectContent>
-                                    {locations.map(l => (
-                                      <SelectItem key={l.id} value={l.name}>{l.name}</SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                              ) : (
-                                <FormControl><Input placeholder="e.g., Room 101, Shelf A" {...field} /></FormControl>
-                              )}
-                              <FormMessage />
-                          </FormItem>
                       )}
                     />
                     <FormField
@@ -284,14 +339,11 @@ export function ProductForm({ product, onSave, onCancel, isSaving }: ProductForm
                       name={`lots.${index}.receiptDate`}
                       render={({ field }) => (
                         <FormItem className="flex flex-col">
-                          <FormLabel>Receipt Date</FormLabel>
+                          <FormLabel style={labelStyle}>Receipt Date</FormLabel>
                           <Popover>
                             <PopoverTrigger asChild>
                               <FormControl>
-                                <Button
-                                  variant={"outline"}
-                                  className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")}
-                                >
+                                <Button variant={"outline"} className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")} style={inputStyle}>
                                   {field.value && isValid(field.value) ? format(field.value, "PPP") : <span>Pick a date</span>}
                                   <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
                                 </Button>
@@ -310,26 +362,18 @@ export function ProductForm({ product, onSave, onCancel, isSaving }: ProductForm
                       name={`lots.${index}.expirationDate`}
                       render={({ field }) => (
                         <FormItem className="flex flex-col">
-                          <FormLabel>Expiration Date (Optional)</FormLabel>
+                          <FormLabel style={labelStyle}>Expiration Date (Optional)</FormLabel>
                           <Popover>
                             <PopoverTrigger asChild>
                               <FormControl>
-                                <Button
-                                  variant={"outline"}
-                                  className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")}
-                                >
+                                <Button variant={"outline"} className={cn("pl-3 text-left font-normal", !field.value && "text-muted-foreground")} style={inputStyle}>
                                   {field.value && isValid(field.value) ? format(field.value, "PPP") : <span>Pick a date</span>}
                                   <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
                                 </Button>
                               </FormControl>
                             </PopoverTrigger>
                             <PopoverContent className="w-auto p-0" align="start">
-                              <Calendar
-                                mode="single"
-                                selected={field.value && isValid(field.value) ? field.value : undefined}
-                                onSelect={field.onChange}
-                                initialFocus
-                              />
+                              <Calendar mode="single" selected={field.value && isValid(field.value) ? field.value : undefined} onSelect={field.onChange} initialFocus />
                             </PopoverContent>
                           </Popover>
                           <FormMessage />
@@ -337,13 +381,39 @@ export function ProductForm({ product, onSave, onCancel, isSaving }: ProductForm
                       )}
                     />
                     <FormField
+                      control={form.control}
+                      name={`lots.${index}.location`}
+                      render={({ field }) => (
+                          <FormItem>
+                              <FormLabel style={labelStyle}>Storage Location</FormLabel>
+                              {locations.length > 0 ? (
+                                <Select value={field.value || ''} onValueChange={field.onChange}>
+                                  <FormControl>
+                                    <SelectTrigger style={inputStyle}>
+                                      <SelectValue placeholder="Select location..." />
+                                    </SelectTrigger>
+                                  </FormControl>
+                                  <SelectContent>
+                                    {locations.map(l => (
+                                      <SelectItem key={l.id} value={l.name}>{l.name}</SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              ) : (
+                                <FormControl><Input placeholder="e.g., Room 101, Shelf A" {...field} style={inputStyle} /></FormControl>
+                              )}
+                              <FormMessage />
+                          </FormItem>
+                      )}
+                    />
+                    <FormField
                         control={form.control}
                         name={`lots.${index}.file`}
                         render={({ field }) => (
                           <FormItem>
-                              <FormLabel>Lot File (Optional)</FormLabel>
+                              <FormLabel style={labelStyle}>Lot File (Optional)</FormLabel>
                               {field.value ? (
-                                  <div className="flex items-center justify-between p-2 border rounded-md">
+                                  <div className="flex items-center justify-between p-2 rounded-md" style={{ ...inputStyle }}>
                                       <div className="flex items-center gap-2 truncate">
                                         <Paperclip className="h-4 w-4" />
                                         <span className="text-sm truncate">{field.value.name}</span>
@@ -355,16 +425,10 @@ export function ProductForm({ product, onSave, onCancel, isSaving }: ProductForm
                               ) : (
                                 <FormControl>
                                     <div className="relative">
-                                        <Button type="button" variant="outline" className="w-full" onClick={() => document.getElementById(`file-input-${index}`)?.click()}>
+                                        <Button type="button" variant="outline" className="w-full" style={inputStyle} onClick={() => document.getElementById(`file-input-${index}`)?.click()}>
                                             <FileUp className="mr-2 h-4 w-4" /> Upload File
                                         </Button>
-                                        <Input
-                                            id={`file-input-${index}`}
-                                            type="file"
-                                            className="hidden"
-                                            accept={VALID_FILE_TYPES}
-                                            onChange={(e) => handleFileChange(e, index)}
-                                        />
+                                        <Input id={`file-input-${index}`} type="file" className="hidden" accept={VALID_FILE_TYPES} onChange={(e) => handleFileChange(e, index)} />
                                     </div>
                                 </FormControl>
                               )}
@@ -372,34 +436,29 @@ export function ProductForm({ product, onSave, onCancel, isSaving }: ProductForm
                           </FormItem>
                         )}
                       />
-                  </div>
-                   <FormField
+                    <FormField
                       control={form.control}
                       name={`lots.${index}.notes`}
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Notes (Optional)</FormLabel>
-                          <FormControl><Textarea placeholder="e.g., QC passed on..." {...field} /></FormControl>
+                          <FormLabel style={labelStyle}>Notes (Optional)</FormLabel>
+                          <FormControl><Textarea placeholder="e.g., QC passed on..." {...field} style={inputStyle} /></FormControl>
                           <FormMessage />
                         </FormItem>
                       )}
                     />
-                  <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleRemoveLot(index)}
-                      className="text-destructive hover:text-destructive"
-                      disabled={fields.length <= 1}
-                    >
-                      <Trash2 className="mr-2 h-4 w-4" /> Remove Lot
-                    </Button>
-                </div>
-              ))}
-              <div className="flex justify-start">
-                  <Button type="button" variant="secondary" onClick={() => append({ id: uuidv4(), lotNumber: '', quantity: 1, receiptDate: new Date(), expirationDate: null, location: '', file: null, notes: '' })}>
-                      <PlusCircle className="mr-2 h-4 w-4" /> Add Another Lot
-                  </Button>
+                  </div>
+                ))}
+                {/* Add Lot dashed card */}
+                <button
+                  type="button"
+                  onClick={() => append({ id: uuidv4(), lotNumber: '', quantity: 1, receiptDate: new Date(), expirationDate: null, location: '', file: null, notes: '' })}
+                  className="flex flex-col items-center justify-center gap-2 p-4 rounded-[10px] transition-colors hover:bg-white"
+                  style={{ border: '2px dashed #cbd5e1', minHeight: '200px', color: '#64748b' }}
+                >
+                  <PlusCircle className="h-6 w-6" />
+                  <span className="text-sm font-medium">+ Add Lot</span>
+                </button>
               </div>
             </div>
           </div>
@@ -415,7 +474,3 @@ export function ProductForm({ product, onSave, onCancel, isSaving }: ProductForm
     </Form>
   );
 }
-
-    
-
-    

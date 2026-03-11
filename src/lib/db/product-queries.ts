@@ -27,9 +27,12 @@ export type LotJsonRow = {
 export type ProductRow = {
   id: string;
   name: string;
-  vendor: string;
-  vendor_part_number: string;
+  manufacturer: string;
+  manufacturer_part_number: string;
+  vwr_part_number: string | null;
   uom: string | null;
+  som_approval_required: boolean;
+  cost_per_unit: number | null;
   reorder_threshold: number | null;
   // json_agg produces a parsed JS array because pg auto-parses JSON columns
   lots: LotJsonRow[];
@@ -47,9 +50,12 @@ export const PRODUCT_SELECT_SQL = `
   SELECT
     p.id,
     p.name,
-    p.vendor,
-    p.vendor_part_number,
+    p.manufacturer,
+    p.manufacturer_part_number,
+    p.vwr_part_number,
     p.uom,
+    p.som_approval_required,
+    p.cost_per_unit,
     p.reorder_threshold,
     COALESCE(
       json_agg(
@@ -83,9 +89,12 @@ export function rowToProduct(row: ProductRow): Product {
   return {
     id: row.id,
     name: row.name,
-    vendor: row.vendor,
-    vendorPartNumber: row.vendor_part_number,
+    manufacturer: row.manufacturer,
+    manufacturerPartNumber: row.manufacturer_part_number,
+    vwrPartNumber: row.vwr_part_number ?? undefined,
     uom: row.uom ?? undefined,
+    somApprovalRequired: row.som_approval_required,
+    costPerUnit: row.cost_per_unit != null ? Number(row.cost_per_unit) : null,
     reorderThreshold: row.reorder_threshold,
     lots: row.lots.map((lot): Lot => ({
       id: lot.id,

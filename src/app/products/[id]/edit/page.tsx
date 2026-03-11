@@ -136,17 +136,16 @@ function EditProductFormPage() {
       </div>
 
       <div className="p-8 max-w-4xl">
-        {/* Product Information Card */}
-        <div style={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: 12 }} className="p-6">
-          <h2 className="text-lg font-semibold mb-1" style={{ color: '#0f2a2a' }}>{product.name}</h2>
-          <p className="text-sm mb-6" style={{ color: '#64748b' }}>Update product information and lot details.</p>
-          <ProductForm
-            product={product}
-            onSave={handleSave}
-            onCancel={() => window.location.href = '/'}
-            isSaving={isSaving}
-          />
+        <div className="mb-4 flex items-center gap-2" style={{ backgroundColor: '#fefce8', border: '1px solid #fde68a', borderRadius: 8, padding: '10px 16px', fontSize: 13, color: '#92400e' }}>
+          <span style={{ color: '#ef4444' }}>*</span> Required fields are marked with an asterisk
         </div>
+        <ProductForm
+          product={product}
+          onSave={handleSave}
+          onCancel={() => window.location.href = '/'}
+          isSaving={isSaving}
+          isAdmin={true}
+        />
       </div>
     </div>
   );

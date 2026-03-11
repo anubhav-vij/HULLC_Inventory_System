@@ -2,6 +2,103 @@
 
 ---
 
+## Session 10 — 2026-03-11
+
+### What was accomplished
+
+Fixed the app's CSS color scheme — replaced outdated `:root` CSS variables in `globals.css` with the correct teal design system, removed unused `.dark` theme block, and audited all form pages for consistency.
+
+1. **CSS Variables Overhaul** — Replaced the entire `:root` block in `src/app/globals.css` with the canonical teal color scheme:
+   - `--background: 174 25% 95%` (#f0f4f4 teal-tinted page bg)
+   - `--foreground: 174 71% 10%` (#0f2a2a near-black teal text)
+   - `--primary: 174 62% 27%` (#1a7070 teal)
+   - `--secondary: 174 25% 91%` (#e6f7f7 teal light)
+   - `--border/--input: 214 32% 89%` (#e2e8f0)
+   - `--destructive: 0 72% 51%`
+   - Chart colors updated to teal-based palette
+   - Sidebar variables updated: `--sidebar-background: 174 75% 15%` (#0d3d3d)
+   - Removed `.dark` theme block (app is light-only)
+
+2. **Audit Results** — All pages confirmed consistent:
+   - `layout.tsx`: body uses `bg-background` class (correctly maps to teal page bg)
+   - `sidebar.tsx`: hardcoded `#0d3d3d` background (intentional dark sidebar, not a CSS variable)
+   - Form section cards: `#f1f5f9` headers, `#f8fafc` bodies, white inputs with `#cbd5e1` border
+   - Primary buttons: either `style={{ backgroundColor: '#1a7070' }}` or default variant (`bg-primary` now maps to #1a7070)
+   - Semantic buttons (Approve=#16a34a green, Reject=#dc2626 red) left intentionally different
+
+### Files modified
+- `src/app/globals.css` — replaced `:root` variables with teal scheme, removed `.dark` block
+
+### TypeScript status
+Clean — only pre-existing test file redeclaration errors.
+
+---
+
+## Session 9 — 2026-03-11
+
+### What was accomplished
+
+Vendor→Manufacturer rename, new product fields (VWR Part #, SOM Approval, Cost Per Unit), SOM two-stage approval workflow, form contrast redesign, inline errors, request display improvements.
+
+1. **Vendor → Manufacturer Rename** — Migration 009 renames `vendors` table → `manufacturers`, adds `alternate_names TEXT` column, renames all product columns (`vendor_id`→`manufacturer_id`, `vendor`→`manufacturer`, `vendor_part_number`→`manufacturer_part_number`). All API routes, types, UI components, and sidebar nav updated. Old `/api/vendors` routes replaced by `/api/manufacturers`.
+
+2. **New Product Fields** — Migration 010 adds `vwr_part_number TEXT`, `som_approval_required BOOLEAN DEFAULT false`, `cost_per_unit NUMERIC(10,2)` to products. Also adds `som_approval_status TEXT`, `sciops_director_approved_at TIMESTAMPTZ`, `sciops_director_approved_by UUID` to product_requests. Extended `request_status` enum with `Pending SciOps Approval`. All fields wired through types, product-queries, API POST/PUT, and ProductForm.
+
+3. **SOM Two-Stage Approval Workflow** — Products with `som_approval_required=true` follow: Staff → Director (Pending Approval → Pending SciOps Approval) → Sci-Ops Director (Pending SciOps Approval → Approved) → Admin fulfills. Director approve checks product's SOM flag and routes accordingly. New API endpoints: `PUT /api/requests/[id]/sciops-approve` and `PUT /api/requests/[id]/sciops-reject` — both validate the approving Director belongs to "Scientific Operations" functional group. Rejection route records `rejection_stage='sciops'`. Backward compatible: non-SOM products follow existing Director → Admin flow unchanged.
+
+4. **Inline Validation Errors** — Replaced toast-based validation on `/requests/new` with inline field errors using `formErrors` state. Project select, justification textarea, and SOP checkbox all show red error text below the field. Errors clear on interaction. Line item date and quantity errors also display inline.
+
+5. **Date Validation Fix** — Changed `todayStr` from `new Date().toISOString().split('T')[0]` (UTC) to `new Date().toLocaleDateString('en-CA')` (local timezone YYYY-MM-DD) on request form.
+
+6. **Request Display Improvements** — All request list tables (Product Requests, Approvals, Fulfillments) now show manufacturer part # instead of internal product ID below product name. Request detail page shows: HULLC Request ID as title, product name, manufacturer part #, UoM, requestor, department, project, justification. SOM badge shown when applicable. Rejection note shows rejection stage (Director/Sci-Ops/Admin).
+
+7. **Approvals Tab Enhanced** — Director Approvals tab now shows both "Pending Approval" and "Pending SciOps Approval" requests (for Sci-Ops Directors). Added Status column to distinguish between the two. Approve/Reject handlers route to correct endpoint based on request status.
+
+8. **Form Contrast Styling** — Applied across: `/requests/new` (all 4 cards), `/requests/[id]` (details card, line items card, action card), `/products/new`, `/products/[id]/edit`. Design tokens: `#f8fafc` card background, `#f1f5f9` card headers with bottom border, white inputs with `#cbd5e1` border, `#475569` uppercase 11px labels with `0.05em` letter-spacing.
+
+10. **Unified Form Visual Overhaul** — Applied consistent visual design system across all forms:
+    - **Section cards**: White outer bg, `#f1f5f9` header band (16px h-padding, 14px v-padding), 15px/700 header text `#0f2a2a`, `#f8fafc` card body with 20px padding, 12px border-radius
+    - **Required field asterisks**: Red `*` added to all mandatory fields — Product Name, Manufacturer, SOM Approval Required on product form; Project, Requested Date, Justification, SOP, line item quantities on request form; Name fields on all 5 config dialogs (Users, Groups, Projects, Manufacturers, Storage Locations)
+    - **Field contrast**: Input bg white, border `1px solid #cbd5e1`, border-radius 8px, labels `#475569` 11px uppercase 600 weight
+    - **Focus ring**: Global CSS `box-shadow: 0 0 0 2px #1a7070` on input/select/textarea focus
+    - **Top banner**: `#fefce8` bg with `#fde68a` border, red asterisk, `#92400e` text on product new/edit and request new pages
+    - **Config dialogs**: All 5 entity dialogs updated with label styling, input borders, and required-field asterisks
+
+9. **ProductForm Updated** — Added `isAdmin` prop for cost-per-unit visibility. Manufacturer dropdown with alternate names. VWR Part #, SOM Approval (Yes/No Select), Cost Per Unit fields. Lots section redesigned as 2-column card grid with teal "Lot N" pill badges and dashed "+ Add Lot" card.
+
+### Files created
+- `src/lib/db/migrations/009_rename_vendor_to_manufacturer.sql`
+- `src/lib/db/migrations/010_add_product_fields_and_som.sql`
+- `src/app/api/manufacturers/route.ts`
+- `src/app/api/manufacturers/[id]/route.ts`
+- `src/app/api/requests/[id]/sciops-approve/route.ts`
+- `src/app/api/requests/[id]/sciops-reject/route.ts`
+
+### Files modified
+- `src/lib/types.ts` — vendor→manufacturer fields, SOM fields, Pending SciOps Approval status
+- `src/lib/db/product-queries.ts` — vendor→manufacturer column names, new fields in SQL/mapper
+- `src/app/api/products/route.ts` — manufacturer fields in POST
+- `src/app/api/products/[id]/route.ts` — manufacturer fields in PUT
+- `src/app/api/requests/route.ts` — joins products for manufacturer_part_number/uom/som, SciOps Director visibility
+- `src/app/api/requests/[id]/route.ts` — joins products for new fields, SOM transitions
+- `src/app/api/requests/[id]/approve/route.ts` — SOM-aware: routes to Pending SciOps Approval when needed
+- `src/app/api/requests/[id]/reject/route.ts` — detects sciops rejection stage
+- `src/components/sidebar.tsx` — config-vendors → config-manufacturers
+- `src/components/inventory-page.tsx` — vendor→manufacturer throughout, SOM badge, SciOps approval routing, request display
+- `src/components/product-form.tsx` — complete redesign with manufacturer, VWR, SOM, cost, lot grid
+- `src/components/departmental-page.tsx` — vendorPartNumber → manufacturerPartNumber
+- `src/components/request-form.tsx` — vendor → manufacturer
+- `src/app/requests/new/page.tsx` — form contrast, inline errors, date fix, SOM badge
+- `src/app/requests/[id]/page.tsx` — form contrast, SOM workflow UI, manufacturer part #, UoM, rejection stage
+- `src/app/products/new/page.tsx` — form contrast styling, isAdmin prop
+- `src/app/products/[id]/edit/page.tsx` — form contrast styling, isAdmin prop
+- `src/app/globals.css` — focus ring CSS for form inputs (2px solid #1a7070)
+
+### TypeScript status
+Clean — only pre-existing test file redeclaration errors.
+
+---
+
 ## Session 8 — 2026-03-11
 
 ### What was accomplished
