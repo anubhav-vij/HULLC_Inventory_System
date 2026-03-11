@@ -126,6 +126,10 @@ each phase sequentially, marking `[~]` while in progress and `[x]` when complete
 - [x] Mobile card view for inventory (below md breakpoint), desktop table preserved
 - [x] Responsive padding (p-4 md:p-8), responsive text sizes, collapsible labels on buttons
 - [x] CSS: sidebar-open class, sidebar-overlay, tablet sidebar width adjustment
+- [x] Storage location filter dropdown on Inventory tab (Admin, ProjectManager, Chief)
+- [x] Deployed to AWS Amplify with Neon PostgreSQL (free tier) — `amplify.yml` build config
+- [x] Database initialized: schema + 12 migrations + seed (admin@hullc.nih.gov / Admin1234!)
+- [x] Resolved env var issue: Amplify requires `.env.production` written during build phase
 
 ---
 
@@ -206,15 +210,21 @@ each phase sequentially, marking `[~]` while in progress and `[x]` when complete
 
 > Deploy the application to personal AWS for staging and testing before NIH handoff.
 
+### Demo Deployment (Complete)
+- [x] Connect GitHub `production` branch to AWS Amplify hosting
+- [x] Configure Amplify build settings for Next.js 15 (`amplify.yml`)
+- [x] Set up Neon PostgreSQL (free tier) as demo database
+- [x] Initialize remote database: schema + all migrations + seed data
+- [x] Configure environment variables (DATABASE_URL, DATABASE_SSL) with `.env.production` build step
+- [x] Verify full application works end-to-end on Amplify URL
+- [x] Live at: `production.d2v9jxoej8ezlm.amplifyapp.com`
+
+### Production Upgrade (Remaining)
 - [ ] Replace IndexedDB with AWS S3 for lot file attachments
 - [ ] Create S3 bucket for file storage with appropriate CORS and access policies
 - [ ] Update `src/lib/file-store.ts` to use S3 presigned URLs instead of IndexedDB
-- [ ] Set up AWS RDS PostgreSQL 18 instance (personal AWS account)
-- [ ] Run `src/lib/db/schema.sql` against RDS instance to create all tables
-- [ ] Add RDS connection string to Amplify environment variables
-- [ ] Connect GitHub `production` branch to AWS Amplify hosting
-- [ ] Configure Amplify build settings for Next.js 15
-- [ ] Verify full application works end-to-end on Amplify URL
+- [ ] Set up AWS RDS PostgreSQL 18 instance (personal AWS account) — replaces Neon free tier
+- [ ] Migrate data from Neon to RDS
 - [ ] Set AWS billing alert to avoid unexpected charges
 
 ---
