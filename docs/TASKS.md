@@ -522,5 +522,5 @@ each phase sequentially, marking `[~]` while in progress and `[x]` when complete
 
 ---
 
-*Built for laboratory inventory management at NIH/NIAID — HULLC.*
+
 ````"*
