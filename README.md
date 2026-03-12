@@ -3,7 +3,7 @@
 A full-stack inventory management system built for the **Hu Lab at NIAID/NIH (HULLC)**. Tracks reagent and consumable stock across multiple lots, manages dispensing transactions, handles multi-stage supply request approvals, and provides metrics dashboards — all backed by PostgreSQL with a Next.js 15 REST API.
 
 **Live demo:** [production.d2v9jxoej8ezlm.amplifyapp.com](https://production.d2v9jxoej8ezlm.amplifyapp.com)
-**Default login:** `admin@hullc.nih.gov` / `Admin1234!`
+**Default login:** `X`
 
 ---
 
