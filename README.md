@@ -41,14 +41,16 @@ A full-stack inventory management system built for the **Hu Lab at NIAID/NIH (HU
 - Auto-generated request IDs: `HULLC-YYYY-XXXX` (annual sequence)
 - Two-stage approval: Director → (SOM products) Sci-Ops Director → Admin fulfillment
 - Director approve/reject with comments; Sci-Ops approve/reject for SOM products
+- Admin can approve any pending request across all groups (OOO Director coverage)
 - Request status machine: Pending Approval → Approved → In Progress → Completed (or Rejected at any stage)
 
 ### User Management & Roles
 - Email + password authentication (bcrypt)
 - 5 roles: **Admin**, **ProjectManager**, **Chief**, **Director**, **Staff**
-- Role-based access: `canEdit` (Admin only for mutations), `hasFullView` (Admin/PM/Chief)
+- Role-based access: `canEdit` (Admin only for mutations), `hasFullView` (Admin/PM/Chief for read-only visibility)
 - Functional group management (7 default groups, one Director per group enforced)
 - User activate/deactivate (soft delete)
+- Admin override approval: Admins can approve requests on behalf of OOO Directors
 
 ### Metrics & Reporting
 - Inventory Received report with date range filtering and Excel export
@@ -290,7 +292,7 @@ All routes return JSON. Error responses include an `error` string field. Validat
 | `GET` | `/api/requests/:id` | Single request with line items |
 | `PUT` | `/api/requests/:id` | Update request |
 | `DELETE` | `/api/requests/:id` | Delete (Pending/Rejected only) |
-| `PUT` | `/api/requests/:id/approve` | Director approval |
+| `PUT` | `/api/requests/:id/approve` | Director or Admin approval |
 | `PUT` | `/api/requests/:id/reject` | Director/Admin rejection |
 | `PUT` | `/api/requests/:id/sciops-approve` | Sci-Ops approval (SOM products) |
 | `PUT` | `/api/requests/:id/sciops-reject` | Sci-Ops rejection |
@@ -393,6 +395,7 @@ All active development happens on `production`. `master` is kept as a reference 
 | 13 | 2026-03-11 | CSS overhaul (navy/indigo), dark mode, print styles, request ID backfill |
 | 14 | 2026-03-11 | Audit reports, charts dashboard, mobile responsive, AWS Amplify deploy |
 | 15 | 2026-03-12 | Codebase review & hardening: security guards, bug fixes, DRY refactors, frontend quality |
+| 16 | 2026-03-12 | Role access overhaul: Dashboard Admin-only, PM/Chief restricted to Inventory+Transactions+Metrics, Admin override approvals for OOO Directors |
 
 For detailed task-by-task history, see `docs/TASKS.md`.
 

@@ -33,17 +33,17 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { id: "dashboard", label: "Dashboard", icon: LayoutDashboard, roles: ["Admin"] },
   { id: "inventory", label: "HULLC Inventory", icon: Package },
-  { id: "requests", label: "Product Requests", icon: ClipboardList },
-  { id: "approvals", label: "Approvals", icon: CheckSquare, roles: ["Director"] },
+  { id: "requests", label: "Product Requests", icon: ClipboardList, roles: ["Admin", "Director", "Staff"] },
+  { id: "approvals", label: "Approvals", icon: CheckSquare, roles: ["Admin", "Director"] },
   { id: "transactions", label: "Transactions", icon: ArrowLeftRight, roles: ["Admin", "ProjectManager", "Chief"] },
-  { id: "fulfillments", label: "Fulfillments", icon: Truck, roles: ["Admin", "ProjectManager", "Chief"] },
+  { id: "fulfillments", label: "Fulfillments", icon: Truck, roles: ["Admin"] },
   {
     id: "configuration",
     label: "Configuration",
     icon: Settings,
-    roles: ["Admin", "ProjectManager", "Chief"],
+    roles: ["Admin"],
     children: [
       { id: "config-users", label: "Users", icon: Users },
       { id: "config-groups", label: "Functional Groups", icon: Building2 },
@@ -56,7 +56,7 @@ const NAV_ITEMS: NavItem[] = [
     id: "metrics",
     label: "Metrics",
     icon: BarChart3,
-    roles: ["Admin", "Chief"],
+    roles: ["Admin", "ProjectManager", "Chief"],
     children: [
       { id: "metrics-dashboard", label: "Charts Dashboard", icon: PieChart },
       { id: "metrics-received", label: "Inventory Received", icon: PackagePlus },

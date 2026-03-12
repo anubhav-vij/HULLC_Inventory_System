@@ -54,7 +54,7 @@ export default function MetricsDisbursedPage() {
       if (stored) {
         const parsed = JSON.parse(stored);
         if (parsed?.id) {
-          if (parsed.role !== "Admin") {
+          if (!["Admin", "ProjectManager", "Chief"].includes(parsed.role)) {
             router.replace("/");
             return;
           }

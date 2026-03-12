@@ -34,8 +34,9 @@ import { Label } from './ui/label';
 const USER_STORAGE_KEY = 'hullc-user-data';
 const DEPT_PRODUCTS_STORAGE_KEY_PREFIX = 'hullc-dept-products';
 
-function getDefaultView(_role: string): string {
-    return 'dashboard';
+function getDefaultView(role: string): string {
+    if (role === 'Admin') return 'dashboard';
+    return 'inventory';
 }
 
 function coerceProduct(p: any): Product {
@@ -1527,8 +1528,8 @@ export default function InventoryPage() {
             <TooltipProvider>
                 <main className="p-4 md:p-8">
 
-                {/* ── Dashboard View ──────────────────────────────────── */}
-                {activeView === 'dashboard' && (() => {
+                {/* ── Dashboard View (Admin only) ─────────────────────── */}
+                {activeView === 'dashboard' && user.role === 'Admin' && (() => {
                     const sevenDaysAgo = new Date();
                     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
                     sevenDaysAgo.setHours(0, 0, 0, 0);
@@ -1541,19 +1542,9 @@ export default function InventoryPage() {
                     todayStart.setHours(0, 0, 0, 0);
                     const todayTransactions = transactions.filter(t => new Date(t.date) >= todayStart);
 
-                    // Role-aware pending count
-                    let pendingLabel = 'Pending Items';
-                    let pendingCount = 0;
-                    if (user.role === 'Director') {
-                        pendingCount = productRequests.filter(r => r.status === 'Pending Approval' || r.status === 'Pending SciOps Approval').length;
-                        pendingLabel = 'Pending Approvals';
-                    } else if (hasFullView) {
-                        pendingCount = productRequests.filter(r => r.status === 'Approved' || r.status === 'In Progress').length;
-                        pendingLabel = 'Unfulfilled Requests';
-                    } else {
-                        pendingCount = productRequests.filter(r => r.status !== 'Completed' && r.status !== 'Rejected').length;
-                        pendingLabel = 'Your Pending Requests';
-                    }
+                    // Admin dashboard — show unfulfilled requests count
+                    const pendingLabel = 'Unfulfilled Requests';
+                    const pendingCount = productRequests.filter(r => r.status === 'Approved' || r.status === 'In Progress').length;
 
                     const lowStockProducts = products.filter(p => {
                         const stock = totalQuantity(p.lots);
@@ -1602,9 +1593,7 @@ export default function InventoryPage() {
                                 style={clickableCardStyle}
                                 className="p-6 hover:shadow-md"
                                 onClick={() => {
-                                    if (user.role === 'Director') setActiveView('approvals');
-                                    else if (hasFullView) setActiveView('fulfillments');
-                                    else setActiveView('requests');
+                                    setActiveView('fulfillments');
                                 }}
                             >
                                 <p className="text-xs font-medium uppercase tracking-wider" style={labelStyle}>{pendingLabel}</p>
@@ -1934,8 +1923,8 @@ export default function InventoryPage() {
                             </div>
                 )}
 
-                {/* ── Requests View ──────────────────────────────────── */}
-                {activeView === 'requests' && (
+                {/* ── Requests View (Admin, Director, Staff) ──────────── */}
+                {activeView === 'requests' && user.role !== 'ProjectManager' && user.role !== 'Chief' && (
                                 <div style={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: 12 }}>
                                     <div className="p-6 pb-4">
                                         <div className="flex flex-col gap-4">
@@ -2105,12 +2094,16 @@ export default function InventoryPage() {
                                 </div>
                 )}
 
-                {/* ── Approvals View ─────────────────────────────────── */}
-                {activeView === 'approvals' && user.role === 'Director' && (
+                {/* ── Approvals View (Director + Admin) ─────────────── */}
+                {activeView === 'approvals' && (user.role === 'Director' || user.role === 'Admin') && (
                                 <div style={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: 12 }}>
                                     <div className="p-6 pb-4">
                                         <h2 className="text-lg font-semibold" style={{ color: '#0f172a' }}>Pending Approvals</h2>
-                                        <p className="text-sm" style={{ color: '#64748b' }}>Product requests from your functional group awaiting your approval.</p>
+                                        <p className="text-sm" style={{ color: '#64748b' }}>
+                                            {user.role === 'Admin'
+                                                ? 'All pending requests across functional groups. Approve on behalf of OOO Directors.'
+                                                : 'Product requests from your functional group awaiting your approval.'}
+                                        </p>
                                     </div>
                                     <div className="px-6 pb-6">
                                         <div className="border rounded-lg overflow-hidden" style={{ borderColor: '#e2e8f0' }}>
@@ -2219,7 +2212,7 @@ export default function InventoryPage() {
                 )}
 
                 {/* ── Fulfillments View ──────────────────────────────── */}
-                {activeView === 'fulfillments' && hasFullView && (
+                {activeView === 'fulfillments' && canEdit && (
                     <div className="space-y-6">
                     {/* Approved/In-Progress requests with line-item fulfill */}
                     <div style={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: 12 }}>
@@ -2496,7 +2489,7 @@ export default function InventoryPage() {
                 )}
 
                 {/* ── Config: Users ──────────────────────────────── */}
-                {(activeView === 'configuration' || activeView === 'config-users') && hasFullView && (
+                {(activeView === 'configuration' || activeView === 'config-users') && canEdit && (
                                 <div className="space-y-6">
                                     {/* Users table */}
                                     <div style={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: 12 }}>
@@ -2571,7 +2564,7 @@ export default function InventoryPage() {
                 )}
 
                 {/* ── Config: Functional Groups ──────────────────────────── */}
-                {(activeView === 'configuration' || activeView === 'config-groups') && hasFullView && (
+                {(activeView === 'configuration' || activeView === 'config-groups') && canEdit && (
                                 <div className="space-y-6">
                                     {/* Functional Groups table */}
                                     <div style={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: 12 }}>
@@ -2640,7 +2633,7 @@ export default function InventoryPage() {
                 )}
 
                 {/* ── Config: Projects ──────────────────────────── */}
-                {(activeView === 'configuration' || activeView === 'config-projects') && hasFullView && (
+                {(activeView === 'configuration' || activeView === 'config-projects') && canEdit && (
                                 <div className="space-y-6">
                                     {/* Projects table */}
                                     <div style={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: 12 }}>
@@ -2709,7 +2702,7 @@ export default function InventoryPage() {
                 )}
 
                 {/* ── Config: Manufacturers ──────────────────────────── */}
-                {activeView === 'config-manufacturers' && hasFullView && (
+                {activeView === 'config-manufacturers' && canEdit && (
                                 <div className="space-y-6">
                                     <div style={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: 12 }}>
                                         <div className="p-6 pb-4">
@@ -2782,7 +2775,7 @@ export default function InventoryPage() {
                 )}
 
                 {/* ── Config: Storage Locations ──────────────────────────── */}
-                {activeView === 'config-locations' && hasFullView && (
+                {activeView === 'config-locations' && canEdit && (
                                 <div className="space-y-6">
                                     <div style={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: 12 }}>
                                         <div className="p-6 pb-4">

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { query } from '@/lib/db';
 
-const ALLOWED_ROLES = ['Admin', 'Chief'];
+const ALLOWED_ROLES = ['Admin', 'ProjectManager', 'Chief'];
 
 export async function GET(request: Request) {
   const role = request.headers.get('x-user-role') ?? '';

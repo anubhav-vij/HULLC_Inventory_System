@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cd \"C:\\\\Users\\\\MV PC\\\\OneDrive\\\\Desktop\\\\HULLC_Inventory_System\" && npm run build 2>&1 | tail -20)",
+      "Bash(cd \"C:\\\\Users\\\\MV PC\\\\OneDrive\\\\Desktop\\\\HULLC_Inventory_System\" && npm run typecheck 2>&1 | grep -v \"test-\" | head -10)",
+      "Bash(cd \"C:\\\\Users\\\\MV PC\\\\OneDrive\\\\Desktop\\\\HULLC_Inventory_System\" && npm run build 2>&1 | tail -5)",
+      "Bash(cd \"C:\\\\Users\\\\MV PC\\\\OneDrive\\\\Desktop\\\\HULLC_Inventory_System\" && grep -n \"getDefaultView\" src/components/inventory-page.tsx | head -3 && grep -n \"ALLOWED_ROLES\\\\|FULL_VIEW_ROLES\" src/app/api/metrics/*/route.ts && grep -n \"role !== .Director\" src/app/api/requests/\\\\[id\\\\]/approve/route.ts | head -3)",
+      "Bash(cd \"C:\\\\Users\\\\MV PC\\\\OneDrive\\\\Desktop\\\\HULLC_Inventory_System\" && npm run dev 2>&1)"
+    ]
+  }
+}

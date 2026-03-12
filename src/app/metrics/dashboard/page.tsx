@@ -51,7 +51,7 @@ export default function MetricsDashboardPage() {
       const stored = window.localStorage.getItem(USER_STORAGE_KEY);
       if (stored) {
         const parsed = JSON.parse(stored);
-        if (parsed?.id && ["Admin", "Chief"].includes(parsed.role)) {
+        if (parsed?.id && ["Admin", "ProjectManager", "Chief"].includes(parsed.role)) {
           setUser(parsed);
         } else {
           router.replace("/");

@@ -167,6 +167,30 @@ each phase sequentially, marking `[~]` while in progress and `[x]` when complete
 - [x] Material audit report: replaced setTimeout-based close with `afterprint` browser event
 - [x] SSL config: made `rejectUnauthorized` configurable via DATABASE_SSL_REJECT_UNAUTHORIZED env var
 
+### Session 16 — Role Access Overhaul & Admin Override Approvals (2026-03-12)
+
+#### Dashboard visibility
+- [x] Dashboard restricted to Admin only (sidebar + view guard + default landing)
+- [x] Non-Admin roles land on Inventory view by default on login
+
+#### PM/Chief role restrictions
+- [x] ProjectManager and Chief now only see: HULLC Inventory, Transactions, Metrics
+- [x] Removed PM/Chief access to: Dashboard, Product Requests, Fulfillments, Configuration (all 5 sub-items)
+- [x] Fulfillments and Configuration view guards changed from `hasFullView` to `canEdit` (Admin only)
+- [x] Metrics (Charts Dashboard, Received, Disbursed) opened to ProjectManager (was Admin+Chief only)
+- [x] Updated all 3 metrics API routes and 3 metrics pages to allow ProjectManager + Chief
+
+#### Admin override approvals (OOO Director coverage)
+- [x] `/api/requests/[id]/approve` now accepts Admin role — bypasses functional group check
+- [x] `/api/requests` GET: Admin now sees all requests including Pending Approval (was filtered out)
+- [x] Approvals sidebar item visible to Admin + Director (was Director only)
+- [x] Approvals view renders for Admin with contextual description for cross-group approval
+- [x] Reject API already allowed Admin — no change needed
+
+#### Pending
+- [ ] Investigate and fix Metrics Dashboard "Failed to load metrics data" error
+- [ ] Run migrations 013-015 on remote Neon database
+
 ---
 
 ## Phase 1 — User Management

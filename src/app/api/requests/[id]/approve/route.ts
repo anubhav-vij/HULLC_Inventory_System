@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { query, withTransaction } from '@/lib/db';
+import { withTransaction } from '@/lib/db';
 import { LINE_ITEMS_SUBQUERY, RequestRow, rowToRequest } from '@/lib/db/request-queries';
 
 type RouteContext = { params: Promise<{ id: string }> };
@@ -8,6 +8,7 @@ type RouteContext = { params: Promise<{ id: string }> };
 // ---------------------------------------------------------------------------
 // PUT /api/requests/[id]/approve
 // Director approves a Pending Approval request for their functional group.
+// Admin can approve any request (override for OOO Directors).
 // ---------------------------------------------------------------------------
 
 export async function PUT(request: Request, { params }: RouteContext) {
@@ -16,8 +17,8 @@ export async function PUT(request: Request, { params }: RouteContext) {
   const role = request.headers.get('x-user-role') ?? '';
   const userId = request.headers.get('x-user-id') ?? '';
 
-  if (role !== 'Director') {
-    return NextResponse.json({ error: 'Only Directors can approve requests' }, { status: 403 });
+  if (role !== 'Director' && role !== 'Admin') {
+    return NextResponse.json({ error: 'Only Directors and Admins can approve requests' }, { status: 403 });
   }
 
   if (!userId) {
@@ -38,7 +39,7 @@ export async function PUT(request: Request, { params }: RouteContext) {
 
   try {
     const result = await withTransaction(async (client) => {
-      // Get the director's user record and functional group
+      // Verify the approving user exists
       const { rows: userRows } = await client.query<{
         id: string;
         functional_group_id: string | null;
@@ -48,24 +49,10 @@ export async function PUT(request: Request, { params }: RouteContext) {
       );
 
       if (userRows.length === 0) {
-        throw Object.assign(new Error('Director user not found'), { code: 'USER_NOT_FOUND' });
+        throw Object.assign(new Error('User not found'), { code: 'USER_NOT_FOUND' });
       }
 
-      const director = userRows[0];
-      if (!director.functional_group_id) {
-        throw Object.assign(new Error('Director has no functional group assigned'), { code: 'NO_GROUP' });
-      }
-
-      const { rows: groupRows } = await client.query<{ name: string }>(
-        'SELECT name FROM functional_groups WHERE id = $1',
-        [director.functional_group_id]
-      );
-
-      if (groupRows.length === 0) {
-        throw Object.assign(new Error('Functional group not found'), { code: 'GROUP_NOT_FOUND' });
-      }
-
-      const groupName = groupRows[0].name;
+      const approver = userRows[0];
 
       // Get the request
       const { rows: reqRows } = await client.query<{ id: string; status: string; department: string }>(
@@ -86,11 +73,28 @@ export async function PUT(request: Request, { params }: RouteContext) {
         );
       }
 
-      if (req.department.toLowerCase() !== groupName.toLowerCase()) {
-        throw Object.assign(
-          new Error('You can only approve requests from your functional group'),
-          { code: 'WRONG_GROUP' }
+      // Directors can only approve requests from their own functional group.
+      // Admins can approve any request (override for OOO Directors).
+      if (role === 'Director') {
+        if (!approver.functional_group_id) {
+          throw Object.assign(new Error('Director has no functional group assigned'), { code: 'NO_GROUP' });
+        }
+
+        const { rows: groupRows } = await client.query<{ name: string }>(
+          'SELECT name FROM functional_groups WHERE id = $1',
+          [approver.functional_group_id]
         );
+
+        if (groupRows.length === 0) {
+          throw Object.assign(new Error('Functional group not found'), { code: 'GROUP_NOT_FOUND' });
+        }
+
+        if (req.department.toLowerCase() !== groupRows[0].name.toLowerCase()) {
+          throw Object.assign(
+            new Error('You can only approve requests from your functional group'),
+            { code: 'WRONG_GROUP' }
+          );
+        }
       }
 
       // Check if the product requires SOM approval

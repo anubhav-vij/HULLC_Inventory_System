@@ -41,8 +41,8 @@ export async function GET(request: Request) {
     const params: unknown[] = [];
 
     if (role === 'Admin') {
-      // Admin sees everything except Pending Approval and Pending SciOps (those go to Directors)
-      whereClause = "WHERE pr.status IN ('Approved', 'Pending SciOps Approval', 'In Progress', 'Completed', 'Rejected')";
+      // Admin sees all requests (including Pending Approval — can approve on behalf of OOO Directors)
+      whereClause = '';
     } else if (role === 'Director') {
       // Director sees Pending Approval requests for their functional group
       // Sci-Ops Director also sees Pending SciOps Approval requests
