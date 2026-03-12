@@ -3,10 +3,24 @@
 import { z } from 'zod';
 import { v4 as uuidv4 } from 'uuid';
 
+export const ALLOWED_FILE_TYPES = [
+  'application/pdf',
+  'image/jpeg',
+  'image/tiff',
+  'image/png',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+] as const;
+
+export type AllowedFileType = (typeof ALLOWED_FILE_TYPES)[number];
+
 export const LotFileSchema = z.object({
   id: z.string(), // used as the key in IndexedDB
   name: z.string(),
-  type: z.string(),
+  type: z.string().refine(
+    (t) => (ALLOWED_FILE_TYPES as readonly string[]).includes(t),
+    { message: 'Unsupported file type. Allowed: PDF, JPEG, PNG, TIFF, DOCX, XLSX.' }
+  ),
 });
 
 export const LotSchema = z.object({

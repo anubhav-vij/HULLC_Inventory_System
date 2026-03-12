@@ -118,6 +118,11 @@ export async function GET() {
 // ---------------------------------------------------------------------------
 
 export async function POST(request: Request) {
+  const role = request.headers.get('x-user-role') ?? '';
+  if (role !== 'Admin') {
+    return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
+  }
+
   let body: unknown;
   try {
     body = await request.json();
@@ -179,8 +184,8 @@ export async function POST(request: Request) {
 
       // 3. Advance request to In Progress (idempotent if already there)
       await client.query(
-        `UPDATE product_requests SET status = 'In Progress' WHERE id = $1`,
-        [requestId]
+        `UPDATE product_requests SET status = 'In Progress', updated_by = $2 WHERE id = $1`,
+        [requestId, userId]
       );
 
       // Return the newly created fulfillment

@@ -274,16 +274,17 @@ export default function InventoryPage() {
             return;
         }
 
+        const controller = new AbortController();
+        const signal = controller.signal;
+
         const loadData = async () => {
             setIsLoading(true);
             try {
-                const adminHeaders = { 'x-user-role': user.role };
-                const userHeaders = { 'x-user-role': user.role, 'x-user-id': user.id ?? '', 'x-user-email': user.email ?? '', 'x-user-functional-group': user.functionalGroupName ?? '' };
                 const [pRes, tRes, rRes, fRes] = await Promise.all([
-                    fetch('/api/products'),
-                    fetch('/api/transactions'),
-                    fetch('/api/requests', { headers: userHeaders }),
-                    fetch('/api/fulfillments'),
+                    fetch('/api/products', { signal }),
+                    fetch('/api/transactions', { signal }),
+                    fetch('/api/requests', { headers: requestHeaders(), signal }),
+                    fetch('/api/fulfillments', { signal }),
                 ]);
                 if (!pRes.ok) throw new Error('Failed to load products');
                 if (!tRes.ok) throw new Error('Failed to load transactions');
@@ -292,6 +293,7 @@ export default function InventoryPage() {
                 const [pData, tData, rData, fData] = await Promise.all([
                     pRes.json(), tRes.json(), rRes.json(), fRes.json(),
                 ]);
+                if (signal.aborted) return;
                 setProducts(pData.map(coerceProduct));
                 setTransactions(tData.map((tx: any) => ({ ...tx, date: new Date(tx.date) })));
                 setProductRequests(rData.map((r: any) => ({ ...r, date: new Date(r.date) })));
@@ -302,13 +304,15 @@ export default function InventoryPage() {
 
                 // Load config data for Admin, ProjectManager, Chief
                 if (['Admin', 'ProjectManager', 'Chief'].includes(user.role)) {
+                    const roleHeaders = authHeaders(false);
                     const [usersRes, groupsRes, projectsRes, mfrsRes, locationsRes] = await Promise.all([
-                        fetch('/api/users', { headers: adminHeaders }),
-                        fetch('/api/functional-groups?active=false'),
-                        fetch('/api/projects', { headers: adminHeaders }),
-                        fetch('/api/manufacturers', { headers: adminHeaders }),
-                        fetch('/api/storage-locations', { headers: adminHeaders }),
+                        fetch('/api/users', { headers: roleHeaders, signal }),
+                        fetch('/api/functional-groups?active=false', { signal }),
+                        fetch('/api/projects', { headers: roleHeaders, signal }),
+                        fetch('/api/manufacturers', { headers: roleHeaders, signal }),
+                        fetch('/api/storage-locations', { headers: roleHeaders, signal }),
                     ]);
+                    if (signal.aborted) return;
                     if (usersRes.ok) setAppUsers(await usersRes.json());
                     if (groupsRes.ok) setFunctionalGroups(await groupsRes.json());
                     if (projectsRes.ok) setAppProjects(await projectsRes.json());
@@ -316,6 +320,7 @@ export default function InventoryPage() {
                     if (locationsRes.ok) setAppLocations(await locationsRes.json());
                 }
             } catch (error: any) {
+                if (error.name === 'AbortError') return;
                 console.error('Error loading data', error);
                 toast({ title: 'Load Error', description: error.message || 'Could not load inventory data.', variant: 'destructive' });
                 setProducts([]);
@@ -327,6 +332,7 @@ export default function InventoryPage() {
         };
 
         loadData();
+        return () => controller.abort();
     }, [user]);
 
 
@@ -382,7 +388,18 @@ export default function InventoryPage() {
 
     // ─── User Management handlers ────────────────────────────────────────────
 
-    const adminHeaders = () => ({ 'Content-Type': 'application/json', 'x-user-role': user?.role ?? '', 'x-user-id': user?.id ?? '' });
+    const authHeaders = (contentType = true) => {
+        const h: Record<string, string> = { 'x-user-role': user?.role ?? '', 'x-user-id': user?.id ?? '' };
+        if (contentType) h['Content-Type'] = 'application/json';
+        return h;
+    };
+
+    /** Auth headers extended with email/group — needed for role-aware request filtering */
+    const requestHeaders = () => ({
+        ...authHeaders(false),
+        'x-user-email': user?.email ?? '',
+        'x-user-functional-group': user?.functionalGroupName ?? '',
+    });
 
     const handleOpenUserForm = (u: SystemUser | null) => {
         setUserToEdit(u);
@@ -408,7 +425,7 @@ export default function InventoryPage() {
 
             const url = userToEdit ? `/api/users/${userToEdit.id}` : '/api/users';
             const method = userToEdit ? 'PUT' : 'POST';
-            const res = await fetch(url, { method, headers: adminHeaders(), body: JSON.stringify(body) });
+            const res = await fetch(url, { method, headers: authHeaders(), body: JSON.stringify(body) });
             const data = await res.json();
             if (!res.ok) throw new Error(data.error || 'Failed to save user');
 
@@ -431,7 +448,7 @@ export default function InventoryPage() {
         try {
             const res = await fetch(`/api/users/${u.id}/status`, {
                 method: 'PUT',
-                headers: adminHeaders(),
+                headers: authHeaders(),
                 body: JSON.stringify({ isActive: !u.isActive }),
             });
             const data = await res.json();
@@ -455,7 +472,7 @@ export default function InventoryPage() {
         try {
             const url = groupToEdit ? `/api/functional-groups/${groupToEdit.id}` : '/api/functional-groups';
             const method = groupToEdit ? 'PUT' : 'POST';
-            const res = await fetch(url, { method, headers: adminHeaders(), body: JSON.stringify({ name: groupFormName }) });
+            const res = await fetch(url, { method, headers: authHeaders(), body: JSON.stringify({ name: groupFormName }) });
             const data = await res.json();
             if (!res.ok) throw new Error(data.error || 'Failed to save group');
 
@@ -478,7 +495,7 @@ export default function InventoryPage() {
         try {
             const res = await fetch(`/api/functional-groups/${g.id}`, {
                 method: 'PUT',
-                headers: adminHeaders(),
+                headers: authHeaders(),
                 body: JSON.stringify({ isActive: !g.isActive }),
             });
             const data = await res.json();
@@ -506,12 +523,12 @@ export default function InventoryPage() {
             const res = isEdit
                 ? await fetch(`/api/projects/${projectToEdit!.id}`, {
                     method: 'PUT',
-                    headers: adminHeaders(),
+                    headers: authHeaders(),
                     body: JSON.stringify({ name: projectFormName }),
                   })
                 : await fetch('/api/projects', {
                     method: 'POST',
-                    headers: adminHeaders(),
+                    headers: authHeaders(),
                     body: JSON.stringify({ name: projectFormName }),
                   });
             if (!res.ok) {
@@ -539,7 +556,7 @@ export default function InventoryPage() {
         try {
             const res = await fetch(`/api/projects/${p.id}`, {
                 method: 'PUT',
-                headers: adminHeaders(),
+                headers: authHeaders(),
                 body: JSON.stringify({ isActive: !p.isActive }),
             });
             if (!res.ok) throw new Error('Failed to update project');
@@ -570,12 +587,12 @@ export default function InventoryPage() {
             const res = isEdit
                 ? await fetch(`/api/manufacturers/${manufacturerToEdit!.id}`, {
                     method: 'PUT',
-                    headers: adminHeaders(),
+                    headers: authHeaders(),
                     body: JSON.stringify({ name: manufacturerFormName, alternateNames: manufacturerFormAltNames }),
                   })
                 : await fetch('/api/manufacturers', {
                     method: 'POST',
-                    headers: adminHeaders(),
+                    headers: authHeaders(),
                     body: JSON.stringify({ name: manufacturerFormName, alternateNames: manufacturerFormAltNames }),
                   });
             if (!res.ok) {
@@ -603,7 +620,7 @@ export default function InventoryPage() {
         try {
             const res = await fetch(`/api/manufacturers/${m.id}`, {
                 method: 'PUT',
-                headers: adminHeaders(),
+                headers: authHeaders(),
                 body: JSON.stringify({ isActive: !m.isActive }),
             });
             if (!res.ok) throw new Error('Failed to update manufacturer');
@@ -633,12 +650,12 @@ export default function InventoryPage() {
             const res = isEdit
                 ? await fetch(`/api/storage-locations/${locationToEdit!.id}`, {
                     method: 'PUT',
-                    headers: adminHeaders(),
+                    headers: authHeaders(),
                     body: JSON.stringify({ name: locationFormName }),
                   })
                 : await fetch('/api/storage-locations', {
                     method: 'POST',
-                    headers: adminHeaders(),
+                    headers: authHeaders(),
                     body: JSON.stringify({ name: locationFormName }),
                   });
             if (!res.ok) {
@@ -666,7 +683,7 @@ export default function InventoryPage() {
         try {
             const res = await fetch(`/api/storage-locations/${l.id}`, {
                 method: 'PUT',
-                headers: adminHeaders(),
+                headers: authHeaders(),
                 body: JSON.stringify({ isActive: !l.isActive }),
             });
             if (!res.ok) {
@@ -775,7 +792,7 @@ export default function InventoryPage() {
                 }
                 const res = await fetch(`/api/products/${productToEdit.id}`, {
                     method: 'PUT',
-                    headers: { 'Content-Type': 'application/json', 'x-user-id': user?.id ?? '' },
+                    headers: authHeaders(),
                     body: JSON.stringify(payload),
                 });
                 if (!res.ok) {
@@ -788,7 +805,7 @@ export default function InventoryPage() {
             } else {
                 const res = await fetch('/api/products', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'x-user-id': user?.id ?? '' },
+                    headers: authHeaders(),
                     body: JSON.stringify(payload),
                 });
                 if (!res.ok) {
@@ -859,7 +876,7 @@ export default function InventoryPage() {
                     const lineItemId = parts[2];
                     res = await fetch(`/api/requests/${reqId}/line-items/${lineItemId}`, {
                         method: 'PUT',
-                        headers: { 'Content-Type': 'application/json', 'x-user-role': user?.role ?? 'Admin', 'x-user-id': user?.id ?? '' },
+                        headers: authHeaders(),
                         body: JSON.stringify({
                             date: data.date instanceof Date ? data.date.toISOString() : data.date,
                             notes: data.notes,
@@ -870,7 +887,7 @@ export default function InventoryPage() {
                     // Path B: dispense for a legacy fulfillment
                     res = await fetch(`/api/fulfillments/${fulfillmentToUpdate.id}`, {
                         method: 'PUT',
-                        headers: { 'Content-Type': 'application/json', 'x-user-id': user?.id ?? '' },
+                        headers: authHeaders(),
                         body: JSON.stringify({
                             date: data.date instanceof Date ? data.date.toISOString() : data.date,
                             notes: data.notes,
@@ -888,10 +905,9 @@ export default function InventoryPage() {
                     addFulfilledItemsToDepartmentInventory(request.department, productForTransaction.id, totalDispensed);
                 }
                 // Re-fetch all affected state
-                const userHeaders2 = { 'x-user-role': user?.role ?? '', 'x-user-id': user?.id ?? '', 'x-user-email': user?.email ?? '', 'x-user-functional-group': user?.functionalGroupName ?? '' };
                 const [fRes, rRes, txRes, pRes] = await Promise.all([
                     fetch('/api/fulfillments'),
-                    fetch('/api/requests', { headers: userHeaders2 }),
+                    fetch('/api/requests', { headers: requestHeaders() }),
                     fetch('/api/transactions'),
                     fetch('/api/products'),
                 ]);
@@ -910,7 +926,7 @@ export default function InventoryPage() {
                 // Path A: standalone transaction
                 const res = await fetch('/api/transactions', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'x-user-id': user?.id ?? '' },
+                    headers: authHeaders(),
                     body: JSON.stringify({
                         productId: productForTransaction.id,
                         date: data.date instanceof Date ? data.date.toISOString() : data.date,
@@ -1121,8 +1137,7 @@ export default function InventoryPage() {
                 throw new Error((body as any).error || 'Failed to cancel fulfillment');
             }
             setFulfillments(prev => prev.filter(f => f.id !== fulfillmentToCancel.id));
-            const userHeaders3 = { 'x-user-role': user?.role ?? '', 'x-user-id': user?.id ?? '', 'x-user-email': user?.email ?? '', 'x-user-functional-group': user?.functionalGroupName ?? '' };
-            const rRes = await fetch('/api/requests', { headers: userHeaders3 });
+            const rRes = await fetch('/api/requests', { headers: requestHeaders() });
             if (rRes.ok) setProductRequests((await rRes.json()).map((r: any) => ({ ...r, date: new Date(r.date) })));
             toast({ title: 'Fulfillment Cancelled', description: `The fulfillment for "${fulfillmentToCancel.productName}" has been cancelled.` });
             setFulfillmentToCancel(null);
@@ -1204,7 +1219,7 @@ export default function InventoryPage() {
                     if (existingIds.has(product.id)) {
                         const res = await fetch(`/api/products/${product.id}`, {
                             method: 'PUT',
-                            headers: { 'Content-Type': 'application/json', 'x-user-id': user?.id ?? '' },
+                            headers: authHeaders(),
                             body: JSON.stringify(product),
                         });
                         if (!res.ok) {
@@ -1215,7 +1230,7 @@ export default function InventoryPage() {
                         const { id: _ignored, ...productWithoutId } = product;
                         const res = await fetch('/api/products', {
                             method: 'POST',
-                            headers: { 'Content-Type': 'application/json', 'x-user-id': user?.id ?? '' },
+                            headers: authHeaders(),
                             body: JSON.stringify(productWithoutId),
                         });
                         if (!res.ok) {

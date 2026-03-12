@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { query } from '@/lib/db';
+import { isUniqueViolation } from '@/lib/api-error';
 
 const LocationCreateSchema = z.object({
   name: z.string().min(1).max(255),
@@ -46,8 +47,8 @@ export async function POST(request: Request) {
       [parsed.data.name.trim(), userId]
     );
     return NextResponse.json(rows[0], { status: 201 });
-  } catch (error: any) {
-    if (error.code === '23505') {
+  } catch (error) {
+    if (isUniqueViolation(error)) {
       return NextResponse.json({ error: 'A storage location with that name already exists' }, { status: 409 });
     }
     console.error('[api/storage-locations] POST error:', error);

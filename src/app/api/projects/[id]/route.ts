@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { query } from '@/lib/db';
+import { isUniqueViolation } from '@/lib/api-error';
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -26,7 +27,7 @@ export async function PUT(request: Request, { params }: RouteContext) {
   const { name, isActive } = parsed.data;
   const userId = request.headers.get('x-user-id') || null;
   if (name === undefined && isActive === undefined) {
-    return NextResponse.json({ error: 'No fields to update' }, { status: 400 });
+    return NextResponse.json({ error: 'No fields to update' }, { status: 422 });
   }
   try {
     const setParts: string[] = [];
@@ -41,8 +42,8 @@ export async function PUT(request: Request, { params }: RouteContext) {
     );
     if (rows.length === 0) return NextResponse.json({ error: 'Project not found' }, { status: 404 });
     return NextResponse.json({ id: rows[0].id, name: rows[0].name, isActive: rows[0].is_active });
-  } catch (error: any) {
-    if (error.code === '23505') {
+  } catch (error) {
+    if (isUniqueViolation(error)) {
       return NextResponse.json({ error: 'A project with that name already exists' }, { status: 409 });
     }
     console.error(`[api/projects/${id}] PUT error:`, error);

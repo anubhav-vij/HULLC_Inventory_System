@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { query } from '@/lib/db';
+import { isUniqueViolation } from '@/lib/api-error';
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -84,8 +85,8 @@ export async function PUT(request: Request, { params }: RouteContext) {
       return NextResponse.json({ error: 'Storage location not found' }, { status: 404 });
     }
     return NextResponse.json(rows[0]);
-  } catch (error: any) {
-    if (error.code === '23505') {
+  } catch (error) {
+    if (isUniqueViolation(error)) {
       return NextResponse.json({ error: 'A storage location with that name already exists' }, { status: 409 });
     }
     console.error(`[api/storage-locations/${id}] PUT error:`, error);

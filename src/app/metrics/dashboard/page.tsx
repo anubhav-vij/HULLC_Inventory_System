@@ -54,19 +54,19 @@ export default function MetricsDashboardPage() {
         if (parsed?.id && ["Admin", "Chief"].includes(parsed.role)) {
           setUser(parsed);
         } else {
-          window.location.href = "/";
+          router.replace("/");
           return;
         }
       } else {
-        window.location.href = "/";
+        router.replace("/");
         return;
       }
     } catch {
-      window.location.href = "/";
+      router.replace("/");
       return;
     }
     setIsLoading(false);
-  }, []);
+  }, [router]);
 
   useEffect(() => {
     if (!user) return;
@@ -180,7 +180,7 @@ export default function MetricsDashboardPage() {
         user={user}
         onLogout={() => {
           window.localStorage.removeItem(USER_STORAGE_KEY);
-          window.location.href = "/";
+          router.push("/");
         }}
       />
 

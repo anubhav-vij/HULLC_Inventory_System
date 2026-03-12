@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { query } from '@/lib/db';
+import { isUniqueViolation } from '@/lib/api-error';
 
 const ManufacturerCreateSchema = z.object({
   name: z.string().min(1).max(255),
@@ -47,8 +48,8 @@ export async function POST(request: Request) {
       [parsed.data.name.trim(), parsed.data.alternateNames?.trim() || null, userId]
     );
     return NextResponse.json(rows[0], { status: 201 });
-  } catch (error: any) {
-    if (error.code === '23505') {
+  } catch (error) {
+    if (isUniqueViolation(error)) {
       return NextResponse.json({ error: 'A manufacturer with that name already exists' }, { status: 409 });
     }
     console.error('[api/manufacturers] POST error:', error);

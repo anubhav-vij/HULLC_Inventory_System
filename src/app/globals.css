@@ -127,6 +127,25 @@
   }
 }
 
+/* Sidebar nav button hover & focus */
+.sidebar-nav-btn:not(.sidebar-nav-btn--active):hover,
+.sidebar-nav-btn:not(.sidebar-nav-btn--active):focus-visible {
+  background-color: rgba(128, 212, 212, 0.08);
+}
+.sidebar-nav-btn:focus-visible {
+  outline: 2px solid #80d4d4;
+  outline-offset: -2px;
+}
+.sidebar-logout-btn:hover,
+.sidebar-logout-btn:focus-visible {
+  background-color: rgba(128, 212, 212, 0.08);
+  color: #fff;
+}
+.sidebar-logout-btn:focus-visible {
+  outline: 2px solid #80d4d4;
+  outline-offset: -2px;
+}
+
 /* Focus ring for form inputs */
 input:focus,
 select:focus,

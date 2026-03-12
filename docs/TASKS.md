@@ -131,6 +131,39 @@ each phase sequentially, marking `[~]` while in progress and `[x]` when complete
 - [x] Database initialized: schema + 12 migrations + seed (admin@hullc.nih.gov / Admin1234!)
 - [x] Resolved env var issue: Amplify requires `.env.production` written during build phase
 
+### Session 15 — Codebase Review & Hardening (2026-03-12)
+
+#### Security fixes
+- [x] Added Admin-only auth guards (403) to 8 unprotected mutation endpoints: products POST/PUT/DELETE, transactions POST/DELETE, fulfillments POST/PUT/DELETE
+- [x] Migration 013: case-insensitive unique index on users.email (`idx_users_email_lower`)
+- [x] Migration 014: missing indexes on request_line_items.fulfillment_id, manufacturers.is_active, storage_locations.is_active
+
+#### Critical bug fixes
+- [x] Migration 015: expanded lot_files.type CHECK constraint from 3 MIME types (pdf, jpeg, tiff) to 6 (adds png, docx, xlsx) — was causing DB constraint violations vs ALLOWED_FILE_TYPES
+- [x] Fixed fulfillment cancellation: status restoration changed from 'Pending Approval' → 'Approved' (preserves director's approval)
+- [x] Added missing `updated_by` audit trail on request status changes in fulfillment POST and PUT
+- [x] Fixed status code in projects/[id] "No fields to update" from 400 → 422
+
+#### Code quality — shared modules (DRY)
+- [x] Created `src/lib/api-error.ts` — typed helpers (isUniqueViolation, isForeignKeyViolation, getErrorMessage) replacing `error: any` in 13 API catch blocks
+- [x] Created `src/lib/db/request-queries.ts` — centralized LINE_ITEMS_SUBQUERY, RequestRow, rowToRequest() eliminating ~60 lines of duplication per file across 7 request API routes
+- [x] Refactored all 7 request API routes to import from shared request-queries module
+
+#### Code quality — type safety & consistency
+- [x] Replaced 12+ `(error as any).code === '23505'` patterns with `isUniqueViolation(error)` across all config API routes
+- [x] Removed `as any` casts in material-audit-report.tsx (Product type already has vwrPartNumber, somApprovalRequired)
+- [x] Replaced `crypto.randomUUID()` with `uuidv4()` in requests/new/page.tsx for consistency
+- [x] Added `LotFileSchema` type validation with ALLOWED_FILE_TYPES constant in types.ts
+
+#### Code quality — frontend improvements
+- [x] Centralized auth headers in inventory-page.tsx: `authHeaders()` and `requestHeaders()` replace 13+ inconsistent inline patterns
+- [x] Added AbortController to inventory-page.tsx loadData (9 fetches) and material-audit-report.tsx
+- [x] Sidebar: replaced JS onMouseEnter/onMouseLeave with CSS hover/focus-visible, added ARIA attributes (aria-current, aria-expanded, role)
+- [x] Metrics pages: wrapped fetchData in useCallback, added error toasts
+- [x] Product/request pages: replaced `window.location.href` with `router.push()`/`router.replace()`
+- [x] Material audit report: replaced setTimeout-based close with `afterprint` browser event
+- [x] SSL config: made `rejectUnauthorized` configurable via DATABASE_SSL_REJECT_UNAUTHORIZED env var
+
 ---
 
 ## Phase 1 — User Management

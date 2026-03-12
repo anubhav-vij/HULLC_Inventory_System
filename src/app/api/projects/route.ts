@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { query } from '@/lib/db';
+import { isUniqueViolation } from '@/lib/api-error';
 
 const CreateProjectSchema = z.object({
   name: z.string().min(1, 'Name is required.'),
@@ -38,8 +39,8 @@ export async function POST(request: Request) {
       [parsed.data.name, userId]
     );
     return NextResponse.json({ id: rows[0].id, name: rows[0].name, isActive: rows[0].is_active }, { status: 201 });
-  } catch (error: any) {
-    if (error.code === '23505') {
+  } catch (error) {
+    if (isUniqueViolation(error)) {
       return NextResponse.json({ error: 'A project with that name already exists' }, { status: 409 });
     }
     console.error('[api/projects] POST error:', error);

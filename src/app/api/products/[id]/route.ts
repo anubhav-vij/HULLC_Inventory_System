@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { v4 as uuidv4 } from 'uuid';
 import { query, withTransaction } from '@/lib/db';
 import { ProductFormSchema } from '@/lib/types';
+import { isForeignKeyViolation } from '@/lib/api-error';
 import {
   PRODUCT_SELECT_SQL,
   ProductRow,
@@ -50,6 +51,11 @@ export async function GET(_request: Request, { params }: RouteContext) {
 // ---------------------------------------------------------------------------
 
 export async function PUT(request: Request, { params }: RouteContext) {
+  const role = request.headers.get('x-user-role') ?? '';
+  if (role !== 'Admin') {
+    return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
+  }
+
   const { id } = await params;
 
   let body: unknown;
@@ -193,7 +199,12 @@ export async function PUT(request: Request, { params }: RouteContext) {
 // has existing transaction history (RESTRICT FK prevents the delete).
 // ---------------------------------------------------------------------------
 
-export async function DELETE(_request: Request, { params }: RouteContext) {
+export async function DELETE(request: Request, { params }: RouteContext) {
+  const role = request.headers.get('x-user-role') ?? '';
+  if (role !== 'Admin') {
+    return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
+  }
+
   const { id } = await params;
 
   try {
@@ -207,14 +218,7 @@ export async function DELETE(_request: Request, { params }: RouteContext) {
   } catch (error) {
     console.error(`[api/products/${id}] DELETE error:`, error);
 
-    // PostgreSQL error code 23503 = foreign_key_violation.
-    // pg DatabaseError exposes the SQLSTATE as .code; fall back to the message
-    // text in case the error is wrapped or the property is inaccessible.
-    const pgCode = (error as Record<string, unknown>)?.['code'];
-    const isFKViolation =
-      pgCode === '23503' ||
-      (error instanceof Error && error.message.includes('foreign key constraint'));
-    if (isFKViolation) {
+    if (isForeignKeyViolation(error)) {
       return NextResponse.json(
         {
           error:

@@ -99,10 +99,11 @@ function NavButton({
   return (
     <button
       onClick={onClick}
+      aria-current={isActive ? "page" : undefined}
       className={cn(
-        "w-full flex items-center gap-3 px-5 py-2.5 text-sm transition-colors text-left",
+        "sidebar-nav-btn w-full flex items-center gap-3 px-5 py-2.5 text-sm transition-colors text-left",
         isActive
-          ? "border-l-[3px] pl-[17px]"
+          ? "sidebar-nav-btn--active border-l-[3px] pl-[17px]"
           : "border-l-[3px] border-transparent hover:pl-[17px]"
       )}
       style={
@@ -114,17 +115,6 @@ function NavButton({
             }
           : { color: "#80d4d4" }
       }
-      onMouseEnter={(e) => {
-        if (!isActive) {
-          (e.currentTarget as HTMLButtonElement).style.backgroundColor =
-            "rgba(128,212,212,0.08)";
-        }
-      }}
-      onMouseLeave={(e) => {
-        if (!isActive) {
-          (e.currentTarget as HTMLButtonElement).style.backgroundColor = "";
-        }
-      }}
     >
       <Icon className="h-4 w-4 shrink-0 opacity-80" />
       <span>{item.label}</span>
@@ -159,8 +149,6 @@ export function Sidebar({ activeView, onNavigate, user, onLogout, mobileOpen, on
     (item) => !item.roles || item.roles.includes(user.role)
   );
 
-  const isConfigChild = activeView.startsWith("config-");
-
   const handleNavClick = (view: string) => {
     onNavigate(view);
     onMobileClose?.();
@@ -172,6 +160,8 @@ export function Sidebar({ activeView, onNavigate, user, onLogout, mobileOpen, on
     <aside
       className={cn("sidebar-fixed flex flex-col", mobileOpen && "sidebar-open")}
       style={{ backgroundColor: "#0d3d3d" }}
+      role="navigation"
+      aria-label="Main navigation"
     >
       {/* Logo area */}
       <div className="px-6 py-5 border-b" style={{ borderColor: "rgba(255,255,255,0.1)" }}>
@@ -193,9 +183,11 @@ export function Sidebar({ activeView, onNavigate, user, onLogout, mobileOpen, on
               <div key={item.id}>
                 <button
                   onClick={() => toggleMenu(item.id)}
+                  aria-expanded={isOpen}
                   className={cn(
-                    "w-full flex items-center gap-3 px-5 py-2.5 text-sm transition-colors text-left",
-                    "border-l-[3px] border-transparent"
+                    "sidebar-nav-btn w-full flex items-center gap-3 px-5 py-2.5 text-sm transition-colors text-left",
+                    "border-l-[3px] border-transparent",
+                    isParentActive && !isOpen && "sidebar-nav-btn--active"
                   )}
                   style={
                     isParentActive && !isOpen
@@ -206,17 +198,6 @@ export function Sidebar({ activeView, onNavigate, user, onLogout, mobileOpen, on
                         }
                       : { color: "#80d4d4" }
                   }
-                  onMouseEnter={(e) => {
-                    if (!isParentActive || isOpen) {
-                      (e.currentTarget as HTMLButtonElement).style.backgroundColor =
-                        "rgba(128,212,212,0.08)";
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (!isParentActive || isOpen) {
-                      (e.currentTarget as HTMLButtonElement).style.backgroundColor = "";
-                    }
-                  }}
                 >
                   <ParentIcon className="h-4 w-4 shrink-0 opacity-80" />
                   <span className="flex-1">{item.label}</span>
@@ -228,7 +209,7 @@ export function Sidebar({ activeView, onNavigate, user, onLogout, mobileOpen, on
                   />
                 </button>
                 {isOpen && (
-                  <div className="ml-4">
+                  <div className="ml-4" role="group" aria-label={item.label}>
                     {item.children.map((child) => {
                       const ChildIcon = child.icon;
                       const isChildActive = activeView === child.id;
@@ -236,10 +217,11 @@ export function Sidebar({ activeView, onNavigate, user, onLogout, mobileOpen, on
                         <button
                           key={child.id}
                           onClick={() => handleNavClick(child.id)}
+                          aria-current={isChildActive ? "page" : undefined}
                           className={cn(
-                            "w-full flex items-center gap-3 px-5 py-2 text-[13px] transition-colors text-left",
+                            "sidebar-nav-btn sidebar-nav-btn--child w-full flex items-center gap-3 px-5 py-2 text-[13px] transition-colors text-left",
                             isChildActive
-                              ? "border-l-[2px] pl-[18px]"
+                              ? "sidebar-nav-btn--active border-l-[2px] pl-[18px]"
                               : "border-l-[2px] border-transparent"
                           )}
                           style={
@@ -251,17 +233,6 @@ export function Sidebar({ activeView, onNavigate, user, onLogout, mobileOpen, on
                                 }
                               : { color: "rgba(128,212,212,0.75)" }
                           }
-                          onMouseEnter={(e) => {
-                            if (!isChildActive) {
-                              (e.currentTarget as HTMLButtonElement).style.backgroundColor =
-                                "rgba(128,212,212,0.08)";
-                            }
-                          }}
-                          onMouseLeave={(e) => {
-                            if (!isChildActive) {
-                              (e.currentTarget as HTMLButtonElement).style.backgroundColor = "";
-                            }
-                          }}
                         >
                           <ChildIcon className="h-3.5 w-3.5 shrink-0 opacity-70" />
                           <span>{child.label}</span>
@@ -308,17 +279,8 @@ export function Sidebar({ activeView, onNavigate, user, onLogout, mobileOpen, on
         </div>
         <button
           onClick={onLogout}
-          className="w-full flex items-center gap-2 px-3 py-1.5 rounded text-sm transition-colors"
+          className="sidebar-logout-btn w-full flex items-center gap-2 px-3 py-1.5 rounded text-sm transition-colors"
           style={{ color: "#80d4d4" }}
-          onMouseEnter={(e) => {
-            (e.currentTarget as HTMLButtonElement).style.backgroundColor =
-              "rgba(128,212,212,0.08)";
-            (e.currentTarget as HTMLButtonElement).style.color = "#fff";
-          }}
-          onMouseLeave={(e) => {
-            (e.currentTarget as HTMLButtonElement).style.backgroundColor = "";
-            (e.currentTarget as HTMLButtonElement).style.color = "#80d4d4";
-          }}
         >
           <LogOut className="h-4 w-4" />
           Logout

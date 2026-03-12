@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import bcrypt from 'bcryptjs';
 import { query, withTransaction } from '@/lib/db';
+import { isUniqueViolation } from '@/lib/api-error';
 
 const FULL_VIEW_ROLES = ['Admin', 'ProjectManager', 'Chief'];
 
@@ -130,8 +131,8 @@ export async function POST(request: Request) {
     });
 
     return NextResponse.json(rowToUser(user), { status: 201 });
-  } catch (error: any) {
-    if (error.code === '23505') {
+  } catch (error) {
+    if (isUniqueViolation(error)) {
       return NextResponse.json(
         { error: 'A user with that email already exists' },
         { status: 409 }

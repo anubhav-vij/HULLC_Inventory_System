@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { query } from '@/lib/db';
+import { isUniqueViolation } from '@/lib/api-error';
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -87,8 +88,8 @@ export async function PUT(request: Request, { params }: RouteContext) {
       return NextResponse.json({ error: 'Functional group not found' }, { status: 404 });
     }
     return NextResponse.json(rowToGroup(rows[0]));
-  } catch (error: any) {
-    if (error.code === '23505') {
+  } catch (error) {
+    if (isUniqueViolation(error)) {
       return NextResponse.json(
         { error: 'A group with that name already exists' },
         { status: 409 }

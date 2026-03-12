@@ -24,19 +24,19 @@ function NewProductFormPage() {
         if (parsed?.id && parsed?.role === 'Admin') {
           setUser(parsed);
         } else {
-          window.location.href = '/';
+          router.replace('/');
           return;
         }
       } else {
-        window.location.href = '/';
+        router.replace('/');
         return;
       }
     } catch {
-      window.location.href = '/';
+      router.replace('/');
       return;
     }
     setIsLoading(false);
-  }, []);
+  }, [router]);
 
   const handleSave = async (data: ProductFormData) => {
     setIsSaving(true);
@@ -51,7 +51,7 @@ function NewProductFormPage() {
     try {
       const res = await fetch('/api/products', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-user-id': user?.id ?? '' },
+        headers: { 'Content-Type': 'application/json', 'x-user-role': user?.role ?? '', 'x-user-id': user?.id ?? '' },
         body: JSON.stringify(payload),
       });
       if (!res.ok) {
@@ -59,7 +59,7 @@ function NewProductFormPage() {
         throw new Error((body as any).error || 'Failed to create product');
       }
       toast({ title: 'Product Added', description: `"${data.name}" has been added successfully.` });
-      window.location.href = '/';
+      router.push('/');
     } catch (error: any) {
       toast({ title: 'Save Failed', description: error.message, variant: 'destructive' });
     } finally {
@@ -87,7 +87,7 @@ function NewProductFormPage() {
           <span style={{ color: '#0f172a' }} className="font-medium">Add New Product</span>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={() => window.location.href = '/'} disabled={isSaving}>Cancel</Button>
+          <Button variant="outline" onClick={() => router.push('/')} disabled={isSaving}>Cancel</Button>
           <Button type="submit" form="product-form" disabled={isSaving} style={{ backgroundColor: '#1e40af' }}>
             {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Save Product
@@ -102,7 +102,7 @@ function NewProductFormPage() {
         <ProductForm
           product={null}
           onSave={handleSave}
-          onCancel={() => window.location.href = '/'}
+          onCancel={() => router.push('/')}
           isSaving={isSaving}
           isAdmin={true}
         />

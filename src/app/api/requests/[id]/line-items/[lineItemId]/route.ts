@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { v4 as uuidv4 } from 'uuid';
 import { z } from 'zod';
 import { withTransaction } from '@/lib/db';
+import { LINE_ITEMS_SUBQUERY, rowToRequest } from '@/lib/db/request-queries';
 
 type RouteContext = { params: Promise<{ id: string; lineItemId: string }> };
 
@@ -15,23 +16,6 @@ const FulfillLineItemSchema = z.object({
   notes: z.string().min(1),
   items: z.array(DispenseItemSchema).min(1),
 });
-
-const LINE_ITEMS_SUBQUERY = `
-  COALESCE(
-    json_agg(
-      json_build_object(
-        'id', rli.id,
-        'requestId', rli.request_id,
-        'requestedDate', to_char(rli.requested_date, 'YYYY-MM-DD'),
-        'quantity', rli.quantity,
-        'status', rli.status,
-        'fulfilledQuantity', rli.fulfilled_quantity,
-        'fulfillmentId', rli.fulfillment_id
-      ) ORDER BY rli.requested_date
-    ) FILTER (WHERE rli.id IS NOT NULL),
-    '[]'
-  ) AS line_items
-`;
 
 // ---------------------------------------------------------------------------
 // PUT /api/requests/[id]/line-items/[lineItemId]
@@ -221,38 +205,7 @@ export async function PUT(request: Request, { params }: RouteContext) {
       return full[0];
     });
 
-    // Map the result
-    const mapped = {
-      id: result.id,
-      productId: result.product_id,
-      productName: result.product_name,
-      requestorName: result.requestor_name,
-      requestorEmail: result.requestor_email,
-      department: result.department,
-      project: result.project ?? null,
-      justification: result.justification,
-      sopRead: result.sop_read,
-      status: result.status,
-      rejectionNote: result.rejection_note ?? undefined,
-      directorId: result.director_id ?? null,
-      directorApprovedAt: result.director_approved_at ? new Date(result.director_approved_at).toISOString() : null,
-      directorRejectionNote: result.director_rejection_note ?? null,
-      rejectedBy: result.rejected_by ?? null,
-      rejectionStage: result.rejection_stage ?? null,
-      date: result.date,
-      lineItems: (result.line_items ?? []).map((li: any) => ({
-        id: li.id,
-        requestId: li.requestId,
-        requestedDate: li.requestedDate,
-        quantity: li.quantity,
-        status: li.status,
-        fulfilledQuantity: li.fulfilledQuantity,
-        fulfillmentId: li.fulfillmentId ?? null,
-        createdAt: new Date().toISOString(),
-      })),
-    };
-
-    return NextResponse.json(mapped);
+    return NextResponse.json(rowToRequest(result));
   } catch (error) {
     const err = error as Error & { code?: string; status?: string; lotId?: string };
 

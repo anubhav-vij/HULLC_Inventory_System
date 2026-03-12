@@ -1,86 +1,9 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { query, withTransaction } from '@/lib/db';
+import { LINE_ITEMS_SUBQUERY, RequestRow, rowToRequest } from '@/lib/db/request-queries';
 
 type RouteContext = { params: Promise<{ id: string }> };
-
-interface RequestRow {
-  id: string;
-  product_id: string;
-  product_name: string;
-  requestor_name: string;
-  requestor_email: string;
-  department: string;
-  project: string | null;
-  justification: string;
-  sop_read: boolean;
-  status: string;
-  rejection_note: string | null;
-  director_id: string | null;
-  director_approved_at: Date | null;
-  director_rejection_note: string | null;
-  rejected_by: string | null;
-  rejection_stage: string | null;
-  date: Date;
-  line_items: Array<{
-    id: string;
-    requestId: string;
-    requestedDate: string;
-    quantity: number;
-    status: string;
-    fulfilledQuantity: number;
-    fulfillmentId: string | null;
-  }> | null;
-}
-
-const LINE_ITEMS_SUBQUERY = `
-  COALESCE(
-    json_agg(
-      json_build_object(
-        'id', rli.id,
-        'requestId', rli.request_id,
-        'requestedDate', to_char(rli.requested_date, 'YYYY-MM-DD'),
-        'quantity', rli.quantity,
-        'status', rli.status,
-        'fulfilledQuantity', rli.fulfilled_quantity,
-        'fulfillmentId', rli.fulfillment_id
-      ) ORDER BY rli.requested_date
-    ) FILTER (WHERE rli.id IS NOT NULL),
-    '[]'
-  ) AS line_items
-`;
-
-function rowToRequest(row: RequestRow) {
-  return {
-    id: row.id,
-    productId: row.product_id,
-    productName: row.product_name,
-    requestorName: row.requestor_name,
-    requestorEmail: row.requestor_email,
-    department: row.department,
-    project: row.project ?? null,
-    justification: row.justification,
-    sopRead: row.sop_read,
-    status: row.status,
-    rejectionNote: row.rejection_note ?? undefined,
-    directorId: row.director_id ?? null,
-    directorApprovedAt: row.director_approved_at ? row.director_approved_at.toISOString() : null,
-    directorRejectionNote: row.director_rejection_note ?? null,
-    rejectedBy: row.rejected_by ?? null,
-    rejectionStage: row.rejection_stage ?? null,
-    date: row.date,
-    lineItems: (row.line_items ?? []).map(li => ({
-      id: li.id,
-      requestId: li.requestId,
-      requestedDate: li.requestedDate,
-      quantity: li.quantity,
-      status: li.status,
-      fulfilledQuantity: li.fulfilledQuantity,
-      fulfillmentId: li.fulfillmentId ?? null,
-      createdAt: new Date().toISOString(),
-    })),
-  };
-}
 
 const RejectSchema = z.object({
   rejectionNote: z.string().min(1, 'Rejection note is required'),

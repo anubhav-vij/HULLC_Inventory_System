@@ -16,9 +16,12 @@ const poolConfig = {
 
   // Enable SSL in production. Most cloud Postgres providers (Supabase, Neon,
   // Railway, etc.) require it. Set DATABASE_SSL=false to opt out explicitly.
+  // Enable SSL in production. Set DATABASE_SSL=false to disable, or
+  // DATABASE_SSL_REJECT_UNAUTHORIZED=true for strict certificate validation
+  // (recommended for RDS/private CAs; Neon free tier needs rejectUnauthorized: false).
   ssl:
     process.env.NODE_ENV === 'production' && process.env.DATABASE_SSL !== 'false'
-      ? { rejectUnauthorized: false }
+      ? { rejectUnauthorized: process.env.DATABASE_SSL_REJECT_UNAUTHORIZED === 'true' }
       : false,
 
   // Keep the pool small — Next.js App Router runs many concurrent server-side

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { query, withTransaction } from '@/lib/db';
+import { isUniqueViolation } from '@/lib/api-error';
 
 type RouteContext = { params: Promise<{ id: string }> };
 
@@ -134,8 +135,8 @@ export async function PUT(request: Request, { params }: RouteContext) {
     }
 
     return NextResponse.json(rowToUser(user));
-  } catch (error: any) {
-    if (error.code === '23505') {
+  } catch (error) {
+    if (isUniqueViolation(error)) {
       return NextResponse.json(
         { error: 'A user with that email already exists' },
         { status: 409 }

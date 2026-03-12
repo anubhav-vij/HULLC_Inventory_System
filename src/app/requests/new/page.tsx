@@ -12,6 +12,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Loader2, PlusCircle, Trash2, ChevronRight } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { v4 as uuidv4 } from 'uuid';
 import type { Product, User } from '@/lib/types';
 
 interface AppProject { id: string; name: string; isActive: boolean; }
@@ -45,7 +46,7 @@ function NewRequestForm() {
   const todayStr = new Date().toLocaleDateString('en-CA');
 
   const [lineItems, setLineItems] = useState<LineItem[]>([
-    { id: crypto.randomUUID(), requestedDate: '', quantity: 1 },
+    { id: uuidv4(), requestedDate: '', quantity: 1 },
   ]);
 
   useEffect(() => {
@@ -92,7 +93,7 @@ function NewRequestForm() {
   }, [productId]);
 
   const addLineItem = () => {
-    setLineItems(prev => [...prev, { id: crypto.randomUUID(), requestedDate: '', quantity: 1 }]);
+    setLineItems(prev => [...prev, { id: uuidv4(), requestedDate: '', quantity: 1 }]);
   };
 
   const removeLineItem = (id: string) => {

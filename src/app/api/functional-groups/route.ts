@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { query } from '@/lib/db';
+import { isUniqueViolation } from '@/lib/api-error';
 
 function isAdmin(request: Request) {
   return request.headers.get('x-user-role') === 'Admin';
@@ -76,8 +77,8 @@ export async function POST(request: Request) {
       [parsed.data.name, userId]
     );
     return NextResponse.json(rowToGroup(rows[0]), { status: 201 });
-  } catch (error: any) {
-    if (error.code === '23505') {
+  } catch (error) {
+    if (isUniqueViolation(error)) {
       return NextResponse.json(
         { error: 'A group with that name already exists' },
         { status: 409 }

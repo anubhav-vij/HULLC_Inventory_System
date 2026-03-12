@@ -27,27 +27,31 @@ export function MaterialAuditReport({ product, generatedBy, onClose }: MaterialA
   }, []);
 
   useEffect(() => {
-    fetch("/api/transactions")
+    const productId = product.id;
+    const controller = new AbortController();
+    fetch("/api/transactions", { signal: controller.signal })
       .then((r) => (r.ok ? r.json() : []))
       .then((data: any[]) => {
         const filtered = data
-          .filter((t) => t.items?.some((i: any) => i.productId === product.id) || t.productId === product.id)
+          .filter((t) => t.items?.some((i: any) => i.productId === productId) || t.productId === productId)
           .map((t) => ({ ...t, date: new Date(t.date) }))
           .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
         setTransactions(filtered);
       })
-      .catch(() => setTransactions([]))
+      .catch((err) => { if (err.name !== 'AbortError') setTransactions([]); })
       .finally(() => setLoading(false));
+    return () => controller.abort();
   }, [product.id]);
 
   useEffect(() => {
     if (!loading && portalRoot) {
-      const timer = setTimeout(() => {
-        window.print();
-        // After print dialog closes, clean up
-        setTimeout(() => onClose(), 300);
-      }, 200);
-      return () => clearTimeout(timer);
+      const handleAfterPrint = () => onClose();
+      window.addEventListener("afterprint", handleAfterPrint);
+      const timer = setTimeout(() => window.print(), 200);
+      return () => {
+        clearTimeout(timer);
+        window.removeEventListener("afterprint", handleAfterPrint);
+      };
     }
   }, [loading, portalRoot, onClose]);
 
@@ -96,9 +100,9 @@ export function MaterialAuditReport({ product, generatedBy, onClose }: MaterialA
             ["Product Name", product.name],
             ["Manufacturer", product.manufacturer || "—"],
             ["Manufacturer Part #", product.manufacturerPartNumber || "—"],
-            ["VWR Part #", (product as any).vwrPartNumber || "—"],
+            ["VWR Part #", product.vwrPartNumber || "—"],
             ["Unit of Measure", product.uom || "—"],
-            ["SOM Approval Required", (product as any).somApprovalRequired ? "Yes" : "No"],
+            ["SOM Approval Required", product.somApprovalRequired ? "Yes" : "No"],
             ["Reorder Threshold", product.reorderThreshold != null ? String(product.reorderThreshold) : "—"],
             ["Total Current Stock", String(totalStock)],
           ].map(([label, value]) => (

@@ -113,6 +113,11 @@ const DispenseSchema = z.object({
 // ---------------------------------------------------------------------------
 
 export async function PUT(request: Request, { params }: RouteContext) {
+  const role = request.headers.get('x-user-role') ?? '';
+  if (role !== 'Admin') {
+    return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
+  }
+
   const { id } = await params;
 
   let body: unknown;
@@ -211,24 +216,25 @@ export async function PUT(request: Request, { params }: RouteContext) {
       // 4. Insert the transaction record (linked to this fulfillment)
       const totalQuantity = lotData.reduce((sum, item) => sum + item.quantityTaken, 0);
       const transactionId = uuidv4();
+      const userId = request.headers.get('x-user-id') || null;
 
       await client.query(
         `INSERT INTO transactions
            (id, product_id, product_name, date, notes, total_quantity,
-            requestor_name, department, fulfillment_id)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+            requestor_name, department, fulfillment_id, created_by, updated_by)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $10)`,
         [
           transactionId, productId, productName, date, notes, totalQuantity,
-          requestorName, reqDepartment, id,
+          requestorName, reqDepartment, id, userId,
         ]
       );
 
       // 5. Insert transaction_items and decrement lot quantities
       for (const item of lotData) {
         await client.query(
-          `INSERT INTO transaction_items (id, transaction_id, lot_id, lot_number, quantity)
-           VALUES ($1, $2, $3, $4, $5)`,
-          [uuidv4(), transactionId, item.lotId, item.lotNumber, item.quantityTaken]
+          `INSERT INTO transaction_items (id, transaction_id, lot_id, lot_number, quantity, created_by)
+           VALUES ($1, $2, $3, $4, $5, $6)`,
+          [uuidv4(), transactionId, item.lotId, item.lotNumber, item.quantityTaken, userId]
         );
 
         await client.query('UPDATE lots SET quantity = quantity - $1 WHERE id = $2', [
@@ -237,11 +243,11 @@ export async function PUT(request: Request, { params }: RouteContext) {
         ]);
       }
 
-      // 6. Mark the linked request as Completed (if there is one)
+      // 6. Mark the linked request as Completed and update audit trail
       if (requestId) {
         await client.query(
-          `UPDATE product_requests SET status = 'Completed' WHERE id = $1`,
-          [requestId]
+          `UPDATE product_requests SET status = 'Completed', updated_by = $2 WHERE id = $1`,
+          [requestId, userId]
         );
       }
 
@@ -294,7 +300,12 @@ export async function PUT(request: Request, { params }: RouteContext) {
 // Returns 204 on success, 404 if not found, 409 if dispensing has occurred.
 // ---------------------------------------------------------------------------
 
-export async function DELETE(_request: Request, { params }: RouteContext) {
+export async function DELETE(request: Request, { params }: RouteContext) {
+  const role = request.headers.get('x-user-role') ?? '';
+  if (role !== 'Admin') {
+    return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
+  }
+
   const { id } = await params;
 
   try {
@@ -323,10 +334,12 @@ export async function DELETE(_request: Request, { params }: RouteContext) {
         return { found: true, hasTransactions: true };
       }
 
-      // 3. Reset the linked request back to Pending Approval (if there is one)
+      // 3. Reset the linked request back to Approved (if there is one).
+      //    The request was Approved before fulfillment started — restoring to
+      //    "Pending Approval" would lose the director's approval.
       if (requestId) {
         await client.query(
-          `UPDATE product_requests SET status = 'Pending Approval' WHERE id = $1`,
+          `UPDATE product_requests SET status = 'Approved' WHERE id = $1`,
           [requestId]
         );
       }

@@ -39,20 +39,20 @@ function EditProductFormPage() {
         if (parsed?.id && parsed?.role === 'Admin') {
           setUser(parsed);
         } else {
-          window.location.href = '/';
+          router.replace('/');
           return;
         }
       } else {
-        window.location.href = '/';
+        router.replace('/');
         return;
       }
     } catch {
-      window.location.href = '/';
+      router.replace('/');
       return;
     }
 
     if (!productId) {
-      window.location.href = '/';
+      router.replace('/');
       return;
     }
 
@@ -64,10 +64,10 @@ function EditProductFormPage() {
       .then(data => setProduct(coerceProduct(data)))
       .catch(() => {
         toast({ title: 'Error', description: 'Product not found.', variant: 'destructive' });
-        window.location.href = '/';
+        router.replace('/');
       })
       .finally(() => setIsLoading(false));
-  }, [productId]);
+  }, [productId, router, toast]);
 
   const handleSave = async (data: ProductFormData) => {
     if (!product) return;
@@ -91,7 +91,7 @@ function EditProductFormPage() {
     try {
       const res = await fetch(`/api/products/${product.id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json', 'x-user-id': user?.id ?? '' },
+        headers: { 'Content-Type': 'application/json', 'x-user-role': user?.role ?? '', 'x-user-id': user?.id ?? '' },
         body: JSON.stringify(payload),
       });
       if (!res.ok) {
@@ -99,7 +99,7 @@ function EditProductFormPage() {
         throw new Error((body as any).error || 'Failed to update product');
       }
       toast({ title: 'Product Updated', description: `"${data.name}" has been updated successfully.` });
-      window.location.href = '/';
+      router.push('/');
     } catch (error: any) {
       toast({ title: 'Save Failed', description: error.message, variant: 'destructive' });
     } finally {
@@ -127,7 +127,7 @@ function EditProductFormPage() {
           <span style={{ color: '#0f172a' }} className="font-medium">Edit Product — {product.name}</span>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={() => window.location.href = '/'} disabled={isSaving}>Cancel</Button>
+          <Button variant="outline" onClick={() => router.push('/')} disabled={isSaving}>Cancel</Button>
           <Button type="submit" form="product-form" disabled={isSaving} style={{ backgroundColor: '#1e40af' }}>
             {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Save Changes
@@ -142,7 +142,7 @@ function EditProductFormPage() {
         <ProductForm
           product={product}
           onSave={handleSave}
-          onCancel={() => window.location.href = '/'}
+          onCancel={() => router.push('/')}
           isSaving={isSaving}
           isAdmin={true}
         />

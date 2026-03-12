@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -11,6 +11,7 @@ import { Loader2, Download, ArrowUpDown, ChevronLeft } from "lucide-react";
 import { Sidebar } from "@/components/sidebar";
 import { Badge } from "@/components/ui/badge";
 import type { User } from "@/lib/types";
+import { useToast } from "@/hooks/use-toast";
 import * as XLSX from "xlsx";
 import { format } from "date-fns";
 
@@ -29,6 +30,7 @@ interface ReceivedRow {
 
 export default function MetricsReceivedPage() {
   const router = useRouter();
+  const { toast } = useToast();
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [data, setData] = useState<ReceivedRow[]>([]);
@@ -64,26 +66,27 @@ export default function MetricsReceivedPage() {
     }
   }, [router]);
 
-  useEffect(() => {
+  const fetchData = useCallback(async (from: string, to: string) => {
     if (!user) return;
-    fetchData(appliedFrom, appliedTo);
-  }, [user, appliedFrom, appliedTo]);
-
-  const fetchData = async (from: string, to: string) => {
     setIsLoading(true);
     try {
       const res = await fetch(
         `/api/metrics/received?from=${from}&to=${to}`,
-        { headers: { "x-user-role": user!.role } }
+        { headers: { "x-user-role": user.role } }
       );
       if (!res.ok) throw new Error("Failed to fetch");
       setData(await res.json());
     } catch {
       setData([]);
+      toast({ title: "Load Error", description: "Could not load received inventory data.", variant: "destructive" });
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [user]);
+
+  useEffect(() => {
+    fetchData(appliedFrom, appliedTo);
+  }, [fetchData, appliedFrom, appliedTo]);
 
   const handleApply = () => {
     setAppliedFrom(fromDate);
