@@ -155,6 +155,9 @@ each phase sequentially, marking `[~]` while in progress and `[x]` when complete
 - [x] Replaced `crypto.randomUUID()` with `uuidv4()` in requests/new/page.tsx for consistency
 - [x] Added `LotFileSchema` type validation with ALLOWED_FILE_TYPES constant in types.ts
 
+#### Pending deployment actions
+- [ ] Run migrations 013-015 on remote Neon database (case-insensitive email index, missing indexes, expanded MIME types)
+
 #### Code quality — frontend improvements
 - [x] Centralized auth headers in inventory-page.tsx: `authHeaders()` and `requestHeaders()` replace 13+ inconsistent inline patterns
 - [x] Added AbortController to inventory-page.tsx loadData (9 fetches) and material-audit-report.tsx

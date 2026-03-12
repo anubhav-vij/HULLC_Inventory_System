@@ -1,43 +1,68 @@
 # HULLC Inventory Management System
 
-A full-stack inventory management system built for the **Hu Lab at NIAID/NIH**. The system tracks reagent and consumable stock across multiple lots, manages dispensing transactions, and handles supply requests from departmental staff — all backed by a PostgreSQL database with a Next.js REST API.
+A full-stack inventory management system built for the **Hu Lab at NIAID/NIH (HULLC)**. Tracks reagent and consumable stock across multiple lots, manages dispensing transactions, handles multi-stage supply request approvals, and provides metrics dashboards — all backed by PostgreSQL with a Next.js 15 REST API.
+
+**Live demo:** [production.d2v9jxoej8ezlm.amplifyapp.com](https://production.d2v9jxoej8ezlm.amplifyapp.com)
+**Default login:** `admin@hullc.nih.gov` / `Admin1234!`
 
 ---
 
 ## Table of Contents
 
-1. [Project Overview](#1-project-overview)
+1. [Features](#1-features)
 2. [Tech Stack](#2-tech-stack)
 3. [Architecture](#3-architecture)
 4. [Local Development Setup](#4-local-development-setup)
-5. [Session Log](#5-session-log)
+5. [Database Migrations](#5-database-migrations)
 6. [API Reference](#6-api-reference)
 7. [Deployment](#7-deployment)
 8. [Branch Strategy](#8-branch-strategy)
+9. [Session Log](#9-session-log)
 
 ---
 
-## 1. Project Overview
+## 1. Features
 
-### What it does
+### Inventory Management
+- Add, edit, and delete reagents/consumables with multiple tracked lots (quantity, receipt date, expiration, storage location, SDS/CoA files)
+- Manufacturer management with alternate names
+- VWR part numbers and cost-per-unit tracking
+- SOM (Scientific Operations Manager) approval flag per product
+- Storage location management (managed dropdown, prevents deletion of in-use locations)
+- Excel import/export with multi-sheet selector for .xlsx files
 
-The HULLC Inventory System gives lab administrators a single interface to:
+### Dispensing & Transactions
+- Record dispensing transactions against specific lots with atomic quantity decrement
+- Full transaction reversal (restores lot quantities)
+- Transaction history with date range and functional group filtering
 
-- **Manage products** — add, edit, and delete reagents and consumables, each with one or more tracked lot records (quantity, receipt date, expiration date, storage location, attached SDS/CoA files)
-- **Dispense stock** — record dispensing transactions against specific lots; lot quantities are decremented atomically in the database
-- **Handle requests** — departmental staff submit supply requests that admins can approve (start fulfillment), reject with a reason, or cancel
-- **Fulfillments** — approved requests become fulfillment records; the admin dispenses items against the fulfillment, which creates a linked transaction and marks the request completed
-- **Export data** — download full inventory or transaction history as CSV for reporting
-- **CSV import** — bulk-load or update products from a spreadsheet
+### Request & Approval Workflow
+- Multi-line-item requests (each date/quantity pair fulfilled independently)
+- Auto-generated request IDs: `HULLC-YYYY-XXXX` (annual sequence)
+- Two-stage approval: Director → (SOM products) Sci-Ops Director → Admin fulfillment
+- Director approve/reject with comments; Sci-Ops approve/reject for SOM products
+- Request status machine: Pending Approval → Approved → In Progress → Completed (or Rejected at any stage)
 
-### Who it's for
+### User Management & Roles
+- Email + password authentication (bcrypt)
+- 5 roles: **Admin**, **ProjectManager**, **Chief**, **Director**, **Staff**
+- Role-based access: `canEdit` (Admin only for mutations), `hasFullView` (Admin/PM/Chief)
+- Functional group management (7 default groups, one Director per group enforced)
+- User activate/deactivate (soft delete)
 
-| User | Access |
-|------|--------|
-| **Admin (Core)** | Full inventory management: add/edit/delete products, record transactions, manage requests and fulfillments, import/export |
-| **Staff** | Submit supply requests only; cannot view or modify the core inventory |
+### Metrics & Reporting
+- Inventory Received report with date range filtering and Excel export
+- Inventory Disbursed report with date range filtering and Excel export
+- Charts Dashboard: transactions/day (line), transactions/week (bar), requests by group (horizontal bar), requests by status (donut), cumulative products (line)
+- Global date range picker across all charts
+- Printable Material Audit Reports per product (HULLC header, lots, transaction history, confidential footer)
 
-Authentication is currently a placeholder role-selector screen. NIH SSO (SAML/OIDC via `login.nih.gov`) is planned for the production handoff.
+### UI & Responsiveness
+- Navy/indigo color scheme with dark teal sidebar
+- Dark mode support (CSS variables)
+- Mobile responsive: hamburger sidebar, card view for inventory on small screens
+- CSS-based sidebar hover/focus with ARIA attributes
+- Storage location filter on Inventory tab
 
 ---
 
@@ -49,9 +74,14 @@ Authentication is currently a placeholder role-selector screen. NIH SSO (SAML/OI
 | Language | TypeScript 5 |
 | UI components | [shadcn/ui](https://ui.shadcn.com/) + [Radix UI](https://www.radix-ui.com/) |
 | Styling | Tailwind CSS |
-| Validation | [Zod](https://zod.dev/) (shared between API routes and client forms) |
-| Database | PostgreSQL 18 |
+| Forms | React Hook Form |
+| Validation | [Zod](https://zod.dev/) (shared API + client) |
+| Charts | [Recharts](https://recharts.org/) |
+| Excel | [SheetJS (xlsx)](https://sheetjs.com/) |
+| Database | PostgreSQL (Neon free tier for demo, RDS planned) |
 | DB client | [node-postgres (`pg`)](https://node-postgres.com/) with connection pooling |
+| AI | [Genkit](https://firebase.google.com/docs/genkit) (Google AI) — expiration date prediction |
+| Hosting | AWS Amplify |
 | Runtime | Node.js 20+ |
 | Dev server port | **9002** |
 
@@ -62,47 +92,65 @@ Authentication is currently a placeholder role-selector screen. NIH SSO (SAML/OI
 ```
 src/
 ├── app/
-│   ├── api/                     # Next.js Route Handlers (REST API)
-│   │   ├── health/              # GET  /api/health
-│   │   ├── products/            # GET, POST /api/products
-│   │   │   └── [id]/            # GET, PUT, DELETE /api/products/:id
-│   │   ├── transactions/        # GET, POST /api/transactions
-│   │   │   └── [id]/            # DELETE /api/transactions/:id
-│   │   ├── requests/            # GET, POST /api/requests
-│   │   │   └── [id]/            # GET, PUT, DELETE /api/requests/:id
-│   │   └── fulfillments/        # GET, POST /api/fulfillments
-│   │       └── [id]/            # PUT, DELETE /api/fulfillments/:id
+│   ├── api/                          # Next.js Route Handlers (REST API)
+│   │   ├── auth/login/               # POST — email+password login
+│   │   ├── health/                   # GET — DB connectivity check
+│   │   ├── products/                 # CRUD + lot management
+│   │   ├── transactions/             # Dispense recording + reversal
+│   │   ├── requests/                 # Multi-line-item requests + approval workflow
+│   │   │   └── [id]/
+│   │   │       ├── approve/          # Director approval
+│   │   │       ├── reject/           # Director/Admin rejection
+│   │   │       ├── sciops-approve/   # Sci-Ops Director approval (SOM products)
+│   │   │       ├── sciops-reject/    # Sci-Ops Director rejection
+│   │   │       └── line-items/[lineItemId]/  # Individual line item fulfillment
+│   │   ├── fulfillments/             # Fulfillment lifecycle
+│   │   ├── functional-groups/        # Group management (Admin)
+│   │   ├── users/                    # User CRUD + status toggle (Admin)
+│   │   ├── manufacturers/            # Manufacturer management
+│   │   ├── storage-locations/        # Storage location management
+│   │   ├── vendors/                  # (deprecated — renamed to manufacturers)
+│   │   ├── projects/                 # Project management
+│   │   └── metrics/                  # received, disbursed, dashboard APIs
+│   ├── metrics/
+│   │   ├── received/page.tsx         # Inventory Received report
+│   │   ├── disbursed/page.tsx        # Inventory Disbursed report
+│   │   └── dashboard/page.tsx        # Charts dashboard (recharts)
+│   ├── products/
+│   │   ├── new/page.tsx              # Add Product (full page)
+│   │   └── [id]/edit/page.tsx        # Edit Product (full page)
+│   ├── requests/
+│   │   ├── new/page.tsx              # New Request (multi-line-item)
+│   │   └── [id]/page.tsx             # Request detail + fulfillment
 │   ├── layout.tsx
 │   └── page.tsx
 ├── components/
-│   ├── inventory-page.tsx       # Main admin UI (all API-backed)
-│   ├── departmental-page.tsx    # Departmental staff UI (localStorage, out of scope)
-│   ├── product-form.tsx
-│   ├── transaction-form.tsx
-│   └── request-form.tsx
-└── lib/
-    ├── db/
-    │   ├── index.ts             # pg Pool singleton, query(), withTransaction()
-    │   ├── schema.sql           # Full PostgreSQL schema (7 tables, 4 enums)
-    │   ├── schema.md            # Plain-English schema documentation
-    │   └── product-queries.ts   # Shared SQL helpers and row mappers
-    └── types.ts                 # Zod schemas and TypeScript types
+│   ├── inventory-page.tsx            # Main SPA client component (~3150 lines)
+│   ├── sidebar.tsx                   # Dark teal sidebar with role-aware nav
+│   ├── material-audit-report.tsx     # Print audit report (createPortal)
+│   ├── departmental-page.tsx         # (legacy, localStorage — out of scope)
+│   └── ui/                           # shadcn/ui components
+├── lib/
+│   ├── db/
+│   │   ├── index.ts                  # pg Pool singleton, query(), withTransaction()
+│   │   ├── schema.sql                # Full PostgreSQL schema
+│   │   ├── migrations/               # 15 numbered SQL migration files
+│   │   ├── migrate.ts                # Migration runner
+│   │   ├── seed.ts                   # Idempotent seed (groups, projects, admin user)
+│   │   ├── product-queries.ts        # Shared SQL, row mappers, coerceLotDates
+│   │   └── request-queries.ts        # Shared request SQL/mappers (DRY)
+│   ├── api-error.ts                  # Typed error helpers (isUniqueViolation, etc.)
+│   ├── types.ts                      # Zod schemas + TypeScript types (single source of truth)
+│   └── file-store.ts                 # File storage abstraction (IndexedDB → S3 planned)
+└── ai/                               # Genkit AI flows
 ```
 
-### Database schema (7 tables)
-
-```
-users               — placeholder for NIH SSO identities
-products            — reagents/consumables (P001, P002, … TEXT primary keys)
-lots                — individual lot records per product (UUID PKs)
-lot_files           — file metadata for SDS/CoA attachments; binaries in object storage
-product_requests    — supply requests submitted by staff (status machine)
-fulfillments        — one-to-one with a request; tracks dispensing progress
-transactions        — dispensing events; quantities decremented atomically
-transaction_items   — lot-level line items for each transaction
-```
-
-All multi-step writes use `withTransaction()` to guarantee atomicity. Sequential `P001/P002` product IDs are generated inside a `SELECT … FOR UPDATE` to prevent races.
+### Key database facts
+- **13 tables:** users, functional_groups, products, lots, lot_files, product_requests, request_line_items, fulfillments, transactions, transaction_items, projects, manufacturers, storage_locations (+ supporting tables: request_id_sequences, schema_migrations)
+- Product IDs: `TEXT` format `P001`, `P002` (not UUIDs). All other PKs: UUID via `gen_random_uuid()`
+- All tables have `created_by`/`updated_by` audit fields referencing `users.id`
+- All multi-step writes use `withTransaction()` for atomicity
+- Cascade deletes: deleting a product deletes its lots and lot_files
 
 ---
 
@@ -113,57 +161,44 @@ All multi-step writes use `withTransaction()` to guarantee atomicity. Sequential
 - **Node.js** 20 or later
 - **PostgreSQL 18** installed locally (default port 5432)
 
-### Step 1 — Clone and switch to the migration branch
+### Step 1 — Clone and install
 
 ```bash
 git clone <repo-url>
 cd HULLC_Inventory_System
 git checkout production
-```
-
-### Step 2 — Install dependencies
-
-```bash
 npm install
 ```
 
-### Step 3 — Create the development database
-
-Open **psql** (or pgAdmin) and run:
+### Step 2 — Create the database
 
 ```sql
 CREATE DATABASE hullc_dev;
 ```
 
-### Step 4 — Configure environment variables
+### Step 3 — Configure environment
 
 Create `.env.local` in the project root:
 
 ```env
 DATABASE_URL=postgresql://postgres:<your-password>@localhost:5432/hullc_dev
+DATABASE_SSL=false
 ```
 
-Replace `<your-password>` with your local PostgreSQL `postgres` user password.
-
-### Step 5 — Add PostgreSQL to PATH (Windows)
-
-In each new PowerShell / terminal session, run:
-
-```powershell
-$env:PATH += ";C:\Program Files\PostgreSQL\18\bin"
-```
-
-To make this permanent, add the path through **System Properties → Environment Variables**.
-
-### Step 6 — Apply the database schema
+### Step 4 — Apply schema and migrations
 
 ```bash
+# Apply base schema
 psql -U postgres -d hullc_dev -f src/lib/db/schema.sql
+
+# Run all migrations (001-015)
+npx tsx --env-file=.env.local src/lib/db/migrate.ts
+
+# Seed functional groups, projects, and admin user
+npx tsx --env-file=.env.local src/lib/db/seed.ts
 ```
 
-You will be prompted for the `postgres` password. This creates all 7 tables, 4 enums, indexes, and triggers.
-
-### Step 7 — Start the dev server
+### Step 5 — Start the dev server
 
 ```bash
 npm run dev
@@ -171,155 +206,161 @@ npm run dev
 
 The app starts on **http://localhost:9002** (Turbopack).
 
-### Step 8 — Verify the database connection
+### Step 6 — Verify
 
 ```bash
 curl http://localhost:9002/api/health
+# → { "status": "ok", "database": "connected", "timestamp": "..." }
 ```
 
-Expected response:
+Login with `admin@hullc.nih.gov` / `Admin1234!`
 
-```json
-{ "status": "ok", "database": "connected", "timestamp": "..." }
+### Available commands
+
+```bash
+npm run dev          # Next.js dev server (port 9002, Turbopack)
+npm run build        # Production build
+npm run typecheck    # tsc --noEmit (no build artifacts)
+npm run lint         # next lint
+npm run genkit:dev   # Genkit AI dev server
 ```
 
 ---
 
-## 5. Session Log
+## 5. Database Migrations
 
-### Session 1 — 2026-03-05
+Migrations live in `src/lib/db/migrations/` as numbered `.sql` files. The runner (`migrate.ts`) tracks applied migrations in a `schema_migrations` table.
 
-**Goal:** Establish the database foundation and Products API.
+```bash
+npx tsx --env-file=.env.local src/lib/db/migrate.ts
+```
 
-- Full codebase audit — mapped every localStorage key, all TypeScript/Zod schemas, React hooks, and components
-- Designed and created `src/lib/db/schema.sql` (7 tables, 4 enums, triggers, FK constraints, indexes)
-- Written `src/lib/db/schema.md` — plain-English documentation of every table and relationship
-- Application rename: StockPilot → HULLC throughout all source files
-- Built `src/lib/db/index.ts` — pg Pool singleton with `query()`, `getClient()`, `withTransaction()` helpers
-- Built `GET /api/health`, `GET/POST /api/products`, `GET/PUT/DELETE /api/products/:id`
-- Integration test (`src/lib/db/test-products-api.ts`): 10 assertions, all passed
+| # | Description |
+|---|-------------|
+| 001 | Request line items table |
+| 002 | Request redesign (multi-line items, approval workflow) |
+| 003 | Fulfillment link to line items |
+| 004 | Projects table |
+| 005 | Request ID sequences (HULLC-YYYY-XXXX format) |
+| 006 | Manufacturers table (was vendors) |
+| 007 | Unit of measure column on products |
+| 008 | Storage locations table |
+| 009 | Vendor → manufacturer rename |
+| 010 | VWR part number, SOM approval, cost per unit, SOM request columns |
+| 011 | Audit fields (created_by/updated_by) on all 13 tables |
+| 012 | Backfill request IDs to HULLC-YYYY-XXXX format |
+| 013 | Case-insensitive email unique index |
+| 014 | Missing indexes (fulfillment_id, is_active columns) |
+| 015 | Expanded lot_files MIME type CHECK (3→6 types) |
 
-### Session 2 — 2026-03-06
-
-**Goal:** Complete the remaining API surface.
-
-- Built `GET/POST /api/transactions` and `DELETE /api/transactions/:id`
-  - POST atomically validates lot stock, decrements quantities, and inserts transaction + line items in one `withTransaction` call
-  - DELETE atomically restores lot quantities and removes the transaction
-- Built `GET/POST /api/requests` and `GET/PUT/DELETE /api/requests/:id`
-  - PUT enforces valid status transitions (`Pending → In Progress/Rejected`, `In Progress → Completed`)
-  - Rejection requires a `rejectionNote` field (enforced at the Zod schema level)
-- Built `GET/POST /api/fulfillments` and `PUT/DELETE /api/fulfillments/:id`
-  - POST atomically creates the fulfillment and advances the request to `In Progress`
-  - PUT atomically creates a dispense transaction, decrements lot quantities, and marks the request `Completed`
-  - DELETE resets the request to `Pending` (only allowed if no transactions have been dispensed yet)
-
-### Session 3 — 2026-03-07
-
-**Goal:** Migrate `inventory-page.tsx` from localStorage to the real API. Smoke test passed.
-
-- Replaced all localStorage data loading with a parallel `Promise.all` fetch of all four collections on user login
-- Removed the auto-save `useEffect` (API mutations are now the source of truth)
-- Removed `initialProducts` seed data and the `nextProductId` client-side ID generator
-- Migrated all 14 handler functions to use `fetch()`:
-
-| Handler | API call |
-|---------|----------|
-| Load on login | `GET /api/products`, `/api/transactions`, `/api/requests`, `/api/fulfillments` |
-| Add product | `POST /api/products` |
-| Edit product | `PUT /api/products/:id` |
-| Delete product | `DELETE /api/products/:id` |
-| Dispense (standalone) | `POST /api/transactions` |
-| Dispense (fulfillment) | `PUT /api/fulfillments/:id` |
-| Delete transaction | `DELETE /api/transactions/:id` |
-| Submit request | `POST /api/requests` |
-| Reject request | `PUT /api/requests/:id` |
-| Start fulfillment | `POST /api/fulfillments` |
-| Cancel fulfillment | `DELETE /api/fulfillments/:id` |
-| CSV import | `PUT` for existing IDs, `POST` for new products |
+**Important:** The migration runner splits SQL on `;` — do NOT use PL/pgSQL `DO $$` blocks (semicolons inside break the splitter). Use plain SQL with CTEs and window functions instead.
 
 ---
 
 ## 6. API Reference
 
-All routes return JSON. Error responses include an `error` string field. Validation errors (422) additionally include an `issues` field from Zod's `flatten()`.
+All routes return JSON. Error responses include an `error` string field. Validation errors (422) include `issues` from Zod's `flatten()`. Mutation endpoints require `x-user-role: Admin` header (returns 403 otherwise). Audit fields populated from `x-user-id` header.
 
-### Health
-
+### Authentication
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/api/health` | Returns database connectivity status and server timestamp |
+| `POST` | `/api/auth/login` | Email + password login (bcrypt) |
 
 ### Products
-
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/api/products` | List all products with their lots |
-| `POST` | `/api/products` | Create a product and its initial lots atomically. Server generates the `P001`-format product ID. |
-| `GET` | `/api/products/:id` | Get a single product with lots |
-| `PUT` | `/api/products/:id` | Update product fields and sync lots (add/update/delete by diffing incoming vs existing lot IDs) |
-| `DELETE` | `/api/products/:id` | Delete product. Returns `409` if transactions, requests, or fulfillments reference it. |
+| `GET` | `/api/products` | List all products with lots |
+| `POST` | `/api/products` | Create product + initial lots (Admin) |
+| `GET` | `/api/products/:id` | Single product with lots |
+| `PUT` | `/api/products/:id` | Update product + sync lots (Admin) |
+| `DELETE` | `/api/products/:id` | Delete product — 409 if referenced (Admin) |
 
 ### Transactions
-
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/api/transactions` | List all transactions with line items. Accepts optional `?productId=` filter. |
-| `POST` | `/api/transactions` | Create a dispense transaction. Atomically validates stock, decrements lot quantities, inserts transaction and line items. Returns `409` on insufficient stock. |
-| `DELETE` | `/api/transactions/:id` | Reverse a transaction. Atomically restores all lot quantities. |
+| `GET` | `/api/transactions` | List all (optional `?productId=` filter) |
+| `POST` | `/api/transactions` | Dispense — atomic stock decrement (Admin) |
+| `DELETE` | `/api/transactions/:id` | Reverse — restores lot quantities (Admin) |
 
-### Product Requests
-
+### Requests & Approvals
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/api/requests` | List all product requests |
-| `POST` | `/api/requests` | Submit a new request (status starts as `Pending`) |
-| `GET` | `/api/requests/:id` | Get a single request |
-| `PUT` | `/api/requests/:id` | Update request status. Enforces valid transitions: `Pending → In Progress \| Rejected`, `In Progress → Completed`. Rejections require `rejectionNote`. |
-| `DELETE` | `/api/requests/:id` | Delete a request. Only allowed for `Pending` or `Rejected` status. |
+| `GET` | `/api/requests` | Role-aware list |
+| `POST` | `/api/requests` | Submit with line items |
+| `GET` | `/api/requests/:id` | Single request with line items |
+| `PUT` | `/api/requests/:id` | Update request |
+| `DELETE` | `/api/requests/:id` | Delete (Pending/Rejected only) |
+| `PUT` | `/api/requests/:id/approve` | Director approval |
+| `PUT` | `/api/requests/:id/reject` | Director/Admin rejection |
+| `PUT` | `/api/requests/:id/sciops-approve` | Sci-Ops approval (SOM products) |
+| `PUT` | `/api/requests/:id/sciops-reject` | Sci-Ops rejection |
+| `PUT` | `/api/requests/:id/line-items/:lineItemId` | Fulfill individual line item (Admin) |
 
 ### Fulfillments
-
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/api/fulfillments` | List all fulfillments with dispensed transactions |
-| `POST` | `/api/fulfillments` | Start a fulfillment for a request. Atomically creates the fulfillment and advances the request to `In Progress`. Returns `409` if a fulfillment already exists for the request. |
-| `PUT` | `/api/fulfillments/:id` | Dispense items against a fulfillment. Atomically creates a transaction, decrements lot quantities, and marks the linked request `Completed`. |
-| `DELETE` | `/api/fulfillments/:id` | Cancel a fulfillment. Only allowed if no transactions have been dispensed. Resets the linked request to `Pending`. |
+| `GET` | `/api/fulfillments` | List all |
+| `POST` | `/api/fulfillments` | Start fulfillment for request (Admin) |
+| `PUT` | `/api/fulfillments/:id` | Dispense against fulfillment (Admin) |
+| `DELETE` | `/api/fulfillments/:id` | Cancel fulfillment (Admin) |
+
+### Configuration (Admin only)
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET/POST` | `/api/functional-groups` | List / create groups |
+| `PUT/DELETE` | `/api/functional-groups/:id` | Update / deactivate group |
+| `GET/POST` | `/api/users` | List / create users |
+| `GET/PUT/DELETE` | `/api/users/:id` | Get / update / delete user |
+| `PUT` | `/api/users/:id/status` | Activate / deactivate user |
+| `GET/POST` | `/api/manufacturers` | List / create manufacturers |
+| `PUT` | `/api/manufacturers/:id` | Update manufacturer |
+| `GET/POST` | `/api/storage-locations` | List / create locations |
+| `PUT` | `/api/storage-locations/:id` | Update location (409 if in use) |
+| `GET/POST` | `/api/projects` | List / create projects |
+| `PUT` | `/api/projects/:id` | Update project |
+
+### Metrics
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/metrics/received` | Inventory received (date range filter) |
+| `GET` | `/api/metrics/disbursed` | Inventory disbursed (date range filter) |
+| `GET` | `/api/metrics/dashboard` | Dashboard aggregates (5 parallel queries) |
+
+### System
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/health` | Database connectivity + timestamp |
 
 ---
 
 ## 7. Deployment
 
-### Target environment
+### Current: AWS Amplify + Neon PostgreSQL
 
-Production deployment targets **NIH/NIAID-managed AWS infrastructure**. The database will be hosted on Amazon RDS (PostgreSQL). The Next.js application will run behind an Application Load Balancer on ECS or Elastic Beanstalk.
+The app is deployed on **AWS Amplify** connected to the `production` branch with auto-deploy on push. Database is **Neon PostgreSQL** (free tier) for demo purposes.
 
-### Environment variables (production)
+**Live URL:** `production.d2v9jxoej8ezlm.amplifyapp.com`
+
+Build configuration is in `amplify.yml`. Amplify env vars don't reach the SSR runtime by default — the build step writes them to `.env.production`.
+
+### Environment variables
 
 | Variable | Description |
 |----------|-------------|
-| `DATABASE_URL` | Full PostgreSQL connection string, e.g. `postgresql://user:pass@rds-host:5432/hullc` |
-| `DATABASE_SSL` | Set to `true` to enforce SSL on the database connection (required in production) |
-| `NODE_ENV` | Set to `production` — enables SSL and disables slow-query logging |
+| `DATABASE_URL` | PostgreSQL connection string |
+| `DATABASE_SSL` | `true` for production (enables SSL) |
+| `DATABASE_SSL_REJECT_UNAUTHORIZED` | `false` for Neon; `true` for RDS |
+| `NODE_ENV` | `production` |
 
-### Authentication
+### Planned: NIH/NIAID AWS Infrastructure
 
-NIH SSO (SAML 2.0 or OIDC via `login.nih.gov`) will be wired up at production handoff. The `users` table already has the correct shape for an `external_id` column to store NIH identity provider subject identifiers. The current role-selector login screen is a placeholder that will be replaced by the SSO redirect flow.
+Production deployment will migrate to NIAID-managed AWS:
+- **Amazon RDS** PostgreSQL (replaces Neon free tier)
+- **Amazon S3** for file storage (replaces IndexedDB)
+- **AWS Cognito** + NIH SSO for authentication (replaces email/password)
+- Custom domain via NIH IT DNS
 
-### Schema migrations
-
-Apply the schema to the production database before first deploy:
-
-```bash
-psql "$DATABASE_URL" -f src/lib/db/schema.sql
-```
-
-For subsequent schema changes, a migration tool (e.g. Flyway or plain numbered SQL files) will be introduced before handoff.
-
-### File storage
-
-Lot attachment files (SDS sheets, Certificates of Analysis) are stored as metadata in the `lot_files` table. Binary file storage will use **Amazon S3** with the `lot_files.id` UUID as the object key. Upload/download/delete API routes are pending implementation.
+See `docs/TASKS.md` for the full migration roadmap (Phases 15-16).
 
 ---
 
@@ -327,7 +368,34 @@ Lot attachment files (SDS sheets, Certificates of Analysis) are stored as metada
 
 | Branch | Purpose |
 |--------|---------|
-| `master` | Original localStorage-only demo. No database dependency. Safe to run anywhere without a PostgreSQL instance. |
-| `production` | Full-stack migration branch. All inventory data persists in PostgreSQL. This is the branch being actively developed and will become the production release. |
+| `master` | Original localStorage-only demo. No database dependency. |
+| `production` | Full-stack PostgreSQL branch. Actively developed. Deployed to Amplify. |
 
-All active development happens on `production`. `master` is kept as a working reference of the original client-side-only implementation and is not updated.
+All active development happens on `production`. `master` is kept as a reference of the original client-side implementation.
+
+---
+
+## 9. Session Log
+
+| Session | Date | Summary |
+|---------|------|---------|
+| 1 | 2026-03-05 | Database schema (7 tables), Products API, pg Pool singleton |
+| 2 | 2026-03-06 | Transactions, Requests, Fulfillments APIs with atomic operations |
+| 3 | 2026-03-07 | Frontend migration from localStorage to API, full smoke test |
+| 4 | 2026-03-08 | Phase 1: User management, functional groups, email+password login |
+| 5 | 2026-03-09 | Phase 2: Request redesign, multi-line-items, Director approval workflow |
+| 6 | 2026-03-10 | Projects table, config UI, Director approve dialog, full-page product forms |
+| 7 | 2026-03-10 | (continued Session 6 work) |
+| 8 | 2026-03-11 | Role-aware nav, vendors→manufacturers, UoM, storage locations, sidebar config |
+| 9 | 2026-03-11 | Manufacturer rename, SOM 2-stage approval, form contrast, inline validation |
+| 10-11 | 2026-03-11 | Audit fields on all 13 tables + 19 API endpoints |
+| 12 | 2026-03-11 | PM/Chief roles UI, metrics pages, Excel sheet selector |
+| 13 | 2026-03-11 | CSS overhaul (navy/indigo), dark mode, print styles, request ID backfill |
+| 14 | 2026-03-11 | Audit reports, charts dashboard, mobile responsive, AWS Amplify deploy |
+| 15 | 2026-03-12 | Codebase review & hardening: security guards, bug fixes, DRY refactors, frontend quality |
+
+For detailed task-by-task history, see `docs/TASKS.md`.
+
+---
+
+*Built for laboratory inventory management at NIH/NIAID — HULLC.*
