@@ -32,6 +32,8 @@ A full-stack inventory management system built for the **Hu Lab at NIAID/NIH (HU
 - Excel import/export with multi-sheet selector for .xlsx files
 - Bulk import with persistent placeholder counters for missing data (PRODUCT-#-Missing, LOT-#-Missing, etc.)
 - Inventory pagination (75 products per page)
+- Product detail page (read-only, all roles) with Print Audit, Edit, and New Transaction actions
+- Expanded lots sorted by receipt date (newest first), limited to 3 in inventory view
 
 ### Dispensing & Transactions
 - Record dispensing transactions against specific lots with atomic quantity decrement
@@ -41,10 +43,12 @@ A full-stack inventory management system built for the **Hu Lab at NIAID/NIH (HU
 ### Request & Approval Workflow
 - Multi-line-item requests (each date/quantity pair fulfilled independently)
 - Auto-generated request IDs: `HULLC-YYYY-XXXX` (annual sequence)
+- Multi-project selection per request (comma-separated display)
 - Two-stage approval: Director → (SOM products) Sci-Ops Director → Admin fulfillment
 - Director approve/reject with comments; Sci-Ops approve/reject for SOM products
 - Admin can approve any pending request across all groups (OOO Director coverage)
 - Request status machine: Pending Approval → Approved → In Progress → Completed (or Rejected at any stage)
+- Workflow history audit trail: tracks all status changes with timestamps, actors, and comments
 
 ### User Management & Roles
 - Email + password authentication (bcrypt)
@@ -132,10 +136,13 @@ src/
 │   │   └── dashboard/page.tsx        # Charts dashboard (recharts)
 │   ├── products/
 │   │   ├── new/page.tsx              # Add Product (full page)
+│   │   ├── [id]/page.tsx             # Product detail (read-only, all roles)
 │   │   └── [id]/edit/page.tsx        # Edit Product (full page)
 │   ├── requests/
-│   │   ├── new/page.tsx              # New Request (multi-line-item)
-│   │   └── [id]/page.tsx             # Request detail + fulfillment
+│   │   ├── new/page.tsx              # New Request (multi-line-item, multi-project)
+│   │   └── [id]/page.tsx             # Request detail + fulfillment + status timeline
+│   ├── workflow-history/
+│   │   └── page.tsx                  # Workflow history audit log (Admin)
 │   ├── layout.tsx
 │   └── page.tsx
 ├── components/
@@ -148,7 +155,7 @@ src/
 │   ├── db/
 │   │   ├── index.ts                  # pg Pool singleton, query(), withTransaction()
 │   │   ├── schema.sql                # Full PostgreSQL schema
-│   │   ├── migrations/               # 16 numbered SQL migration files
+│   │   ├── migrations/               # 17 numbered SQL migration files
 │   │   ├── migrate.ts                # Migration runner
 │   │   ├── seed.ts                   # Idempotent seed (groups, projects, admin user)
 │   │   ├── product-queries.ts        # Shared SQL, row mappers, coerceLotDates
@@ -160,7 +167,7 @@ src/
 ```
 
 ### Key database facts
-- **14 tables:** users, functional_groups, products, lots, lot_files, product_requests, request_line_items, fulfillments, transactions, transaction_items, projects, manufacturers, storage_locations, historical_records (+ supporting tables: request_id_sequences, schema_migrations)
+- **15 tables:** users, functional_groups, products, lots, lot_files, product_requests, request_line_items, fulfillments, transactions, transaction_items, projects, manufacturers, storage_locations, historical_records, request_status_history (+ supporting tables: request_id_sequences, schema_migrations)
 - Product IDs: `TEXT` format `HULLC-XXXX` (e.g. `HULLC-0001`; legacy `P001` still supported). All other PKs: UUID via `gen_random_uuid()`
 - All tables have `created_by`/`updated_by` audit fields referencing `users.id`
 - All multi-step writes use `withTransaction()` for atomicity
@@ -205,7 +212,7 @@ DATABASE_SSL=false
 # Apply base schema
 psql -U postgres -d hullc_dev -f src/lib/db/schema.sql
 
-# Run all migrations (001-016)
+# Run all migrations (001-017)
 npx tsx --env-file=.env.local src/lib/db/migrate.ts
 
 # Seed functional groups, projects, and admin user
@@ -267,6 +274,7 @@ npx tsx --env-file=.env.local src/lib/db/migrate.ts
 | 014 | Missing indexes (fulfillment_id, is_active columns) |
 | 015 | Expanded lot_files MIME type CHECK (3→6 types) |
 | 016 | Historical records table for legacy data import |
+| 017 | Multi-project support (TEXT→TEXT[]) + request_status_history table |
 
 **Important:** The migration runner splits SQL on `;` — do NOT use PL/pgSQL `DO $$` blocks (semicolons inside break the splitter). Use plain SQL with CTEs and window functions instead.
 
@@ -334,6 +342,11 @@ All routes return JSON. Error responses include an `error` string field. Validat
 | `PUT` | `/api/storage-locations/:id` | Update location (409 if in use) |
 | `GET/POST` | `/api/projects` | List / create projects |
 | `PUT` | `/api/projects/:id` | Update project |
+
+### Workflow History
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/workflow-history` | Status change audit log (Admin, optional `?requestId=` filter) |
 
 ### Historical Records
 | Method | Path | Description |
@@ -419,6 +432,7 @@ All active development happens on `production`. `master` is kept as a reference 
 | 16 | 2026-03-12 | Role access overhaul: Dashboard Admin-only, PM/Chief restricted to Inventory+Transactions+Metrics, Admin override approvals for OOO Directors |
 | 17 | 2026-03-12 | Planning session: import redesign, HULLC-XXXX product IDs, historical data approach (no code) |
 | 18 | 2026-03-13 | Import redesign: HULLC-XXXX IDs, bulk import with persistent placeholders, historical data page, dashboard clickable cards, inventory pagination |
+| 19 | 2026-03-13 | Post-demo fixes: metrics dashboard bug fix, product detail page, workflow history audit trail, multi-project requests, timezone fixes, lots sorting |
 
 For detailed task-by-task history, see `docs/TASKS.md`.
 
