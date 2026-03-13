@@ -177,6 +177,14 @@ export async function PUT(request: Request, { params }: RouteContext) {
         [totalDispensed, fulfillmentId, userId, lineItemId]
       );
 
+      // 7b. Release reservation for this line item's requested quantity
+      const requestedQty = li.quantity;
+      await client.query(
+        `UPDATE products SET reserved_quantity = GREATEST(reserved_quantity - $1, 0)
+         WHERE id = $2`,
+        [requestedQty, req.product_id]
+      );
+
       // 8. Check if ALL line items for this request are now Fulfilled
       const { rows: allItems } = await client.query<{ status: string }>(
         'SELECT status FROM request_line_items WHERE request_id = $1',

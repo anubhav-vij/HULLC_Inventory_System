@@ -118,6 +118,24 @@ export async function PUT(request: Request, { params }: RouteContext) {
       }
 
       const updatedBy = request.headers.get('x-user-id') || null;
+
+      // Release reserved stock when rejecting an Approved/In Progress request
+      if (newStatus === 'Rejected' && (currentStatus === 'Approved' || currentStatus === 'In Progress')) {
+        const { rows: liRows } = await client.query<{ total: string }>(
+          `SELECT COALESCE(SUM(quantity), 0) AS total
+           FROM request_line_items WHERE request_id = $1 AND status = 'Pending'`,
+          [id]
+        );
+        const releaseQty = parseInt(liRows[0].total, 10);
+        if (releaseQty > 0) {
+          await client.query(
+            `UPDATE products SET reserved_quantity = GREATEST(reserved_quantity - $1, 0)
+             WHERE id = (SELECT product_id FROM product_requests WHERE id = $2)`,
+            [releaseQty, id]
+          );
+        }
+      }
+
       const { rows: updated } = await client.query<RequestRow>(
         `UPDATE product_requests
          SET status = $1, rejection_note = COALESCE($2, rejection_note), updated_by = COALESCE($3, updated_by)

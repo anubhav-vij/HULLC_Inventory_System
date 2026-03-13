@@ -179,19 +179,6 @@ export default function InventoryPage() {
 
         const totalQuantity = (lots: Lot[]) => lots.reduce((sum, lot) => sum + lot.quantity, 0);
 
-    const productDemand = useMemo(() => {
-        const demandMap = new Map<string, number>();
-
-        productRequests.forEach(req => {
-            if (req.status === 'Pending Approval' || req.status === 'Pending SciOps Approval' || req.status === 'Approved' || req.status === 'In Progress') {
-                const lineItemTotal = (req.lineItems ?? []).reduce((sum, li) => sum + li.quantity, 0);
-                demandMap.set(req.productId, (demandMap.get(req.productId) || 0) + lineItemTotal);
-            }
-        });
-
-        return demandMap;
-    }, [productRequests]);
-
     // Show demo product when inventory is empty (disappears once real data exists)
     const showDemoProduct = products.length === 0;
 
@@ -497,10 +484,11 @@ export default function InventoryPage() {
         e.preventDefault();
         setIsSaving(true);
         try {
+            const isSystemEdit = userToEdit?.isSystem;
             const body: any = {
                 fullName: userFormData.fullName,
-                email: userFormData.email,
-                role: userFormData.role,
+                ...(!isSystemEdit && { email: userFormData.email }),
+                ...(!isSystemEdit && { role: userFormData.role }),
                 functionalGroupId: userFormData.functionalGroupId || null,
                 department: 'core',
             };
@@ -1141,8 +1129,12 @@ export default function InventoryPage() {
             setRequestToApprove(null);
             // Re-fetch requests with role headers to get fresh data
             const userH = { 'x-user-role': user.role, 'x-user-id': user.id ?? '', 'x-user-email': user.email ?? '', 'x-user-functional-group': user.functionalGroupName ?? '' };
-            const rRes = await fetch('/api/requests', { headers: userH });
+            const [rRes, pRes] = await Promise.all([
+                fetch('/api/requests', { headers: userH }),
+                fetch('/api/products'),
+            ]);
             if (rRes.ok) setProductRequests((await rRes.json()).map((r: any) => ({ ...r, date: new Date(r.date) })));
+            if (pRes.ok) setProducts((await pRes.json()).map(coerceProduct));
         } catch (error: any) {
             toast({ title: 'Approve Failed', description: error.message, variant: 'destructive' });
         } finally {
@@ -1195,10 +1187,14 @@ export default function InventoryPage() {
             ));
             toast({ title: 'Request Rejected' });
             setRequestToReject(null);
-            // Re-fetch requests with role headers to get fresh data
+            // Re-fetch requests and products (reservation release) with role headers
             const userH = { 'x-user-role': user.role, 'x-user-id': user.id ?? '', 'x-user-email': user.email ?? '', 'x-user-functional-group': user.functionalGroupName ?? '' };
-            const rRes = await fetch('/api/requests', { headers: userH });
+            const [rRes, pRes] = await Promise.all([
+                fetch('/api/requests', { headers: userH }),
+                fetch('/api/products'),
+            ]);
             if (rRes.ok) setProductRequests((await rRes.json()).map((r: any) => ({ ...r, date: new Date(r.date) })));
+            if (pRes.ok) setProducts((await pRes.json()).map(coerceProduct));
         } catch (error: any) {
             toast({ title: 'Reject Failed', description: error.message, variant: 'destructive' });
         } finally {
@@ -1577,7 +1573,7 @@ export default function InventoryPage() {
 
     const canEdit = user.role === 'Admin';
     const hasFullView = ['Admin', 'ProjectManager', 'Chief'].includes(user.role);
-    const inventoryColSpan = hasFullView ? 8 : 4;
+    const inventoryColSpan = canEdit ? 10 : (hasFullView ? 8 : 4);
     const requestsColSpan = 7;
 
     const pageTitle: Record<string, { title: string; subtitle?: string }> = {
@@ -1886,6 +1882,8 @@ export default function InventoryPage() {
                                                     <TableHead className="text-[11.5px] font-semibold uppercase tracking-wider" style={{ color: '#64748b' }}>VWR Part #</TableHead>
                                                     <TableHead className="text-[11.5px] font-semibold uppercase tracking-wider" style={{ color: '#64748b' }}>UoM</TableHead>
                                                     {hasFullView && <TableHead className="text-[11.5px] font-semibold uppercase tracking-wider" style={{ color: '#64748b' }}>Total Quantity</TableHead>}
+                                                    {canEdit && <TableHead className="text-[11.5px] font-semibold uppercase tracking-wider" style={{ color: '#64748b' }}>Reserved</TableHead>}
+                                                    {canEdit && <TableHead className="text-[11.5px] font-semibold uppercase tracking-wider" style={{ color: '#64748b' }}>Available</TableHead>}
                                                     {hasFullView && <TableHead className="text-[11.5px] font-semibold uppercase tracking-wider" style={{ color: '#64748b' }}>Storage Location</TableHead>}
                                                     {hasFullView ?
                                                         <TableHead className={cn("text-right", canEdit ? "w-[100px]" : "w-[80px]")}>{canEdit ? 'Actions' : ''}</TableHead> :
@@ -1944,6 +1942,22 @@ export default function InventoryPage() {
                                                                                     </Tooltip>
                                                                                 )}
                                                                             </div>
+                                                                        </TableCell>
+                                                                    )}
+                                                                    {canEdit && (
+                                                                        <TableCell>
+                                                                            {(product.reservedQuantity ?? 0) > 0 ? (
+                                                                                <Badge variant="outline" className="text-amber-700 border-amber-300 bg-amber-50">{product.reservedQuantity}</Badge>
+                                                                            ) : (
+                                                                                <span className="text-muted-foreground text-xs">0</span>
+                                                                            )}
+                                                                        </TableCell>
+                                                                    )}
+                                                                    {canEdit && (
+                                                                        <TableCell>
+                                                                            <Badge variant={totalQuantity(product.lots) - (product.reservedQuantity ?? 0) <= (product.reorderThreshold ?? 0) ? "destructive" : "secondary"}>
+                                                                                {totalQuantity(product.lots) - (product.reservedQuantity ?? 0)}
+                                                                            </Badge>
                                                                         </TableCell>
                                                                     )}
                                                                     {hasFullView && (
@@ -2670,10 +2684,8 @@ export default function InventoryPage() {
                                                                 </Badge>
                                                             </TableCell>
                                                             {canEdit && <TableCell className="text-right">
-                                                                {u.isSystem ? (
-                                                                    <span className="text-xs" style={{ color: '#64748b' }}>System Admin</span>
-                                                                ) : (
-                                                                <div className="flex justify-end gap-1">
+                                                                <div className="flex justify-end gap-1 items-center">
+                                                                    {u.isSystem && <span className="text-xs mr-1" style={{ color: '#64748b' }}>System Admin</span>}
                                                                     <Tooltip>
                                                                         <TooltipTrigger asChild>
                                                                             <Button size="sm" variant="ghost" onClick={() => handleOpenUserForm(u)}>
@@ -2682,6 +2694,7 @@ export default function InventoryPage() {
                                                                         </TooltipTrigger>
                                                                         <TooltipContent>Edit user</TooltipContent>
                                                                     </Tooltip>
+                                                                    {!u.isSystem && (
                                                                     <Tooltip>
                                                                         <TooltipTrigger asChild>
                                                                             <Button size="sm" variant="ghost" onClick={() => handleToggleUserStatus(u)}>
@@ -2690,8 +2703,8 @@ export default function InventoryPage() {
                                                                         </TooltipTrigger>
                                                                         <TooltipContent>{u.isActive ? 'Deactivate user' : 'Activate user'}</TooltipContent>
                                                                     </Tooltip>
+                                                                    )}
                                                                 </div>
-                                                                )}
                                                             </TableCell>}
                                                         </TableRow>
                                                     ))}
@@ -3003,7 +3016,8 @@ export default function InventoryPage() {
                         </div>
                         <div className="flex flex-col gap-1.5">
                             <Label htmlFor="uf-email" style={{ color: '#475569', fontSize: 11, textTransform: 'uppercase', fontWeight: 600 }}>Email<span style={{ color: '#ef4444' }}> *</span></Label>
-                            <Input id="uf-email" type="email" value={userFormData.email} onChange={e => setUserFormData(p => ({ ...p, email: e.target.value }))} required placeholder="jane@nih.gov" style={{ backgroundColor: '#fff', border: '1px solid #cbd5e1', borderRadius: 8 }} />
+                            <Input id="uf-email" type="email" value={userFormData.email} onChange={e => setUserFormData(p => ({ ...p, email: e.target.value }))} required placeholder="jane@nih.gov" disabled={!!userToEdit?.isSystem} style={{ backgroundColor: userToEdit?.isSystem ? '#f1f5f9' : '#fff', border: '1px solid #cbd5e1', borderRadius: 8 }} />
+                            {userToEdit?.isSystem && <p className="text-xs" style={{ color: '#64748b' }}>System Administrator email cannot be changed.</p>}
                         </div>
                         {!userToEdit && (
                             <div className="flex flex-col gap-1.5">
@@ -3013,8 +3027,8 @@ export default function InventoryPage() {
                         )}
                         <div className="flex flex-col gap-1.5">
                             <Label htmlFor="uf-role" style={{ color: '#475569', fontSize: 11, textTransform: 'uppercase', fontWeight: 600 }}>Role</Label>
-                            <Select value={userFormData.role} onValueChange={v => setUserFormData(p => ({ ...p, role: v as UserRole }))}>
-                                <SelectTrigger id="uf-role" style={{ backgroundColor: '#fff', border: '1px solid #cbd5e1', borderRadius: 8 }}><SelectValue /></SelectTrigger>
+                            <Select value={userFormData.role} onValueChange={v => setUserFormData(p => ({ ...p, role: v as UserRole }))} disabled={!!userToEdit?.isSystem}>
+                                <SelectTrigger id="uf-role" style={{ backgroundColor: userToEdit?.isSystem ? '#f1f5f9' : '#fff', border: '1px solid #cbd5e1', borderRadius: 8 }}><SelectValue /></SelectTrigger>
                                 <SelectContent>
                                     {USER_ROLES.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}
                                 </SelectContent>

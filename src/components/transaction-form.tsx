@@ -97,6 +97,12 @@ export function TransactionForm({ product, onSave, onCancel, isSaving }: Transac
 
         <div>
           <h3 className="text-lg font-medium mb-2">Dispense from Lots</h3>
+          {(product.reservedQuantity ?? 0) > 0 && (
+            <div className="mb-3 px-3 py-2 rounded-md text-xs" style={{ backgroundColor: '#fffbeb', border: '1px solid #fde68a', color: '#92400e' }}>
+              <strong>{product.reservedQuantity}</strong> unit{product.reservedQuantity === 1 ? '' : 's'} reserved for approved requests.
+              Available: <strong>{product.lots.reduce((s, l) => s + l.quantity, 0) - (product.reservedQuantity ?? 0)}</strong>
+            </div>
+          )}
            <FormMessage>{form.formState.errors.items?.root?.message}</FormMessage>
           <div className="space-y-4 max-h-60 overflow-y-auto pr-2">
             {fields.map((field, index) => {

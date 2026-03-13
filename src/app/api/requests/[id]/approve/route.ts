@@ -114,6 +114,23 @@ export async function PUT(request: Request, { params }: RouteContext) {
         [newStatus, userId, comments, somRequired, id]
       );
 
+      // Reserve stock when transitioning to Approved (not SciOps pending)
+      if (newStatus === 'Approved') {
+        const { rows: liRows } = await client.query<{ total: string }>(
+          `SELECT COALESCE(SUM(quantity), 0) AS total
+           FROM request_line_items WHERE request_id = $1 AND status = 'Pending'`,
+          [id]
+        );
+        const reserveQty = parseInt(liRows[0].total, 10);
+        if (reserveQty > 0) {
+          await client.query(
+            `UPDATE products SET reserved_quantity = reserved_quantity + $1
+             WHERE id = (SELECT product_id FROM product_requests WHERE id = $2)`,
+            [reserveQty, id]
+          );
+        }
+      }
+
       // Log status change
       const approverName = (await client.query<{full_name: string}>('SELECT full_name FROM users WHERE id = $1', [userId])).rows[0]?.full_name ?? 'Unknown';
       await client.query(

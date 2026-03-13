@@ -13,8 +13,8 @@ export async function PUT(request: Request, { params }: RouteContext) {
   const role = request.headers.get('x-user-role') ?? '';
   const userId = request.headers.get('x-user-id') ?? '';
 
-  if (role !== 'Director') {
-    return NextResponse.json({ error: 'Only Directors can approve SciOps requests' }, { status: 403 });
+  if (role !== 'Director' && role !== 'Admin') {
+    return NextResponse.json({ error: 'Only Directors and Admins can approve SciOps requests' }, { status: 403 });
   }
 
   if (!userId) {
@@ -49,21 +49,25 @@ export async function PUT(request: Request, { params }: RouteContext) {
       }
 
       const director = userRows[0];
-      if (!director.functional_group_id) {
-        throw Object.assign(new Error('Director has no functional group'), { code: 'NO_GROUP' });
-      }
 
-      // Check that this director belongs to "Scientific Operations"
-      const { rows: groupRows } = await client.query<{ name: string }>(
-        'SELECT name FROM functional_groups WHERE id = $1',
-        [director.functional_group_id]
-      );
+      // Admin can override SciOps approval (e.g. when SciOps Director is OOO)
+      // Directors must belong to "Scientific Operations" functional group
+      if (role === 'Director') {
+        if (!director.functional_group_id) {
+          throw Object.assign(new Error('Director has no functional group'), { code: 'NO_GROUP' });
+        }
 
-      if (groupRows.length === 0 || groupRows[0].name !== 'Scientific Operations') {
-        throw Object.assign(
-          new Error('Only the Scientific Operations Director can approve SOM requests'),
-          { code: 'WRONG_GROUP' }
+        const { rows: groupRows } = await client.query<{ name: string }>(
+          'SELECT name FROM functional_groups WHERE id = $1',
+          [director.functional_group_id]
         );
+
+        if (groupRows.length === 0 || groupRows[0].name !== 'Scientific Operations') {
+          throw Object.assign(
+            new Error('Only the Scientific Operations Director can approve SOM requests'),
+            { code: 'WRONG_GROUP' }
+          );
+        }
       }
 
       // Get the request
@@ -93,6 +97,21 @@ export async function PUT(request: Request, { params }: RouteContext) {
          WHERE id = $2`,
         [userId, id]
       );
+
+      // Reserve stock when transitioning to Approved
+      const { rows: liRows } = await client.query<{ total: string }>(
+        `SELECT COALESCE(SUM(quantity), 0) AS total
+         FROM request_line_items WHERE request_id = $1 AND status = 'Pending'`,
+        [id]
+      );
+      const reserveQty = parseInt(liRows[0].total, 10);
+      if (reserveQty > 0) {
+        await client.query(
+          `UPDATE products SET reserved_quantity = reserved_quantity + $1
+           WHERE id = (SELECT product_id FROM product_requests WHERE id = $2)`,
+          [reserveQty, id]
+        );
+      }
 
       // Log status change
       const sciopsName = (await client.query<{full_name: string}>('SELECT full_name FROM users WHERE id = $1', [userId])).rows[0]?.full_name ?? 'Unknown';

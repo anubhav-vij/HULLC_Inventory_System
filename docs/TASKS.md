@@ -472,12 +472,15 @@ task and work through each phase sequentially, marking `[~]` while in progress a
 
 > Prevents double-allocation when multiple requests are in flight for the same product.
 
-- [ ] Create DB migration: add `reserved_quantity` column to `products` table
-- [ ] When Admin starts fulfilling a line item, reserve that quantity atomically
-- [ ] Show reserved quantity as separate column in Inventory table (Admin view only)
-- [ ] Prevent dispensing more than (total_quantity - reserved_quantity)
-- [ ] Release reservation automatically when line item is Completed or Rejected
-- [ ] Show reservation indicator on product row when reserved_quantity > 0
+- [x] Create DB migration (019): add `reserved_quantity` column to `products` table
+- [x] Reserve stock atomically when request is approved (Director or SciOps approval)
+- [x] Show Reserved and Available columns in Inventory table (Admin view only)
+- [x] Show reservation info banner in dispense form when product has reservations
+- [x] Release reservation when line item is fulfilled (decrement by requested quantity)
+- [x] Release reservation when approved/in-progress request is rejected
+- [x] Show Reserved/Available stat cards on product detail page when reservations exist
+- [x] Re-fetch products after approval/rejection to update reservation display
+- [x] Removed unused client-side productDemand calculation (replaced by DB-tracked reservations)
 
 ---
 

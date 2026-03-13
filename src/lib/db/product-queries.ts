@@ -35,6 +35,7 @@ export type ProductRow = {
   som_approval_required: boolean;
   cost_per_unit: number | null;
   reorder_threshold: number | null;
+  reserved_quantity: number;
   // json_agg produces a parsed JS array because pg auto-parses JSON columns
   lots: LotJsonRow[];
 };
@@ -59,6 +60,7 @@ export const PRODUCT_SELECT_SQL = `
     p.som_approval_required,
     p.cost_per_unit,
     p.reorder_threshold,
+    p.reserved_quantity,
     COALESCE(
       json_agg(
         json_build_object(
@@ -100,6 +102,7 @@ export function rowToProduct(row: ProductRow): Product {
     somApprovalRequired: row.som_approval_required,
     costPerUnit: row.cost_per_unit != null ? Number(row.cost_per_unit) : null,
     reorderThreshold: row.reorder_threshold,
+    reservedQuantity: row.reserved_quantity ?? 0,
     lots: row.lots.map((lot): Lot => ({
       id: lot.id,
       lotNumber: lot.lotNumber,

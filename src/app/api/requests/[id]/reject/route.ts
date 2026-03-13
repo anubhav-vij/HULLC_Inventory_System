@@ -76,6 +76,23 @@ export async function PUT(request: Request, { params }: RouteContext) {
         [rejectionNote, userId || null, rejectionStage, directorNote, id]
       );
 
+      // Release reserved stock for unfulfilled line items (only if was Approved/In Progress)
+      if (req.status === 'Approved' || req.status === 'In Progress') {
+        const { rows: liRows } = await client.query<{ total: string }>(
+          `SELECT COALESCE(SUM(quantity), 0) AS total
+           FROM request_line_items WHERE request_id = $1 AND status = 'Pending'`,
+          [id]
+        );
+        const releaseQty = parseInt(liRows[0].total, 10);
+        if (releaseQty > 0) {
+          await client.query(
+            `UPDATE products SET reserved_quantity = GREATEST(reserved_quantity - $1, 0)
+             WHERE id = (SELECT product_id FROM product_requests WHERE id = $2)`,
+            [releaseQty, id]
+          );
+        }
+      }
+
       // Log status change
       const rejectorName = (await client.query<{full_name: string}>('SELECT full_name FROM users WHERE id = $1', [userId])).rows[0]?.full_name ?? 'Unknown';
       const stageLabel = rejectionStage === 'sciops' ? 'SciOps Director' : (rejectionStage === 'director' ? 'Director' : 'Admin');

@@ -168,9 +168,13 @@ function ProductDetailPage() {
 
       <div className="p-6 md:p-8 max-w-6xl mx-auto">
         {/* Summary stat cards */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <div className={`grid grid-cols-2 ${(product.reservedQuantity ?? 0) > 0 ? 'md:grid-cols-3 lg:grid-cols-6' : 'md:grid-cols-4'} gap-4 mb-6`}>
           {[
             { label: 'Total Stock', value: `${totalStock}`, sub: (product as any).uom || 'units', color: '#1e40af', accent: '#1e40af' },
+            ...((product.reservedQuantity ?? 0) > 0 ? [
+              { label: 'Reserved', value: `${product.reservedQuantity}`, sub: 'for approved requests', color: '#d97706', accent: '#d97706' },
+              { label: 'Available', value: `${totalStock - (product.reservedQuantity ?? 0)}`, sub: (product as any).uom || 'units', color: totalStock - (product.reservedQuantity ?? 0) <= (product.reorderThreshold ?? 0) ? '#dc2626' : '#16a34a', accent: totalStock - (product.reservedQuantity ?? 0) <= (product.reorderThreshold ?? 0) ? '#dc2626' : '#16a34a' },
+            ] : []),
             { label: 'Lots', value: `${lotCount}`, sub: lotCount === 1 ? 'lot' : 'lots', color: '#0f172a', accent: '#2563eb' },
             { label: 'Reorder At', value: product.reorderThreshold != null ? `${product.reorderThreshold}` : '--', sub: product.reorderThreshold != null ? 'units' : 'not set', color: totalStock <= (product.reorderThreshold ?? 0) && product.reorderThreshold ? '#dc2626' : '#0f172a', accent: totalStock <= (product.reorderThreshold ?? 0) && product.reorderThreshold ? '#dc2626' : '#2563eb' },
             { label: 'Cost / Unit', value: (product as any).costPerUnit != null ? `$${Number((product as any).costPerUnit).toFixed(2)}` : '--', sub: (product as any).costPerUnit != null ? 'per unit' : 'not set', color: '#0f172a', accent: '#2563eb' },

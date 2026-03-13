@@ -36,6 +36,14 @@ A full-stack inventory management system built for the **Hu Lab at NIAID/NIH (HU
 - Expanded lots sorted by receipt date (newest first), limited to 3 in inventory view
 - Manufacturer alternate name displayed throughout system (inventory table, product detail, Excel export)
 
+### Stock Reservation
+- Automatic reservation when requests are approved — prevents double-allocation across concurrent requests
+- Product-level `reserved_quantity` tracks stock committed to approved/in-progress requests
+- Admin sees **Reserved** and **Available** columns in inventory table
+- Reservation released automatically on fulfillment or rejection
+- Dispense form shows amber reservation banner when product has active reservations
+- Product detail page shows Reserved/Available stat cards when reservations exist
+
 ### Dispensing & Transactions
 - Record dispensing transactions against specific lots with atomic quantity decrement
 - Full transaction reversal (restores lot quantities)
@@ -48,7 +56,7 @@ A full-stack inventory management system built for the **Hu Lab at NIAID/NIH (HU
 - Multi-project selection per request (comma-separated display)
 - Two-stage approval: Director → (SOM products) Sci-Ops Director → Admin fulfillment
 - Director approve/reject with comments; Sci-Ops approve/reject for SOM products
-- Admin can approve any pending request across all groups (OOO Director coverage)
+- Admin can approve any pending request across all groups (OOO Director coverage), including SciOps approvals
 - Request status machine: Pending Approval → Approved → In Progress → Completed (or Rejected at any stage)
 - Workflow history audit trail: tracks all status changes with timestamps, actors, and comments
 - Legacy fulfillments displayed as read-only history (phased out in favor of line-item fulfillment flow)
@@ -160,7 +168,7 @@ src/
 │   ├── db/
 │   │   ├── index.ts                  # pg Pool singleton, query(), withTransaction()
 │   │   ├── schema.sql                # Full PostgreSQL schema
-│   │   ├── migrations/               # 18 numbered SQL migration files
+│   │   ├── migrations/               # 19 numbered SQL migration files
 │   │   ├── migrate.ts                # Migration runner
 │   │   ├── seed.ts                   # Idempotent seed (groups, projects, admin user)
 │   │   ├── product-queries.ts        # Shared SQL, row mappers, coerceLotDates
@@ -217,7 +225,7 @@ DATABASE_SSL=false
 # Apply base schema
 psql -U postgres -d hullc_dev -f src/lib/db/schema.sql
 
-# Run all migrations (001-017)
+# Run all migrations (001-019)
 npx tsx --env-file=.env.local src/lib/db/migrate.ts
 
 # Seed functional groups, projects, and admin user
@@ -281,6 +289,7 @@ npx tsx --env-file=.env.local src/lib/db/migrate.ts
 | 016 | Historical records table for legacy data import |
 | 017 | Multi-project support (TEXT→TEXT[]) + request_status_history table |
 | 018 | System user flag (`is_system` boolean) for protected super admin |
+| 019 | Stock reservation (`reserved_quantity` on products table) |
 
 **Important:** The migration runner splits SQL on `;` — do NOT use PL/pgSQL `DO $$` blocks (semicolons inside break the splitter). Use plain SQL with CTEs and window functions instead.
 
@@ -440,6 +449,7 @@ All active development happens on `production`. `master` is kept as a reference 
 | 18 | 2026-03-13 | Import redesign: HULLC-XXXX IDs, bulk import with persistent placeholders, historical data page, dashboard clickable cards, inventory pagination |
 | 19 | 2026-03-13 | Post-demo fixes: metrics dashboard bug fix, product detail page, workflow history audit trail, multi-project requests, timezone fixes, lots sorting |
 | 20 | 2026-03-13 | System-wide pagination (75/page), manufacturer alternate names, product detail redesign, legacy fulfillments read-only, export filters, view details Admin-only, protected system admin |
+| 21 | 2026-03-13 | Phase 7: Stock reservation, system admin name edit fix, Admin SciOps approval override |
 
 For detailed task-by-task history, see `docs/TASKS.md`.
 

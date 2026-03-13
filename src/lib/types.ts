@@ -58,6 +58,7 @@ export const ProductFormCreateSchema = ProductFormSchema.extend({
 export const ProductSchema = ProductFormSchema.extend({
   id: z.string(),
   manufacturerAlternateName: z.string().optional(),
+  reservedQuantity: z.coerce.number().min(0).default(0),
 });
 
 
