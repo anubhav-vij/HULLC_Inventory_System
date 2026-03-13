@@ -21,6 +21,7 @@ import {
   PackagePlus,
   PackageMinus,
   PieChart,
+  History,
 } from "lucide-react";
 import type { User } from "@/lib/types";
 
@@ -61,6 +62,7 @@ const NAV_ITEMS: NavItem[] = [
       { id: "metrics-dashboard", label: "Charts Dashboard", icon: PieChart },
       { id: "metrics-received", label: "Inventory Received", icon: PackagePlus },
       { id: "metrics-disbursed", label: "Inventory Disbursed", icon: PackageMinus },
+      { id: "historical-import", label: "Historical Data", icon: History, roles: ["Admin"] },
     ],
   },
 ];
@@ -210,7 +212,7 @@ export function Sidebar({ activeView, onNavigate, user, onLogout, mobileOpen, on
                 </button>
                 {isOpen && (
                   <div className="ml-4" role="group" aria-label={item.label}>
-                    {item.children.map((child) => {
+                    {item.children.filter(c => !c.roles || c.roles.includes(user.role)).map((child) => {
                       const ChildIcon = child.icon;
                       const isChildActive = activeView === child.id;
                       return (

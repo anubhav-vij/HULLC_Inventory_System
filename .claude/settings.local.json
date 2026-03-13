@@ -5,7 +5,20 @@
       "Bash(cd \"C:\\\\Users\\\\MV PC\\\\OneDrive\\\\Desktop\\\\HULLC_Inventory_System\" && npm run typecheck 2>&1 | grep -v \"test-\" | head -10)",
       "Bash(cd \"C:\\\\Users\\\\MV PC\\\\OneDrive\\\\Desktop\\\\HULLC_Inventory_System\" && npm run build 2>&1 | tail -5)",
       "Bash(cd \"C:\\\\Users\\\\MV PC\\\\OneDrive\\\\Desktop\\\\HULLC_Inventory_System\" && grep -n \"getDefaultView\" src/components/inventory-page.tsx | head -3 && grep -n \"ALLOWED_ROLES\\\\|FULL_VIEW_ROLES\" src/app/api/metrics/*/route.ts && grep -n \"role !== .Director\" src/app/api/requests/\\\\[id\\\\]/approve/route.ts | head -3)",
-      "Bash(cd \"C:\\\\Users\\\\MV PC\\\\OneDrive\\\\Desktop\\\\HULLC_Inventory_System\" && npm run dev 2>&1)"
+      "Bash(cd \"C:\\\\Users\\\\MV PC\\\\OneDrive\\\\Desktop\\\\HULLC_Inventory_System\" && npm run dev 2>&1)",
+      "Bash(cd \"C:\\\\Users\\\\MV PC\\\\OneDrive\\\\Desktop\\\\HULLC_Inventory_System\" && npm run typecheck 2>&1)",
+      "Bash(cd \"C:\\\\Users\\\\MV PC\\\\OneDrive\\\\Desktop\\\\HULLC_Inventory_System\" && npm run build 2>&1 | tail -30)",
+      "Bash(cd \"C:\\\\Users\\\\MV PC\\\\OneDrive\\\\Desktop\\\\HULLC_Inventory_System\" && rm -rf .next && npm run build 2>&1 | tail -10)",
+      "Bash(cd \"C:\\\\Users\\\\MV PC\\\\OneDrive\\\\Desktop\\\\HULLC_Inventory_System\" && npm run build 2>&1 | tail -15)",
+      "Bash(cd \"C:\\\\Users\\\\MV PC\\\\OneDrive\\\\Desktop\\\\HULLC_Inventory_System\" && rm -rf .next && npm run build 2>&1 | tail -20)",
+      "Bash(cd \"C:\\\\Users\\\\MV PC\\\\OneDrive\\\\Desktop\\\\HULLC_Inventory_System\" && npm run build 2>&1 | tail -10)",
+      "Bash(cd \"C:\\\\Users\\\\MV PC\\\\OneDrive\\\\Desktop\\\\HULLC_Inventory_System\" && npm run build 2>&1 | grep \"bulk-import\")",
+      "Bash(cd \"C:\\\\Users\\\\MV PC\\\\OneDrive\\\\Desktop\\\\HULLC_Inventory_System\" && npx tsx --env-file=.env.local src/lib/db/tmp/clean-db.ts 2>&1)",
+      "Bash(cd \"C:\\\\Users\\\\MV PC\\\\OneDrive\\\\Desktop\\\\HULLC_Inventory_System\" && npx tsx --env-file=.env.local src/lib/db/migrate.ts 2>&1)",
+      "Bash(cd \"C:\\\\Users\\\\MV PC\\\\OneDrive\\\\Desktop\\\\HULLC_Inventory_System\" && npx tsx --env-file=.env.local src/lib/db/tmp/delete-p001.ts 2>&1 && rm -rf src/lib/db/tmp)",
+      "Bash(cd \"C:\\\\Users\\\\MV PC\\\\OneDrive\\\\Desktop\\\\HULLC_Inventory_System\" && rm -rf .next && npm run build 2>&1 | tail -5)",
+      "Bash(cd \"C:\\\\Users\\\\MV PC\\\\OneDrive\\\\Desktop\\\\HULLC_Inventory_System\" && npx tsx --env-file=.env.local src/lib/db/tmp/seed-config.ts 2>&1)",
+      "Bash(cd \"C:\\\\Users\\\\MV PC\\\\OneDrive\\\\Desktop\\\\HULLC_Inventory_System\" && rm -rf .next && npm run build 2>&1 | tail -15)"
     ]
   }
 }

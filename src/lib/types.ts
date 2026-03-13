@@ -54,6 +54,7 @@ export const ProductFormCreateSchema = ProductFormSchema.extend({
     lots: z.array(NewLotSchema).min(1, "At least one lot is required."),
 });
 
+
 export const ProductSchema = ProductFormSchema.extend({
   id: z.string(),
 });

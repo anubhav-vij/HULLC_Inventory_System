@@ -132,12 +132,23 @@ export function coerceLotDates(lots: unknown[]): unknown[] {
 // same ID. The lock is released when the transaction commits or rolls back.
 
 export async function generateNextProductId(client: PoolClient): Promise<string> {
-  const { rows } = await client.query<{ id: string }>(
-    'SELECT id FROM products ORDER BY id DESC LIMIT 1 FOR UPDATE'
-  );
-  if (rows.length === 0) return 'P001';
-  const lastNum = parseInt(rows[0].id.substring(1), 10);
-  return `P${String(lastNum + 1).padStart(3, '0')}`;
+  // Lock the products table to prevent concurrent ID generation,
+  // then compute the max numeric suffix across both legacy P### and new HULLC-XXXX formats.
+  // FOR UPDATE can't be used with aggregates, so we lock all rows first,
+  // then run the MAX in a separate query.
+  await client.query('SELECT id FROM products FOR UPDATE');
+  const { rows } = await client.query<{ max_num: string | null }>(`
+    SELECT MAX(
+      CASE
+        WHEN id LIKE 'HULLC-%' THEN CAST(SUBSTRING(id FROM 6) AS INTEGER)
+        WHEN id LIKE 'P%'      THEN CAST(SUBSTRING(id FROM 2) AS INTEGER)
+        ELSE 0
+      END
+    ) AS max_num
+    FROM products
+  `);
+  const lastNum = rows[0]?.max_num ? parseInt(rows[0].max_num, 10) : 0;
+  return `HULLC-${String(lastNum + 1).padStart(4, '0')}`;
 }
 
 // ---------------------------------------------------------------------------

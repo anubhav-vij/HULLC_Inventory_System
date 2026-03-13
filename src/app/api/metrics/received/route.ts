@@ -19,19 +19,36 @@ export async function GET(request: Request) {
 
   try {
     const { rows } = await query(
-      `SELECT
-        p.name AS product_name,
-        p.manufacturer,
-        p.manufacturer_part_number,
-        p.uom,
-        l.lot_number,
-        l.quantity,
-        l.location AS storage_location,
-        l.receipt_date AS received_date
-      FROM lots l
-      JOIN products p ON p.id = l.product_id
-      WHERE l.receipt_date >= $1::date AND l.receipt_date <= $2::date
-      ORDER BY l.receipt_date DESC`,
+      `SELECT * FROM (
+        SELECT
+          p.name AS product_name,
+          p.manufacturer,
+          p.manufacturer_part_number,
+          p.uom,
+          l.lot_number,
+          l.quantity,
+          l.location AS storage_location,
+          l.receipt_date AS received_date
+        FROM lots l
+        JOIN products p ON p.id = l.product_id
+        WHERE l.receipt_date >= $1::date AND l.receipt_date <= $2::date
+
+        UNION ALL
+
+        SELECT
+          hr.product_name,
+          hr.manufacturer,
+          hr.manufacturer_part_number,
+          hr.uom,
+          hr.lot_number,
+          hr.quantity,
+          '' AS storage_location,
+          hr.event_date AS received_date
+        FROM historical_records hr
+        WHERE hr.type = 'In'
+          AND hr.event_date >= $1::date AND hr.event_date <= $2::date
+      ) combined
+      ORDER BY received_date DESC`,
       [from, to]
     );
 

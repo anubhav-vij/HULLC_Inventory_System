@@ -50,6 +50,31 @@ function coerceProduct(p: any): Product {
     };
 }
 
+// Demo product shown when inventory is empty (not stored in DB).
+// Disappears as soon as a real product is added via form or import.
+const DEMO_PRODUCT: Product = {
+    id: 'DEMO-0000',
+    name: 'DPBS (Dulbecco\'s Phosphate Buffered Saline)',
+    manufacturer: 'Thermo Fisher Scientific',
+    manufacturerPartNumber: '14190144',
+    vwrPartNumber: '45000-434',
+    uom: 'Bottle (500 mL)',
+    somApprovalRequired: false,
+    costPerUnit: 12.50,
+    reorderThreshold: 5,
+    lots: [
+        {
+            id: 'demo-lot-1',
+            lotNumber: '2587341',
+            quantity: 12,
+            receiptDate: new Date(),
+            expirationDate: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000),
+            location: 'Cold Storage Room A',
+            file: null,
+        },
+    ],
+};
+
 
 export default function InventoryPage() {
     const [products, setProducts] = useState<Product[]>([]);
@@ -84,6 +109,11 @@ export default function InventoryPage() {
     const [rejectionNote, setRejectionNote] = useState('');
     const [searchQuery, setSearchQuery] = useState('');
     const [locationFilter, setLocationFilter] = useState('');
+
+    // Inventory filter state (set from dashboard cards)
+    const [inventoryFilter, setInventoryFilter] = useState<'all' | 'missing-data' | 'added-this-week' | 'low-stock'>('all');
+    const [inventoryPage, setInventoryPage] = useState(1);
+    const PRODUCTS_PER_PAGE = 75;
 
     // Filter state
     const [txDateFrom, setTxDateFrom] = useState('');
@@ -154,8 +184,45 @@ export default function InventoryPage() {
         return demandMap;
     }, [productRequests]);
 
+    // Show demo product when inventory is empty (disappears once real data exists)
+    const showDemoProduct = products.length === 0;
+
+    // Detect products with placeholder/missing data that admins need to fix
+    const MISSING_SENTINEL_DATE = new Date('1900-01-01');
+    const hasMissingData = (product: Product): boolean => {
+        const missingPatterns = [/^PRODUCT-\d+-Missing$/, /^MFR-\d+-Missing$/, /^PART-\d+-Missing$/];
+        if (missingPatterns.some(p => p.test(product.name))) return true;
+        if (missingPatterns.some(p => p.test(product.manufacturer))) return true;
+        if (missingPatterns.some(p => p.test(product.manufacturerPartNumber))) return true;
+        return product.lots.some(l =>
+            /^LOT-\d+-Missing$/.test(l.lotNumber) ||
+            /^LOC-\d+-Missing$/.test(l.location) ||
+            (l.receiptDate && new Date(l.receiptDate).getFullYear() === 1900)
+        );
+    };
+
+    const missingDataProducts = useMemo(() => products.filter(hasMissingData), [products]);
+
     const filteredProducts = useMemo(() => {
-        let result = products;
+        let result = showDemoProduct ? [DEMO_PRODUCT] : products;
+
+        // Dashboard filter: missing data, added this week, or low stock
+        if (inventoryFilter === 'missing-data') {
+            result = result.filter(hasMissingData);
+        } else if (inventoryFilter === 'added-this-week') {
+            const sevenDaysAgo = new Date();
+            sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+            sevenDaysAgo.setHours(0, 0, 0, 0);
+            result = result.filter(p =>
+                p.lots.some(l => l.receiptDate && new Date(l.receiptDate) >= sevenDaysAgo && new Date(l.receiptDate).getFullYear() !== 1900)
+            );
+        } else if (inventoryFilter === 'low-stock') {
+            result = result.filter(p => {
+                const stock = totalQuantity(p.lots);
+                return p.reorderThreshold != null && p.reorderThreshold > 0 && stock <= p.reorderThreshold;
+            });
+        }
+
         if (locationFilter) {
             result = result.filter(product =>
                 product.lots.some(l => l.location === locationFilter)
@@ -172,7 +239,17 @@ export default function InventoryPage() {
             );
         }
         return result;
-    }, [products, searchQuery, locationFilter]);
+    }, [products, showDemoProduct, searchQuery, locationFilter, inventoryFilter]);
+
+    // Pagination
+    const totalPages = Math.max(1, Math.ceil(filteredProducts.length / PRODUCTS_PER_PAGE));
+    const paginatedProducts = useMemo(() => {
+        const start = (inventoryPage - 1) * PRODUCTS_PER_PAGE;
+        return filteredProducts.slice(start, start + PRODUCTS_PER_PAGE);
+    }, [filteredProducts, inventoryPage]);
+
+    // Reset page when filters change
+    useEffect(() => { setInventoryPage(1); }, [inventoryFilter, searchQuery, locationFilter]);
 
     const filteredTransactions = useMemo(() => {
         let result = transactions;
@@ -1158,49 +1235,77 @@ export default function InventoryPage() {
         try {
             const rows = XLSX.utils.sheet_to_json<any>(workbook.Sheets[selectedSheet], { defval: '' });
 
-            const requiredHeaders = [
-                'product_id', 'product_name', 'manufacturer', 'manufacturer_part_number', 'location',
-                'lot_number', 'quantity', 'receipt_date', 'expiration_date', 'reorder_threshold', 'notes'
-            ];
-            if (rows.length > 0) {
-                const headers = Object.keys(rows[0]);
-                if (!requiredHeaders.every(h => headers.includes(h))) {
-                    throw new Error(`File must contain the following headers: ${requiredHeaders.join(', ')}`);
-                }
+            if (rows.length === 0) {
+                toast({ title: 'Import Failed', description: 'No data rows found in the file.', variant: 'destructive' });
+                return;
             }
 
+            // Group rows into products by (product_name + manufacturer + manufacturer_part_number).
+            // Empty grouping fields are kept as-is — the server assigns placeholders.
             const importedProductsMap = new Map<string, any>();
+            const formatDate = (d: any): string | null => {
+                if (!d || d === '') return null;
+                if (d instanceof Date) return isValid(d) ? format(d, 'yyyy-MM-dd') : null;
+                const parsed = new Date(String(d));
+                return isValid(parsed) ? format(parsed, 'yyyy-MM-dd') : null;
+            };
+
+            // Track which rows had no grouping fields to give them unique keys
+            let emptyGroupCounter = 0;
+
             for (const row of rows) {
                 const {
-                    product_id, product_name, manufacturer, manufacturer_part_number, location,
-                    lot_number, quantity, receipt_date, expiration_date, reorder_threshold, notes
+                    product_name, manufacturer, manufacturer_part_number, location,
+                    lot_number, quantity, receipt_date, expiration_date, notes,
+                    vwr_part_number, uom, som_approval_required, cost_per_unit,
+                    reorder_threshold
                 } = row;
-                if (!product_id || !product_name || !lot_number) continue;
-                const formatDate = (d: any) => {
-                    if (!d) return null;
-                    if (d instanceof Date) return format(d, 'yyyy-MM-dd');
-                    return String(d);
-                };
-                const lot = {
-                    id: uuidv4(),
-                    lotNumber: String(lot_number),
-                    quantity: parseInt(String(quantity), 10) || 0,
-                    receiptDate: formatDate(receipt_date) ?? format(new Date(), 'yyyy-MM-dd'),
-                    expirationDate: formatDate(expiration_date),
-                    location: String(location),
-                    file: null,
-                    notes: String(notes || ''),
-                };
-                if (importedProductsMap.has(String(product_id))) {
-                    importedProductsMap.get(String(product_id)).lots.push(lot);
-                } else {
-                    importedProductsMap.set(String(product_id), {
-                        id: String(product_id),
-                        name: String(product_name),
-                        manufacturer: String(manufacturer),
-                        manufacturerPartNumber: String(manufacturer_part_number),
+
+                const pName = String(product_name ?? '').trim();
+                const pMfr = String(manufacturer ?? '').trim();
+                const pPart = String(manufacturer_part_number ?? '').trim();
+
+                // Build grouping key — if all three are empty, each row is its own product
+                let groupKey = `${pName}||${pMfr}||${pPart}`;
+                if (!pName && !pMfr && !pPart) {
+                    groupKey = `__empty_${++emptyGroupCounter}`;
+                }
+
+                // Ensure the product entry exists
+                if (!importedProductsMap.has(groupKey)) {
+                    const somFlag = som_approval_required
+                        ? String(som_approval_required).toLowerCase() === 'yes' || String(som_approval_required).toLowerCase() === 'true'
+                        : false;
+                    importedProductsMap.set(groupKey, {
+                        name: pName || undefined,
+                        manufacturer: pMfr || undefined,
+                        manufacturerPartNumber: pPart || undefined,
+                        vwrPartNumber: vwr_part_number ? String(vwr_part_number).trim() : undefined,
+                        uom: uom ? String(uom).trim() : undefined,
+                        somApprovalRequired: somFlag,
+                        costPerUnit: cost_per_unit ? parseFloat(String(cost_per_unit)) || null : null,
                         reorderThreshold: reorder_threshold ? parseInt(String(reorder_threshold), 10) : null,
-                        lots: [lot],
+                        lots: [] as any[],
+                    });
+                }
+
+                // Add a lot for every row (server fills missing lot_number/location)
+                const lotNum = String(lot_number ?? '').trim();
+                const loc = String(location ?? '').trim();
+                const receiptDateStr = formatDate(receipt_date);
+                const expirationDateStr = formatDate(expiration_date);
+
+                // Only add a lot row if there's at least one lot-level field present
+                // (lot_number, quantity, receipt_date, or location)
+                const hasLotData = lotNum || (quantity && Number(quantity) !== 0) || receiptDateStr || loc;
+                if (hasLotData) {
+                    importedProductsMap.get(groupKey).lots.push({
+                        lotNumber: lotNum || undefined,
+                        quantity: parseInt(String(quantity), 10) || 0,
+                        receiptDate: receiptDateStr || undefined,
+                        expirationDate: expirationDateStr,
+                        location: loc || undefined,
+                        notes: String(notes || '').trim() || undefined,
                     });
                 }
             }
@@ -1211,45 +1316,25 @@ export default function InventoryPage() {
                 return;
             }
 
-            const existingIds = new Set(products.map(p => p.id));
-            let successCount = 0;
-            const importErrors: string[] = [];
+            // Send all products to the bulk-import endpoint in one request.
+            // The server assigns persistent placeholder counters for missing fields.
+            const res = await fetch('/api/products/bulk-import', {
+                method: 'POST',
+                headers: authHeaders(),
+                body: JSON.stringify({ products: xlsxProducts }),
+            });
 
-            for (const product of xlsxProducts) {
-                try {
-                    if (existingIds.has(product.id)) {
-                        const res = await fetch(`/api/products/${product.id}`, {
-                            method: 'PUT',
-                            headers: authHeaders(),
-                            body: JSON.stringify(product),
-                        });
-                        if (!res.ok) {
-                            const b = await res.json().catch(() => ({}));
-                            importErrors.push(`${product.id}: ${(b as any).error || 'update failed'}`);
-                        } else { successCount++; }
-                    } else {
-                        const { id: _ignored, ...productWithoutId } = product;
-                        const res = await fetch('/api/products', {
-                            method: 'POST',
-                            headers: authHeaders(),
-                            body: JSON.stringify(productWithoutId),
-                        });
-                        if (!res.ok) {
-                            const b = await res.json().catch(() => ({}));
-                            importErrors.push(`${product.name}: ${(b as any).error || 'create failed'}`);
-                        } else { successCount++; }
-                    }
-                } catch { importErrors.push(`${product.name}: network error`); }
+            if (!res.ok) {
+                const b = await res.json().catch(() => ({}));
+                throw new Error((b as any).error || 'Bulk import failed');
             }
+
+            const result = await res.json() as { created: number };
 
             const pRes = await fetch('/api/products');
             if (pRes.ok) setProducts((await pRes.json()).map(coerceProduct));
 
-            if (importErrors.length > 0) {
-                toast({ title: 'Import Partial', description: `${successCount} imported, ${importErrors.length} failed: ${importErrors.slice(0, 2).join('; ')}`, variant: 'destructive' });
-            } else {
-                toast({ title: 'Import Successful', description: `${successCount} product(s) imported.` });
-            }
+            toast({ title: 'Import Successful', description: `${result.created} product(s) imported.` });
         } catch (error: any) {
             toast({ title: 'Import Failed', description: error.message, variant: 'destructive' });
         } finally {
@@ -1508,6 +1593,8 @@ export default function InventoryPage() {
                 if (view === 'metrics-dashboard') { router.push('/metrics/dashboard'); return; }
                 if (view === 'metrics-received') { router.push('/metrics/received'); return; }
                 if (view === 'metrics-disbursed') { router.push('/metrics/disbursed'); return; }
+                if (view === 'historical-import') { router.push('/historical-import'); return; }
+                if (view !== 'inventory') setInventoryFilter('all');
                 setActiveView(view);
             }} user={user} onLogout={handleLogout} mobileOpen={sidebarOpen} onMobileClose={() => setSidebarOpen(false)} />
             <div className="content-with-sidebar">
@@ -1535,7 +1622,7 @@ export default function InventoryPage() {
                     sevenDaysAgo.setHours(0, 0, 0, 0);
                     const recentProducts = products.filter(p => {
                         const lots = p.lots ?? [];
-                        return lots.some(l => l.receiptDate && new Date(l.receiptDate) >= sevenDaysAgo);
+                        return lots.some(l => l.receiptDate && new Date(l.receiptDate) >= sevenDaysAgo && new Date(l.receiptDate).getFullYear() !== 1900);
                     });
 
                     const todayStart = new Date();
@@ -1570,22 +1657,27 @@ export default function InventoryPage() {
                             <div
                                 style={clickableCardStyle}
                                 className="p-6 hover:shadow-md"
-                                onClick={() => setActiveView('inventory')}
+                                onClick={() => { setInventoryFilter('added-this-week'); setActiveView('inventory'); }}
                             >
                                 <p className="text-xs font-medium uppercase tracking-wider" style={labelStyle}>Added This Week</p>
                                 <p className="text-3xl font-bold mt-2" style={valueStyle}>{recentProducts.length}</p>
-                                <p className="text-xs mt-1" style={{ color: '#1e40af' }}>Click to view inventory</p>
+                                <p className="text-xs mt-1" style={{ color: '#1e40af' }}>Click to view filtered</p>
                             </div>
 
                             {/* Transactions today */}
                             <div
                                 style={clickableCardStyle}
                                 className="p-6 hover:shadow-md"
-                                onClick={() => setActiveView('transactions')}
+                                onClick={() => {
+                                    const todayStr = format(new Date(), 'yyyy-MM-dd');
+                                    setTxDateFrom(todayStr);
+                                    setTxDateTo(todayStr);
+                                    setActiveView('transactions');
+                                }}
                             >
                                 <p className="text-xs font-medium uppercase tracking-wider" style={labelStyle}>Transactions Today</p>
                                 <p className="text-3xl font-bold mt-2" style={valueStyle}>{todayTransactions.length}</p>
-                                <p className="text-xs mt-1" style={{ color: '#1e40af' }}>Click to view transactions</p>
+                                <p className="text-xs mt-1" style={{ color: '#1e40af' }}>Click to view today&apos;s only</p>
                             </div>
 
                             {/* Pending items — role-aware */}
@@ -1605,12 +1697,25 @@ export default function InventoryPage() {
                             <div
                                 style={clickableCardStyle}
                                 className="p-6 hover:shadow-md"
-                                onClick={() => setActiveView('inventory')}
+                                onClick={() => { setInventoryFilter('low-stock'); setActiveView('inventory'); }}
                             >
                                 <p className="text-xs font-medium uppercase tracking-wider" style={labelStyle}>Low Stock Alert</p>
                                 <p className="text-3xl font-bold mt-2" style={lowStockProducts.length > 0 ? { color: '#dc2626' } : valueStyle}>{lowStockProducts.length}</p>
-                                <p className="text-xs mt-1" style={labelStyle}>At or below reorder threshold</p>
+                                <p className="text-xs mt-1" style={{ color: '#1e40af' }}>Click to view low stock only</p>
                             </div>
+
+                            {/* Missing data needing admin attention */}
+                            {missingDataProducts.length > 0 && (
+                            <div
+                                style={clickableCardStyle}
+                                className="p-6 hover:shadow-md"
+                                onClick={() => { setInventoryFilter('missing-data'); setActiveView('inventory'); }}
+                            >
+                                <p className="text-xs font-medium uppercase tracking-wider" style={labelStyle}>Missing Data</p>
+                                <p className="text-3xl font-bold mt-2" style={{ color: '#ea580c' }}>{missingDataProducts.length}</p>
+                                <p className="text-xs mt-1" style={{ color: '#1e40af' }}>Products with placeholder values — click to review</p>
+                            </div>
+                            )}
                         </div>
 
                         {/* Low stock detail table */}
@@ -1701,9 +1806,27 @@ export default function InventoryPage() {
                                     </div>
                                 </div>
                                 <div className="px-4 md:px-6 pb-6">
+                                    {showDemoProduct && (
+                                        <div className="mb-4 p-3 rounded-lg text-sm flex items-center gap-2" style={{ backgroundColor: '#fffbeb', border: '1px solid #fcd34d', color: '#92400e' }}>
+                                            <AlertTriangle className="h-4 w-4 shrink-0" />
+                                            <span>This is <strong>sample data</strong> for demonstration. It will be replaced once you import or add real products.</span>
+                                        </div>
+                                    )}
+                                    {inventoryFilter !== 'all' && !showDemoProduct && (
+                                        <div className="mb-4 p-3 rounded-lg text-sm flex items-center justify-between" style={{ backgroundColor: '#eff6ff', border: '1px solid #bfdbfe', color: '#1e3a5f' }}>
+                                            <span>
+                                                {inventoryFilter === 'missing-data' && `Showing ${filteredProducts.length} product(s) with missing/placeholder data`}
+                                                {inventoryFilter === 'added-this-week' && `Showing ${filteredProducts.length} product(s) added in the last 7 days`}
+                                                {inventoryFilter === 'low-stock' && `Showing ${filteredProducts.length} product(s) at or below reorder threshold`}
+                                            </span>
+                                            <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setInventoryFilter('all')}>
+                                                Clear Filter
+                                            </Button>
+                                        </div>
+                                    )}
                                     {/* Mobile card view */}
                                     <div className="md:hidden space-y-3">
-                                        {filteredProducts.length > 0 ? filteredProducts.map(product => {
+                                        {paginatedProducts.length > 0 ? paginatedProducts.map(product => {
                                             const stock = totalQuantity(product.lots);
                                             const demand = productDemand.get(product.id) || 0;
                                             const needed = Math.max(0, demand - stock);
@@ -1724,6 +1847,7 @@ export default function InventoryPage() {
                                                         <div><span className="font-medium">UoM:</span> {product.uom || '—'}</div>
                                                         {hasFullView && needed > 0 && <div><span className="font-medium text-destructive">Needed:</span> {needed}</div>}
                                                     </div>
+                                                    {!showDemoProduct && (
                                                     <div className="flex gap-2">
                                                         {canEdit ? (
                                                             <>
@@ -1737,6 +1861,7 @@ export default function InventoryPage() {
                                                             <Button size="sm" className="text-xs h-7" onClick={() => handleRequestProduct(product)}>Request Item</Button>
                                                         )}
                                                     </div>
+                                                    )}
                                                 </div>
                                             );
                                         }) : (
@@ -1766,8 +1891,8 @@ export default function InventoryPage() {
                                                 </TableRow>
                                             </TableHeader>
                                             <TableBody>
-                                                {filteredProducts.length > 0 ? (
-                                                    filteredProducts.map(product => {
+                                                {paginatedProducts.length > 0 ? (
+                                                    paginatedProducts.map(product => {
                                                         const outOfStock = isProductOutOfStock(product);
                                                         const isExpiredFlag = !outOfStock && isProductExpired(product);
                                                         const isOpen = openProductIds.has(product.id);
@@ -1835,7 +1960,11 @@ export default function InventoryPage() {
                                                                     {hasFullView && (
                                                                         <TableCell><div className="flex items-center gap-2"><Warehouse className="h-4 w-4 text-muted-foreground"/>{getDisplayLocation(product.lots)}</div></TableCell>
                                                                     )}
-                                                                    {canEdit ? (
+                                                                    {showDemoProduct ? (
+                                                                        <TableCell className="text-right">
+                                                                            <span className="text-xs italic" style={{ color: '#94a3b8' }}>Demo</span>
+                                                                        </TableCell>
+                                                                    ) : canEdit ? (
                                                                         <TableCell className="text-right">
                                                                             <DropdownMenu>
                                                                                 <DropdownMenuTrigger asChild><Button variant="ghost" className="h-8 w-8 p-0"><span className="sr-only">Open menu</span><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
@@ -1919,6 +2048,56 @@ export default function InventoryPage() {
                                             </TableBody>
                                         </Table>
                                     </div>
+                                    {/* Pagination */}
+                                    {filteredProducts.length > PRODUCTS_PER_PAGE && (
+                                        <div className="flex items-center justify-between pt-4">
+                                            <p className="text-sm" style={{ color: '#64748b' }}>
+                                                Showing {((inventoryPage - 1) * PRODUCTS_PER_PAGE) + 1}–{Math.min(inventoryPage * PRODUCTS_PER_PAGE, filteredProducts.length)} of {filteredProducts.length} products
+                                            </p>
+                                            <div className="flex gap-2">
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    disabled={inventoryPage <= 1}
+                                                    onClick={() => setInventoryPage(p => Math.max(1, p - 1))}
+                                                >
+                                                    Previous
+                                                </Button>
+                                                <div className="flex items-center gap-1">
+                                                    {Array.from({ length: totalPages }, (_, i) => i + 1)
+                                                        .filter(p => p === 1 || p === totalPages || Math.abs(p - inventoryPage) <= 1)
+                                                        .reduce<(number | string)[]>((acc, p, idx, arr) => {
+                                                            if (idx > 0 && p - (arr[idx - 1] as number) > 1) acc.push('...');
+                                                            acc.push(p);
+                                                            return acc;
+                                                        }, [])
+                                                        .map((p, idx) =>
+                                                            typeof p === 'string' ? (
+                                                                <span key={`ellipsis-${idx}`} className="px-1 text-sm" style={{ color: '#94a3b8' }}>...</span>
+                                                            ) : (
+                                                                <Button
+                                                                    key={p}
+                                                                    variant={p === inventoryPage ? 'default' : 'outline'}
+                                                                    size="sm"
+                                                                    className="h-8 w-8 p-0"
+                                                                    onClick={() => setInventoryPage(p)}
+                                                                >
+                                                                    {p}
+                                                                </Button>
+                                                            )
+                                                        )}
+                                                </div>
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    disabled={inventoryPage >= totalPages}
+                                                    onClick={() => setInventoryPage(p => Math.min(totalPages, p + 1))}
+                                                >
+                                                    Next
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                 )}
@@ -3071,16 +3250,19 @@ export default function InventoryPage() {
                     <DialogHeader>
                         <DialogTitle>Import Products from Excel</DialogTitle>
                         <DialogDescription>
-                            Upload an Excel (.xlsx) or CSV file to bulk-import products. The file must have the following headers:
+                            Upload an Excel (.xlsx) or CSV file to bulk-import products. Product IDs are auto-generated.
                         </DialogDescription>
                     </DialogHeader>
-                    <div className="text-sm bg-muted p-4 rounded-md overflow-x-auto">
-                        <code className="font-mono whitespace-nowrap">
-                            product_id,product_name,manufacturer,manufacturer_part_number,location,lot_number,quantity,receipt_date,expiration_date,reorder_threshold,notes
-                        </code>
+                    <div className="text-sm bg-muted p-4 rounded-md overflow-x-auto space-y-2">
+                        <div>
+                            <span className="font-semibold">Supported columns:</span>{' '}
+                            <code className="font-mono whitespace-nowrap">
+                                product_name, manufacturer, manufacturer_part_number, lot_number, quantity, receipt_date, location, vwr_part_number, uom, som_approval_required, cost_per_unit, reorder_threshold, expiration_date, notes
+                            </code>
+                        </div>
                     </div>
                     <p className="text-sm text-muted-foreground">
-                        Each row represents a single lot. Products with multiple lots should have multiple rows with the same product information. If the file contains multiple sheets, you will be asked to select which sheet to import.
+                        Each row represents a single lot. Rows with the same product_name + manufacturer + manufacturer_part_number are grouped under one product. Missing mandatory values are auto-filled with placeholders (e.g. LOT-1-Missing) for admin review. If the file contains multiple sheets, you will be asked to select which sheet to import.
                     </p>
                     <div className="flex justify-end gap-2 pt-4">
                         <Button variant="ghost" onClick={() => setIsImportDialogOpen(false)} disabled={isImporting}>Cancel</Button>

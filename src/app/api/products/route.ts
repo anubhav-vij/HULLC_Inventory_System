@@ -12,7 +12,7 @@ import {
 
 // ---------------------------------------------------------------------------
 // GET /api/products
-// Returns all products with their lots, ordered by product id (P001, P002…)
+// Returns all products with their lots, ordered by product id
 // ---------------------------------------------------------------------------
 
 export async function GET() {
@@ -33,7 +33,7 @@ export async function GET() {
 // ---------------------------------------------------------------------------
 // POST /api/products
 // Creates a product and its initial lots atomically.
-// Server generates a P001-format product id and a UUID for every lot.
+// Server generates a HULLC-XXXX product id and a UUID for every lot.
 // Returns the created product with lots (201).
 // ---------------------------------------------------------------------------
 
