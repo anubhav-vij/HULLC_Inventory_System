@@ -29,6 +29,7 @@ export type ProductRow = {
   name: string;
   manufacturer: string;
   manufacturer_part_number: string;
+  manufacturer_alternate_names: string | null;
   vwr_part_number: string | null;
   uom: string | null;
   som_approval_required: boolean;
@@ -52,6 +53,7 @@ export const PRODUCT_SELECT_SQL = `
     p.name,
     p.manufacturer,
     p.manufacturer_part_number,
+    MAX(m.alternate_names) AS manufacturer_alternate_names,
     p.vwr_part_number,
     p.uom,
     p.som_approval_required,
@@ -72,11 +74,12 @@ export const PRODUCT_SELECT_SQL = `
               THEN json_build_object('id', lf.id, 'name', lf.name, 'type', lf.type)
             ELSE NULL
           END
-        ) ORDER BY l.created_at
+        ) ORDER BY l.receipt_date DESC
       ) FILTER (WHERE l.id IS NOT NULL),
       '[]'::json
     ) AS lots
   FROM products p
+  LEFT JOIN manufacturers m ON m.id = p.manufacturer_id
   LEFT JOIN lots l ON l.product_id = p.id
   LEFT JOIN lot_files lf ON lf.lot_id = l.id
 `;
@@ -91,6 +94,7 @@ export function rowToProduct(row: ProductRow): Product {
     name: row.name,
     manufacturer: row.manufacturer,
     manufacturerPartNumber: row.manufacturer_part_number,
+    manufacturerAlternateName: row.manufacturer_alternate_names ?? undefined,
     vwrPartNumber: row.vwr_part_number ?? undefined,
     uom: row.uom ?? undefined,
     somApprovalRequired: row.som_approval_required,

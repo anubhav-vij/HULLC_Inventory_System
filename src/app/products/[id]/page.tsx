@@ -1,7 +1,7 @@
 "use client";
 import { Suspense, useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { Loader2, ChevronRight, Pencil, ArrowRightLeft, Printer } from 'lucide-react';
+import { Loader2, ArrowLeft, Pencil, ArrowRightLeft, Printer, Package, FlaskConical } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -40,7 +40,7 @@ function ProductDetailPage() {
       const stored = window.localStorage.getItem(USER_STORAGE_KEY);
       if (stored) {
         const parsed = JSON.parse(stored);
-        if (parsed?.id) {
+        if (parsed?.id && parsed.role === 'Admin') {
           setUser(parsed);
         } else {
           router.replace('/');
@@ -88,93 +88,186 @@ function ProductDetailPage() {
   );
 
   const totalStock = product.lots.reduce((sum, l) => sum + l.quantity, 0);
+  const lotCount = product.lots.length;
 
-  const cardStyle: React.CSSProperties = { backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: 12 };
-  const headerStyle: React.CSSProperties = { backgroundColor: '#1e3a5f', borderRadius: '12px 12px 0 0', padding: '14px 16px' };
-  const headerTextStyle: React.CSSProperties = { color: '#ffffff', fontSize: '15px', fontWeight: 700, margin: 0 };
-  const labelStyle: React.CSSProperties = { color: '#475569', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 };
+  const cardStyle: React.CSSProperties = {
+    backgroundColor: '#fff',
+    borderRadius: 14,
+    boxShadow: '0 1px 4px rgba(15,23,42,0.07), 0 4px 12px rgba(15,23,42,0.04)',
+  };
+  const labelStyle: React.CSSProperties = { color: '#1e40af', fontSize: '12px', fontWeight: 600, letterSpacing: '0.02em' };
   const valueStyle: React.CSSProperties = { color: '#0f172a', fontSize: '14px' };
 
   return (
-    <div className="min-h-screen w-full content-with-sidebar" style={{ backgroundColor: '#eef2f7' }}>
-      {/* Top bar */}
-      <div className="sticky top-0 z-30 flex items-center justify-between px-8" style={{ height: 60, backgroundColor: '#fff', borderBottom: '1px solid #e2e8f0' }}>
-        <div className="flex items-center gap-2 text-sm">
-          <button onClick={() => router.push('/')} className="hover:underline" style={{ color: '#1e40af' }}>HULLC Inventory</button>
-          <ChevronRight className="h-4 w-4" style={{ color: '#64748b' }} />
-          <span style={{ color: '#0f172a' }} className="font-medium">{product.name}</span>
+    <div className="min-h-screen w-full" style={{ backgroundColor: '#eef2f7' }}>
+      {/* Header bar */}
+      <div className="sticky top-0 z-30 flex items-center justify-between px-6 md:px-8" style={{ height: 72, backgroundColor: '#fff', borderBottom: '1px solid #e2e8f0' }}>
+        {/* Left: back + title */}
+        <div className="flex items-center gap-4 min-w-0">
+          <button
+            onClick={() => router.push('/')}
+            className="flex items-center justify-center h-9 w-9 rounded-full transition-colors hover:bg-slate-100"
+            title="Back to Inventory"
+            style={{ color: '#475569' }}
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </button>
+          <div className="min-w-0">
+            <div className="flex items-center gap-2.5">
+              <FlaskConical className="h-6 w-6 shrink-0" style={{ color: '#1e40af' }} />
+              <h1 className="text-xl font-bold truncate" style={{ color: '#0f172a' }}>{product.id}</h1>
+            </div>
+            <p className="text-sm mt-0.5 truncate" style={{ color: '#64748b' }}>
+              {product.name}
+              {(product as any).manufacturer && (
+                <span> &middot; {(product as any).manufacturer}{(product as any).manufacturerAlternateName ? ` (${(product as any).manufacturerAlternateName})` : ''}</span>
+              )}
+            </p>
+          </div>
         </div>
-        <div className="flex items-center gap-2">
-          <Badge variant="outline" className="text-xs font-medium mr-2" style={{ color: '#1e40af', borderColor: '#1e40af' }}>
-            {user.role}
-          </Badge>
-          <Button variant="outline" size="sm" onClick={() => setAuditProduct(product)}>
+
+        {/* Right: action buttons + role badge */}
+        <div className="flex items-center gap-2 shrink-0">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setAuditProduct(product)}
+            className="h-9 px-4"
+            style={{ borderColor: '#1e40af', color: '#1e40af' }}
+          >
             <Printer className="mr-2 h-4 w-4" /> Print Audit
           </Button>
           {canEdit && (
             <>
-              <Button variant="outline" size="sm" onClick={() => router.push(`/products/${product.id}/edit`)}>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => router.push(`/products/${product.id}/edit`)}
+                className="h-9 px-4"
+                style={{ borderColor: '#1e40af', color: '#1e40af' }}
+              >
                 <Pencil className="mr-2 h-4 w-4" /> Edit
               </Button>
-              {/* Navigate back to main inventory page; could be enhanced with query params to pre-select product */}
-              <Button size="sm" style={{ backgroundColor: '#1e40af' }} onClick={() => router.push('/')}>
+              <Button
+                size="sm"
+                onClick={() => router.push('/')}
+                className="h-9 px-4"
+                style={{ backgroundColor: '#1e40af', color: '#fff' }}
+              >
                 <ArrowRightLeft className="mr-2 h-4 w-4" /> New Transaction
               </Button>
             </>
           )}
+          <div className="ml-2 pl-3" style={{ borderLeft: '1px solid #e2e8f0' }}>
+            <Badge variant="outline" className="text-xs font-medium" style={{ color: '#1e40af', borderColor: '#1e40af' }}>
+              {user.fullName || user.email || 'User'}
+            </Badge>
+          </div>
         </div>
       </div>
 
-      <div className="p-8 max-w-5xl">
-        {/* Product Info */}
-        <div style={cardStyle} className="mb-6">
-          <div style={headerStyle}>
-            <h3 style={headerTextStyle}>Product Details</h3>
-          </div>
-          <div style={{ backgroundColor: '#f8fafc', padding: 20, borderRadius: '0 0 12px 12px' }}>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-x-8 gap-y-4">
-              <div>
-                <p style={labelStyle}>Product ID</p>
-                <p style={valueStyle} className="mt-1 font-medium">{product.id}</p>
-              </div>
-              <div>
-                <p style={labelStyle}>Product Name</p>
-                <p style={valueStyle} className="mt-1 font-medium">{product.name}</p>
-              </div>
-              <div>
-                <p style={labelStyle}>Manufacturer</p>
-                <p style={valueStyle} className="mt-1">{(product as any).manufacturer || 'N/A'}</p>
-              </div>
-              <div>
-                <p style={labelStyle}>Manufacturer Part #</p>
-                <p style={valueStyle} className="mt-1">{(product as any).manufacturerPartNumber || (product as any).vendorPartNumber || 'N/A'}</p>
-              </div>
-              <div>
-                <p style={labelStyle}>VWR Part #</p>
-                <p style={valueStyle} className="mt-1">{(product as any).vwrPartNumber || 'N/A'}</p>
-              </div>
-              <div>
-                <p style={labelStyle}>Unit of Measure</p>
-                <p style={valueStyle} className="mt-1">{(product as any).uom || 'N/A'}</p>
-              </div>
-              <div>
-                <p style={labelStyle}>Total Stock</p>
-                <p style={{ ...valueStyle, fontWeight: 700 }} className="mt-1">{totalStock} units</p>
-              </div>
-              <div>
-                <p style={labelStyle}>Reorder Threshold</p>
-                <p style={valueStyle} className="mt-1">{product.reorderThreshold ?? 'Not set'}</p>
-              </div>
-              {(product as any).somApprovalRequired && (
+      <div className="p-6 md:p-8 max-w-6xl mx-auto">
+        {/* Summary stat cards */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+          {[
+            { label: 'Total Stock', value: `${totalStock}`, sub: (product as any).uom || 'units', color: '#1e40af', accent: '#1e40af' },
+            { label: 'Lots', value: `${lotCount}`, sub: lotCount === 1 ? 'lot' : 'lots', color: '#0f172a', accent: '#2563eb' },
+            { label: 'Reorder At', value: product.reorderThreshold != null ? `${product.reorderThreshold}` : '--', sub: product.reorderThreshold != null ? 'units' : 'not set', color: totalStock <= (product.reorderThreshold ?? 0) && product.reorderThreshold ? '#dc2626' : '#0f172a', accent: totalStock <= (product.reorderThreshold ?? 0) && product.reorderThreshold ? '#dc2626' : '#2563eb' },
+            { label: 'Cost / Unit', value: (product as any).costPerUnit != null ? `$${Number((product as any).costPerUnit).toFixed(2)}` : '--', sub: (product as any).costPerUnit != null ? 'per unit' : 'not set', color: '#0f172a', accent: '#2563eb' },
+          ].map((stat) => (
+            <div
+              key={stat.label}
+              style={{
+                ...cardStyle,
+                padding: '20px 20px 16px',
+                borderTop: `3px solid ${stat.accent}`,
+              }}
+            >
+              <p style={{ color: '#64748b', fontSize: '12px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{stat.label}</p>
+              <p className="mt-1" style={{ color: stat.color, fontSize: '28px', fontWeight: 700, lineHeight: 1.1 }}>{stat.value}</p>
+              <p className="mt-1" style={{ color: '#94a3b8', fontSize: '12px' }}>{stat.sub}</p>
+            </div>
+          ))}
+        </div>
+
+        {/* Two-column layout */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+          {/* Product Information card */}
+          <div style={cardStyle}>
+            <div style={{ padding: '20px 24px 16px' }}>
+              <h3 style={{ color: '#0f172a', fontSize: '18px', fontWeight: 700 }}>Product Information</h3>
+            </div>
+            <div style={{ padding: '0 24px 24px' }}>
+              <div className="grid grid-cols-2 gap-x-6 gap-y-5">
                 <div>
-                  <p style={labelStyle}>SOM Approval</p>
-                  <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium mt-1" style={{ backgroundColor: '#fff7ed', color: '#c2410c' }}>Required</span>
+                  <p style={labelStyle}>Product ID</p>
+                  <p style={valueStyle} className="mt-1 font-medium">{product.id}</p>
+                </div>
+                <div>
+                  <p style={labelStyle}>Product Name</p>
+                  <p style={valueStyle} className="mt-1 font-medium">{product.name}</p>
+                </div>
+                <div>
+                  <p style={labelStyle}>Manufacturer</p>
+                  <p style={valueStyle} className="mt-1">{(product as any).manufacturer || 'N/A'}</p>
+                  {(product as any).manufacturerAlternateName && (
+                    <p className="text-xs mt-0.5" style={{ color: '#64748b' }}>aka {(product as any).manufacturerAlternateName}</p>
+                  )}
+                </div>
+                <div>
+                  <p style={labelStyle}>Manufacturer Part #</p>
+                  <p style={valueStyle} className="mt-1">{(product as any).manufacturerPartNumber || (product as any).vendorPartNumber || 'N/A'}</p>
+                </div>
+                <div>
+                  <p style={labelStyle}>VWR Part #</p>
+                  <p style={valueStyle} className="mt-1">{(product as any).vwrPartNumber || 'N/A'}</p>
+                </div>
+                <div>
+                  <p style={labelStyle}>Unit of Measure</p>
+                  <p style={valueStyle} className="mt-1">{(product as any).uom || 'N/A'}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Storage & Status card */}
+          <div style={cardStyle}>
+            <div style={{ padding: '20px 24px 16px' }}>
+              <h3 style={{ color: '#0f172a', fontSize: '18px', fontWeight: 700 }}>Storage & Status</h3>
+            </div>
+            <div style={{ padding: '0 24px 24px' }}>
+              {sortedLots.length === 0 ? (
+                <p style={{ color: '#64748b', fontSize: '14px' }}>No lots / storage locations.</p>
+              ) : (
+                <div className="space-y-3">
+                  {/* Unique locations with stock counts */}
+                  {(() => {
+                    const locationMap = new Map<string, number>();
+                    for (const lot of product.lots) {
+                      const loc = lot.location || 'Unassigned';
+                      locationMap.set(loc, (locationMap.get(loc) ?? 0) + lot.quantity);
+                    }
+                    return Array.from(locationMap.entries()).map(([loc, qty]) => (
+                      <div
+                        key={loc}
+                        style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, padding: '12px 16px' }}
+                      >
+                        <div className="flex items-center gap-2 mb-1">
+                          <Package className="h-4 w-4" style={{ color: '#1e40af' }} />
+                          <span className="text-sm font-semibold" style={{ color: '#1e40af' }}>{loc}</span>
+                        </div>
+                        <p className="text-sm ml-6" style={{ color: '#475569' }}>
+                          {qty} {(product as any).uom || 'units'}
+                        </p>
+                      </div>
+                    ));
+                  })()}
                 </div>
               )}
-              {(product as any).costPerUnit != null && (
-                <div>
-                  <p style={labelStyle}>Cost Per Unit</p>
-                  <p style={valueStyle} className="mt-1">${Number((product as any).costPerUnit).toFixed(2)}</p>
+              {(product as any).somApprovalRequired && (
+                <div className="mt-4 pt-4" style={{ borderTop: '1px solid #e2e8f0' }}>
+                  <p style={labelStyle}>SOM Approval</p>
+                  <span className="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium mt-1" style={{ backgroundColor: '#fff7ed', color: '#c2410c' }}>Required</span>
                 </div>
               )}
             </div>
@@ -182,9 +275,9 @@ function ProductDetailPage() {
         </div>
 
         {/* Lots Table */}
-        <div style={cardStyle}>
-          <div style={headerStyle} className="flex justify-between items-center">
-            <h3 style={headerTextStyle}>Lots ({sortedLots.length})</h3>
+        <div style={{ ...cardStyle, overflow: 'hidden' }}>
+          <div style={{ padding: '20px 24px 16px' }} className="flex justify-between items-center">
+            <h3 style={{ color: '#0f172a', fontSize: '18px', fontWeight: 700 }}>Lots ({sortedLots.length})</h3>
           </div>
           <div className="overflow-x-auto">
             {sortedLots.length === 0 ? (
@@ -193,23 +286,23 @@ function ProductDetailPage() {
               <Table>
                 <TableHeader>
                   <TableRow style={{ backgroundColor: '#f8fafc' }}>
-                    <TableHead style={labelStyle}>Lot #</TableHead>
-                    <TableHead style={labelStyle}>Quantity</TableHead>
-                    <TableHead style={labelStyle}>Receipt Date</TableHead>
-                    <TableHead style={labelStyle}>Expiration Date</TableHead>
-                    <TableHead style={labelStyle}>Storage Location</TableHead>
-                    <TableHead style={labelStyle}>Notes</TableHead>
+                    <TableHead style={{ ...labelStyle, padding: '10px 16px' }}>Lot #</TableHead>
+                    <TableHead style={{ ...labelStyle, padding: '10px 16px' }}>Quantity</TableHead>
+                    <TableHead style={{ ...labelStyle, padding: '10px 16px' }}>Receipt Date</TableHead>
+                    <TableHead style={{ ...labelStyle, padding: '10px 16px' }}>Expiration Date</TableHead>
+                    <TableHead style={{ ...labelStyle, padding: '10px 16px' }}>Storage Location</TableHead>
+                    <TableHead style={{ ...labelStyle, padding: '10px 16px' }}>Notes</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {sortedLots.map(lot => (
-                    <TableRow key={lot.id}>
-                      <TableCell className="font-medium" style={valueStyle}>{lot.lotNumber}</TableCell>
-                      <TableCell style={valueStyle}>{lot.quantity}</TableCell>
-                      <TableCell style={valueStyle}>{isValid(lot.receiptDate) ? format(lot.receiptDate, 'PPP') : 'N/A'}</TableCell>
-                      <TableCell style={valueStyle}>{lot.expirationDate && isValid(lot.expirationDate) ? format(lot.expirationDate, 'PPP') : 'N/A'}</TableCell>
-                      <TableCell style={valueStyle}>{lot.location}</TableCell>
-                      <TableCell className="text-xs" style={{ color: '#64748b' }}>{lot.notes || 'N/A'}</TableCell>
+                    <TableRow key={lot.id} className="hover:bg-slate-50">
+                      <TableCell className="font-medium px-4" style={valueStyle}>{lot.lotNumber}</TableCell>
+                      <TableCell className="px-4" style={valueStyle}>{lot.quantity}</TableCell>
+                      <TableCell className="px-4" style={valueStyle}>{isValid(lot.receiptDate) ? format(lot.receiptDate, 'PPP') : 'N/A'}</TableCell>
+                      <TableCell className="px-4" style={valueStyle}>{lot.expirationDate && isValid(lot.expirationDate) ? format(lot.expirationDate, 'PPP') : 'N/A'}</TableCell>
+                      <TableCell className="px-4" style={valueStyle}>{lot.location}</TableCell>
+                      <TableCell className="text-xs px-4" style={{ color: '#64748b' }}>{lot.notes || 'N/A'}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>

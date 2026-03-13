@@ -9,6 +9,7 @@ import { Sidebar } from "@/components/sidebar";
 import { Badge } from "@/components/ui/badge";
 import type { User } from "@/lib/types";
 import { format } from "date-fns";
+import { PaginationControls, paginate } from "@/components/pagination-controls";
 
 const USER_STORAGE_KEY = "hullc-user-data";
 
@@ -51,7 +52,9 @@ export default function WorkflowHistoryPage() {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [entries, setEntries] = useState<HistoryEntry[]>([]);
+  const [fetchError, setFetchError] = useState(false);
   const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
 
   useEffect(() => {
     try {
@@ -76,15 +79,20 @@ export default function WorkflowHistoryPage() {
   const fetchHistory = useCallback(async () => {
     if (!user) return;
     setIsLoading(true);
+    setFetchError(false);
     try {
       const res = await fetch("/api/workflow-history", {
         headers: { "x-user-role": user.role },
       });
       if (res.ok) {
         setEntries(await res.json());
+      } else {
+        console.error("[workflow-history] API returned", res.status);
+        setFetchError(true);
       }
-    } catch {
-      // ignore
+    } catch (err) {
+      console.error("[workflow-history] fetch failed:", err);
+      setFetchError(true);
     } finally {
       setIsLoading(false);
     }
@@ -93,6 +101,9 @@ export default function WorkflowHistoryPage() {
   useEffect(() => {
     fetchHistory();
   }, [fetchHistory]);
+
+  // Reset page on search change
+  useEffect(() => { setPage(1); }, [search]);
 
   const filtered = entries.filter((e) => {
     if (!search) return true;
@@ -169,11 +180,18 @@ export default function WorkflowHistoryPage() {
           <div className="flex items-center justify-center py-24">
             <Loader2 className="h-10 w-10 animate-spin" style={{ color: "#1e40af" }} />
           </div>
+        ) : fetchError ? (
+          <div className="text-center py-24" style={{ color: "#64748b" }}>
+            <p className="text-base font-medium mb-2" style={{ color: "#0f172a" }}>Unable to load workflow history</p>
+            <p className="text-sm">The status history table may not be available yet. Please ensure database migrations have been run.</p>
+            <Button variant="outline" size="sm" className="mt-4" onClick={() => fetchHistory()}>Retry</Button>
+          </div>
         ) : filtered.length === 0 ? (
           <div className="text-center py-24" style={{ color: "#64748b" }}>
             {entries.length === 0 ? "No workflow history yet. Status changes will appear here as requests are processed." : "No entries match your search."}
           </div>
         ) : (
+          <>
           <div style={cardStyle}>
             <table className="w-full text-sm">
               <thead>
@@ -187,7 +205,7 @@ export default function WorkflowHistoryPage() {
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((entry) => (
+                {paginate(filtered, page).map((entry) => (
                   <tr key={entry.id} className="border-t" style={{ borderColor: "#e2e8f0" }}>
                     <td className="px-6 py-3 whitespace-nowrap" style={{ color: "#475569" }}>
                       {format(new Date(entry.createdAt), "MMM d, yyyy h:mm a")}
@@ -218,6 +236,8 @@ export default function WorkflowHistoryPage() {
               </tbody>
             </table>
           </div>
+          <PaginationControls currentPage={page} totalItems={filtered.length} onPageChange={setPage} label="entries" />
+          </>
         )}
       </div>
     </div>

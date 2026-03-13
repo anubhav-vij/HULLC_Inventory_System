@@ -24,6 +24,7 @@ import type { User } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
 import * as XLSX from "xlsx";
 import { format } from "date-fns";
+import { PaginationControls, paginate } from "@/components/pagination-controls";
 
 const USER_STORAGE_KEY = "hullc-user-data";
 
@@ -57,6 +58,7 @@ export default function HistoricalImportPage() {
   const [typeFilter, setTypeFilter] = useState<"all" | "In" | "Out">("all");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+  const [histPage, setHistPage] = useState(1);
 
   useEffect(() => {
     try {
@@ -282,6 +284,7 @@ export default function HistoricalImportPage() {
     return result;
   }, [records, typeFilter, dateFrom, dateTo]);
 
+  useEffect(() => { setHistPage(1); }, [typeFilter, dateFrom, dateTo]);
   const hasFilters = typeFilter !== "all" || dateFrom || dateTo;
   const inCount = records.filter(r => r.type === "In").length;
   const outCount = records.filter(r => r.type === "Out").length;
@@ -455,6 +458,7 @@ export default function HistoricalImportPage() {
                   </p>
                 </div>
               ) : (
+                <>
                 <div className="border rounded-lg overflow-auto" style={{ borderColor: "#e2e8f0" }}>
                   <Table>
                     <TableHeader>
@@ -472,7 +476,7 @@ export default function HistoricalImportPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {filteredRecords.map((r) => (
+                      {paginate(filteredRecords, histPage).map((r) => (
                         <TableRow key={r.id}>
                           <TableCell>
                             <Badge
@@ -503,6 +507,8 @@ export default function HistoricalImportPage() {
                     </TableBody>
                   </Table>
                 </div>
+                <PaginationControls currentPage={histPage} totalItems={filteredRecords.length} onPageChange={setHistPage} label="records" />
+                </>
               )}
             </div>
           </div>

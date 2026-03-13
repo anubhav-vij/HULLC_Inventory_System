@@ -27,6 +27,7 @@ import { deleteFile, getFile } from '@/lib/file-store';
 import { Input } from '@/components/ui/input';
 import { DepartmentalPage } from './departmental-page';
 import { MaterialAuditReport } from './material-audit-report';
+import { PaginationControls, paginate, PAGE_SIZE } from './pagination-controls';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Textarea } from './ui/textarea';
 import { Label } from './ui/label';
@@ -113,7 +114,14 @@ export default function InventoryPage() {
     // Inventory filter state (set from dashboard cards)
     const [inventoryFilter, setInventoryFilter] = useState<'all' | 'missing-data' | 'added-this-week' | 'low-stock'>('all');
     const [inventoryPage, setInventoryPage] = useState(1);
-    const PRODUCTS_PER_PAGE = 75;
+    const PRODUCTS_PER_PAGE = PAGE_SIZE;
+    const [txPage, setTxPage] = useState(1);
+    const [reqPage, setReqPage] = useState(1);
+    const [mfgPage, setMfgPage] = useState(1);
+    const [usersPage, setUsersPage] = useState(1);
+    const [groupsPage, setGroupsPage] = useState(1);
+    const [projectsPage, setProjectsPage] = useState(1);
+    const [locationsPage, setLocationsPage] = useState(1);
 
     // Filter state
     const [txDateFrom, setTxDateFrom] = useState('');
@@ -242,14 +250,15 @@ export default function InventoryPage() {
     }, [products, showDemoProduct, searchQuery, locationFilter, inventoryFilter]);
 
     // Pagination
-    const totalPages = Math.max(1, Math.ceil(filteredProducts.length / PRODUCTS_PER_PAGE));
     const paginatedProducts = useMemo(() => {
         const start = (inventoryPage - 1) * PRODUCTS_PER_PAGE;
         return filteredProducts.slice(start, start + PRODUCTS_PER_PAGE);
     }, [filteredProducts, inventoryPage]);
 
-    // Reset page when filters change
+    // Reset pages when filters change
     useEffect(() => { setInventoryPage(1); }, [inventoryFilter, searchQuery, locationFilter]);
+    useEffect(() => { setTxPage(1); }, [txDateFrom, txDateTo, txDeptFilter]);
+    useEffect(() => { setReqPage(1); }, [reqStatusFilter, reqDateFrom, reqDateTo]);
 
     const filteredTransactions = useMemo(() => {
         let result = transactions;
@@ -1385,11 +1394,12 @@ export default function InventoryPage() {
     };
 
     const handleExportInventory = () => {
-        const dataToExport = products.flatMap(product =>
+        const dataToExport = filteredProducts.flatMap(product =>
             product.lots.map(lot => ({
                 'Product ID': product.id,
                 'Product Name': product.name,
                 'Manufacturer': product.manufacturer,
+                'Manufacturer Alternate Name': product.manufacturerAlternateName ?? '',
                 'Manufacturer Part #': product.manufacturerPartNumber,
                 'VWR Part #': (product as any).vwrPartNumber ?? '',
                 'UoM': product.uom ?? '',
@@ -1413,7 +1423,7 @@ export default function InventoryPage() {
     };
 
     const handleExportTransactions = () => {
-        const dataToExport = transactions.flatMap(tx =>
+        const dataToExport = filteredTransactions.flatMap(tx =>
             tx.items.map(item => ({
                 'Transaction ID': tx.id,
                 'Date': format(tx.date, 'yyyy-MM-dd HH:mm:ss'),
@@ -1825,8 +1835,6 @@ export default function InventoryPage() {
                                     <div className="md:hidden space-y-3">
                                         {paginatedProducts.length > 0 ? paginatedProducts.map(product => {
                                             const stock = totalQuantity(product.lots);
-                                            const demand = productDemand.get(product.id) || 0;
-                                            const needed = Math.max(0, demand - stock);
                                             return (
                                                 <div key={product.id} className="rounded-lg border p-4" style={{ backgroundColor: '#fff', borderColor: '#e2e8f0' }}>
                                                     <div className="flex items-start justify-between mb-2">
@@ -1839,10 +1847,9 @@ export default function InventoryPage() {
                                                         )}
                                                     </div>
                                                     <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs mb-3" style={{ color: '#475569' }}>
-                                                        <div><span className="font-medium">Mfr:</span> {product.manufacturer || '—'}</div>
+                                                        <div><span className="font-medium">Mfr:</span> {product.manufacturer || '—'}{product.manufacturerAlternateName ? ` (${product.manufacturerAlternateName})` : ''}</div>
                                                         <div><span className="font-medium">Part #:</span> {product.manufacturerPartNumber || '—'}</div>
                                                         <div><span className="font-medium">UoM:</span> {product.uom || '—'}</div>
-                                                        {hasFullView && needed > 0 && <div><span className="font-medium text-destructive">Needed:</span> {needed}</div>}
                                                     </div>
                                                     {!showDemoProduct && (
                                                     <div className="flex gap-2">
@@ -1879,7 +1886,6 @@ export default function InventoryPage() {
                                                     <TableHead className="text-[11.5px] font-semibold uppercase tracking-wider" style={{ color: '#64748b' }}>VWR Part #</TableHead>
                                                     <TableHead className="text-[11.5px] font-semibold uppercase tracking-wider" style={{ color: '#64748b' }}>UoM</TableHead>
                                                     {hasFullView && <TableHead className="text-[11.5px] font-semibold uppercase tracking-wider" style={{ color: '#64748b' }}>Total Quantity</TableHead>}
-                                                    {hasFullView && <TableHead className="text-[11.5px] font-semibold uppercase tracking-wider" style={{ color: '#64748b' }}>Needed</TableHead>}
                                                     {hasFullView && <TableHead className="text-[11.5px] font-semibold uppercase tracking-wider" style={{ color: '#64748b' }}>Storage Location</TableHead>}
                                                     {hasFullView ?
                                                         <TableHead className={cn("text-right", canEdit ? "w-[100px]" : "w-[80px]")}>{canEdit ? 'Actions' : ''}</TableHead> :
@@ -1893,8 +1899,6 @@ export default function InventoryPage() {
                                                         const outOfStock = isProductOutOfStock(product);
                                                         const isExpiredFlag = !outOfStock && isProductExpired(product);
                                                         const isOpen = openProductIds.has(product.id);
-                                                        const demand = productDemand.get(product.id) || 0;
-                                                        const needed = Math.max(0, demand - totalQuantity(product.lots));
 
                                                         return (
                                                             <React.Fragment key={product.id}>
@@ -1916,7 +1920,12 @@ export default function InventoryPage() {
                                                                     <TableCell className="font-medium">
                                                                         <div className="flex items-center gap-3"><Package className="h-5 w-5 text-muted-foreground"/><div><div>{product.name}</div><div className="text-xs text-muted-foreground">{product.id}</div></div></div>
                                                                     </TableCell>
-                                                                    <TableCell>{product.manufacturer}</TableCell>
+                                                                    <TableCell>
+                                                                        <div>{product.manufacturer}</div>
+                                                                        {product.manufacturerAlternateName && (
+                                                                            <div className="text-xs text-muted-foreground">{product.manufacturerAlternateName}</div>
+                                                                        )}
+                                                                    </TableCell>
                                                                     <TableCell>{product.manufacturerPartNumber}</TableCell>
                                                                     <TableCell>{(product as any).vwrPartNumber ?? ''}</TableCell>
                                                                     <TableCell>{product.uom ?? '—'}</TableCell>
@@ -1935,23 +1944,6 @@ export default function InventoryPage() {
                                                                                     </Tooltip>
                                                                                 )}
                                                                             </div>
-                                                                        </TableCell>
-                                                                    )}
-                                                                    {hasFullView && (
-                                                                        <TableCell>
-                                                                            {needed > 0 ? (
-                                                                                <Tooltip>
-                                                                                    <TooltipTrigger className="flex items-center gap-2">
-                                                                                        <Badge variant="destructive">{needed}</Badge>
-                                                                                        <AlertTriangle className="h-4 w-4 text-destructive" />
-                                                                                    </TooltipTrigger>
-                                                                                    <TooltipContent>
-                                                                                        <p>{demand} items requested, only {totalQuantity(product.lots)} in stock.</p>
-                                                                                    </TooltipContent>
-                                                                                </Tooltip>
-                                                                            ) : (
-                                                                                <span className="text-muted-foreground">-</span>
-                                                                            )}
                                                                         </TableCell>
                                                                     )}
                                                                     {hasFullView && (
@@ -1977,24 +1969,15 @@ export default function InventoryPage() {
                                                                         </TableCell>
                                                                     ) : hasFullView ? (
                                                                         <TableCell className="text-right">
-                                                                            <DropdownMenu>
-                                                                                <DropdownMenuTrigger asChild><Button variant="ghost" className="h-8 w-8 p-0"><span className="sr-only">Open menu</span><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
-                                                                                <DropdownMenuContent align="end">
-                                                                                    <DropdownMenuItem onClick={() => router.push(`/products/${product.id}`)}><Eye className="mr-2 h-4 w-4" /> View Details</DropdownMenuItem>
-                                                                                    <DropdownMenuItem onClick={() => setAuditProduct(product)}><Printer className="mr-2 h-4 w-4" /> Print Audit</DropdownMenuItem>
-                                                                                </DropdownMenuContent>
-                                                                            </DropdownMenu>
+                                                                            <Button variant="ghost" size="sm" onClick={() => setAuditProduct(product)} title="Print Audit">
+                                                                                <Printer className="h-4 w-4" />
+                                                                            </Button>
                                                                         </TableCell>
                                                                     ) : (
                                                                         <TableCell className="text-right">
-                                                                            <div className="flex items-center gap-1 justify-end">
-                                                                                <Button variant="ghost" size="sm" onClick={() => router.push(`/products/${product.id}`)} title="View Details">
-                                                                                    <Eye className="h-4 w-4" />
-                                                                                </Button>
-                                                                                <Button size="sm" onClick={() => handleRequestProduct(product)}>
-                                                                                    Request Item
-                                                                                </Button>
-                                                                            </div>
+                                                                            <Button size="sm" onClick={() => handleRequestProduct(product)}>
+                                                                                Request Item
+                                                                            </Button>
                                                                         </TableCell>
                                                                     )}
                                                                 </TableRow>
@@ -2040,10 +2023,14 @@ export default function InventoryPage() {
                                                                                 </Table>
                                                                                 {product.lots.length > 3 && (
                                                                                     <p className="text-xs text-muted-foreground mt-2 ml-2">
-                                                                                        Showing 3 of {product.lots.length} lots.{' '}
-                                                                                        <Button variant="link" size="sm" className="p-0 h-auto text-xs" onClick={() => router.push(`/products/${product.id}`)}>
-                                                                                            View all lots
-                                                                                        </Button>
+                                                                                        Showing 3 of {product.lots.length} lots.{canEdit && (
+                                                                                            <>
+                                                                                                {' '}
+                                                                                                <Button variant="link" size="sm" className="p-0 h-auto text-xs" onClick={() => router.push(`/products/${product.id}`)}>
+                                                                                                    View all lots
+                                                                                                </Button>
+                                                                                            </>
+                                                                                        )}
                                                                                     </p>
                                                                                 )}
                                                                             </div>
@@ -2064,55 +2051,7 @@ export default function InventoryPage() {
                                         </Table>
                                     </div>
                                     {/* Pagination */}
-                                    {filteredProducts.length > PRODUCTS_PER_PAGE && (
-                                        <div className="flex items-center justify-between pt-4">
-                                            <p className="text-sm" style={{ color: '#64748b' }}>
-                                                Showing {((inventoryPage - 1) * PRODUCTS_PER_PAGE) + 1}–{Math.min(inventoryPage * PRODUCTS_PER_PAGE, filteredProducts.length)} of {filteredProducts.length} products
-                                            </p>
-                                            <div className="flex gap-2">
-                                                <Button
-                                                    variant="outline"
-                                                    size="sm"
-                                                    disabled={inventoryPage <= 1}
-                                                    onClick={() => setInventoryPage(p => Math.max(1, p - 1))}
-                                                >
-                                                    Previous
-                                                </Button>
-                                                <div className="flex items-center gap-1">
-                                                    {Array.from({ length: totalPages }, (_, i) => i + 1)
-                                                        .filter(p => p === 1 || p === totalPages || Math.abs(p - inventoryPage) <= 1)
-                                                        .reduce<(number | string)[]>((acc, p, idx, arr) => {
-                                                            if (idx > 0 && p - (arr[idx - 1] as number) > 1) acc.push('...');
-                                                            acc.push(p);
-                                                            return acc;
-                                                        }, [])
-                                                        .map((p, idx) =>
-                                                            typeof p === 'string' ? (
-                                                                <span key={`ellipsis-${idx}`} className="px-1 text-sm" style={{ color: '#94a3b8' }}>...</span>
-                                                            ) : (
-                                                                <Button
-                                                                    key={p}
-                                                                    variant={p === inventoryPage ? 'default' : 'outline'}
-                                                                    size="sm"
-                                                                    className="h-8 w-8 p-0"
-                                                                    onClick={() => setInventoryPage(p)}
-                                                                >
-                                                                    {p}
-                                                                </Button>
-                                                            )
-                                                        )}
-                                                </div>
-                                                <Button
-                                                    variant="outline"
-                                                    size="sm"
-                                                    disabled={inventoryPage >= totalPages}
-                                                    onClick={() => setInventoryPage(p => Math.min(totalPages, p + 1))}
-                                                >
-                                                    Next
-                                                </Button>
-                                            </div>
-                                        </div>
-                                    )}
+                                    <PaginationControls currentPage={inventoryPage} totalItems={filteredProducts.length} onPageChange={setInventoryPage} label="products" />
                                 </div>
                             </div>
                 )}
@@ -2180,7 +2119,7 @@ export default function InventoryPage() {
                                             </TableHeader>
                                             <TableBody>
                                                 {filteredRequests.length > 0 ? (
-                                                    filteredRequests.map(req => {
+                                                    paginate(filteredRequests, reqPage).map(req => {
                                                          const isOpen = openRequestIds.has(req.id);
                                                          return (
                                                             <React.Fragment key={req.id}>
@@ -2284,6 +2223,7 @@ export default function InventoryPage() {
                                             </TableBody>
                                         </Table>
                                         </div>
+                                        <PaginationControls currentPage={reqPage} totalItems={filteredRequests.length} onPageChange={setReqPage} label="requests" />
                                     </div>
                                 </div>
                 )}
@@ -2508,62 +2448,62 @@ export default function InventoryPage() {
                         </div>
                     </div>
 
-                    {/* Legacy fulfillments */}
+                    {/* Legacy fulfillments (read-only history) */}
+                    {fulfillments.length > 0 && (
                     <div style={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: 12 }}>
                         <div className="p-6 pb-4">
                             <h2 className="text-lg font-semibold" style={{ color: '#0f172a' }}>Legacy Fulfillments</h2>
-                            <p className="text-sm" style={{ color: '#64748b' }}>In-progress fulfillments being partially dispensed over time.</p>
+                            <p className="text-sm" style={{ color: '#64748b' }}>Historical fulfillment records. Use the line-item flow above for new fulfillments.</p>
                         </div>
                         <div className="px-6 pb-6">
                             <div className="border rounded-lg overflow-hidden" style={{ borderColor: '#e2e8f0' }}>
                                             <Table>
                                                 <TableHeader>
                                                     <TableRow style={{ backgroundColor: '#f8fafc' }}>
+                                                        <TableHead className="text-[11.5px] font-semibold uppercase tracking-wider" style={{ color: '#64748b' }}>Request</TableHead>
                                                         <TableHead className="text-[11.5px] font-semibold uppercase tracking-wider" style={{ color: '#64748b' }}>Product</TableHead>
                                                         <TableHead className="text-[11.5px] font-semibold uppercase tracking-wider" style={{ color: '#64748b' }}>Department</TableHead>
-                                                        <TableHead className="text-[11.5px] font-semibold uppercase tracking-wider" style={{ color: '#64748b' }}>Quantity</TableHead>
-                                                        <TableHead className="text-[11.5px] font-semibold uppercase tracking-wider text-right" style={{ color: '#64748b' }}>Actions</TableHead>
+                                                        <TableHead className="text-[11.5px] font-semibold uppercase tracking-wider" style={{ color: '#64748b' }}>Dispensed</TableHead>
+                                                        <TableHead className="text-[11.5px] font-semibold uppercase tracking-wider" style={{ color: '#64748b' }}>Dispensed Dates</TableHead>
                                                     </TableRow>
                                                 </TableHeader>
                                                 <TableBody>
-                                                    {fulfillments.length > 0 ? (
-                                                        fulfillments.map(f => {
-                                                            const dispensed = f.dispensedItems.reduce((sum, tx) => sum + tx.totalQuantity, 0);
-                                                            return (
-                                                                <TableRow key={f.id}>
-                                                                    <TableCell>
-                                                                        <div>{f.productName}</div>
-                                                                        <div className="text-xs text-muted-foreground">{f.productId}</div>
-                                                                    </TableCell>
-                                                                    <TableCell>{f.department}</TableCell>
-                                                                    <TableCell>
-                                                                        <Badge variant="outline">{dispensed} / {f.totalQuantityRequested}</Badge>
-                                                                    </TableCell>
-                                                                    <TableCell className="text-right">
-                                                                        {canEdit && (
-                                                                            <div className="flex gap-2 justify-end">
-                                                                                <Button size="sm" variant="outline" disabled={isSaving} onClick={() => handleCancelFulfillment(f)}>
-                                                                                    Cancel
-                                                                                </Button>
-                                                                                <Button size="sm" disabled={isSaving} onClick={() => handleDispenseForFulfillment(f)}>
-                                                                                    Dispense Items
-                                                                                </Button>
-                                                                            </div>
-                                                                        )}
-                                                                    </TableCell>
-                                                                </TableRow>
-                                                            )
-                                                        })
-                                                    ) : (
-                                                        <TableRow>
-                                                            <TableCell colSpan={4} className="h-24 text-center">No requests are currently in progress.</TableCell>
-                                                        </TableRow>
-                                                    )}
+                                                    {fulfillments.map(f => {
+                                                        const dispensed = f.dispensedItems.reduce((sum, tx) => sum + tx.totalQuantity, 0);
+                                                        const matchingReq = productRequests.find(r => r.id === f.requestId);
+                                                        return (
+                                                            <TableRow key={f.id}>
+                                                                <TableCell>
+                                                                    {f.requestId ? (
+                                                                        <button onClick={() => router.push(`/requests/${f.requestId}`)} className="text-sm font-medium hover:underline" style={{ color: '#1e40af' }}>
+                                                                            {(matchingReq as any)?.requestId ?? f.requestId.slice(0, 8)}
+                                                                        </button>
+                                                                    ) : (
+                                                                        <span className="text-muted-foreground">—</span>
+                                                                    )}
+                                                                </TableCell>
+                                                                <TableCell>
+                                                                    <div>{f.productName}</div>
+                                                                    <div className="text-xs text-muted-foreground">{f.productId}</div>
+                                                                </TableCell>
+                                                                <TableCell>{f.department}</TableCell>
+                                                                <TableCell>
+                                                                    <Badge variant="outline">{dispensed} units</Badge>
+                                                                </TableCell>
+                                                                <TableCell className="text-xs" style={{ color: '#64748b' }}>
+                                                                    {f.dispensedItems.length > 0
+                                                                        ? f.dispensedItems.map(tx => format(new Date(tx.date), 'MMM d, yyyy')).join(', ')
+                                                                        : '—'}
+                                                                </TableCell>
+                                                            </TableRow>
+                                                        );
+                                                    })}
                                                 </TableBody>
                                             </Table>
                                         </div>
                                         </div>
                                     </div>
+                    )}
                     </div>
                 )}
 
@@ -2627,7 +2567,7 @@ export default function InventoryPage() {
                                             </TableHeader>
                                             <TableBody>
                                             {filteredTransactions.length > 0 ? (
-                                                filteredTransactions.map(tx => {
+                                                paginate(filteredTransactions, txPage).map(tx => {
                                                     const isOpen = openTransactionIds.has(tx.id);
                                                     return (
                                                         <React.Fragment key={tx.id}>
@@ -2678,6 +2618,7 @@ export default function InventoryPage() {
                                             </TableBody>
                                         </Table>
                                         </div>
+                                        <PaginationControls currentPage={txPage} totalItems={filteredTransactions.length} onPageChange={setTxPage} label="transactions" />
                                     </div>
                                 </div>
                 )}
@@ -2716,7 +2657,7 @@ export default function InventoryPage() {
                                                     {appUsers.length === 0 && (
                                                         <TableRow><TableCell colSpan={canEdit ? 6 : 5} className="text-center text-muted-foreground py-8">No users found.</TableCell></TableRow>
                                                     )}
-                                                    {appUsers.map(u => (
+                                                    {paginate(appUsers, usersPage).map(u => (
                                                         <TableRow key={u.id}>
                                                             <TableCell className="font-medium">{u.fullName}</TableCell>
                                                             <TableCell className="text-muted-foreground">{u.email}</TableCell>
@@ -2752,6 +2693,7 @@ export default function InventoryPage() {
                                                     ))}
                                                 </TableBody>
                                             </Table>
+                                            <PaginationControls currentPage={usersPage} totalItems={appUsers.length} onPageChange={setUsersPage} label="users" />
                                         </div>
                                     </div>
                                 </div>
@@ -2788,7 +2730,7 @@ export default function InventoryPage() {
                                                     {functionalGroups.length === 0 && (
                                                         <TableRow><TableCell colSpan={canEdit ? 3 : 2} className="text-center text-muted-foreground py-8">No functional groups found.</TableCell></TableRow>
                                                     )}
-                                                    {functionalGroups.map(g => (
+                                                    {paginate(functionalGroups, groupsPage).map(g => (
                                                         <TableRow key={g.id}>
                                                             <TableCell className="font-medium">{g.name}</TableCell>
                                                             <TableCell>
@@ -2821,6 +2763,7 @@ export default function InventoryPage() {
                                                     ))}
                                                 </TableBody>
                                             </Table>
+                                            <PaginationControls currentPage={groupsPage} totalItems={functionalGroups.length} onPageChange={setGroupsPage} label="groups" />
                                         </div>
                                     </div>
                                 </div>
@@ -2857,7 +2800,7 @@ export default function InventoryPage() {
                                                     {appProjects.length === 0 && (
                                                         <TableRow><TableCell colSpan={canEdit ? 3 : 2} className="text-center text-muted-foreground py-8">No projects found.</TableCell></TableRow>
                                                     )}
-                                                    {appProjects.map(p => (
+                                                    {paginate(appProjects, projectsPage).map(p => (
                                                         <TableRow key={p.id}>
                                                             <TableCell className="font-medium">{p.name}</TableCell>
                                                             <TableCell>
@@ -2890,6 +2833,7 @@ export default function InventoryPage() {
                                                     ))}
                                                 </TableBody>
                                             </Table>
+                                            <PaginationControls currentPage={projectsPage} totalItems={appProjects.length} onPageChange={setProjectsPage} label="projects" />
                                         </div>
                                     </div>
                                 </div>
@@ -2917,22 +2861,19 @@ export default function InventoryPage() {
                                                 <TableHeader>
                                                     <TableRow>
                                                         <TableHead>Manufacturer Name</TableHead>
+                                                        <TableHead>Alternate Name</TableHead>
                                                         <TableHead>Status</TableHead>
                                                         {canEdit && <TableHead className="text-right">Actions</TableHead>}
                                                     </TableRow>
                                                 </TableHeader>
                                                 <TableBody>
                                                     {appManufacturers.length === 0 && (
-                                                        <TableRow><TableCell colSpan={canEdit ? 3 : 2} className="text-center text-muted-foreground py-8">No manufacturers found.</TableCell></TableRow>
+                                                        <TableRow><TableCell colSpan={canEdit ? 4 : 3} className="text-center text-muted-foreground py-8">No manufacturers found.</TableCell></TableRow>
                                                     )}
-                                                    {appManufacturers.map(m => (
+                                                    {paginate(appManufacturers, mfgPage).map(m => (
                                                         <TableRow key={m.id}>
-                                                            <TableCell>
-                                                                <span className="font-medium">{m.name}</span>
-                                                                {m.alternateNames && (
-                                                                    <p className="text-xs mt-0.5" style={{ color: '#94a3b8' }}>{m.alternateNames}</p>
-                                                                )}
-                                                            </TableCell>
+                                                            <TableCell className="font-medium">{m.name}</TableCell>
+                                                            <TableCell className="text-muted-foreground text-sm">{m.alternateNames || '\u2014'}</TableCell>
                                                             <TableCell>
                                                                 <Badge className={m.isActive ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400'}>
                                                                     {m.isActive ? <CheckCircle2 className="mr-1 h-3 w-3" /> : <XCircle className="mr-1 h-3 w-3" />}
@@ -2963,6 +2904,7 @@ export default function InventoryPage() {
                                                     ))}
                                                 </TableBody>
                                             </Table>
+                                            <PaginationControls currentPage={mfgPage} totalItems={appManufacturers.length} onPageChange={setMfgPage} label="manufacturers" />
                                         </div>
                                     </div>
                                 </div>
@@ -2998,7 +2940,7 @@ export default function InventoryPage() {
                                                     {appLocations.length === 0 && (
                                                         <TableRow><TableCell colSpan={canEdit ? 3 : 2} className="text-center text-muted-foreground py-8">No storage locations found.</TableCell></TableRow>
                                                     )}
-                                                    {appLocations.map(l => (
+                                                    {paginate(appLocations, locationsPage).map(l => (
                                                         <TableRow key={l.id}>
                                                             <TableCell className="font-medium">{l.name}</TableCell>
                                                             <TableCell>
@@ -3031,6 +2973,7 @@ export default function InventoryPage() {
                                                     ))}
                                                 </TableBody>
                                             </Table>
+                                            <PaginationControls currentPage={locationsPage} totalItems={appLocations.length} onPageChange={setLocationsPage} label="locations" />
                                         </div>
                                     </div>
                                 </div>

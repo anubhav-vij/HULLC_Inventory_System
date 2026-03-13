@@ -29,7 +29,7 @@ export async function GET(request: Request) {
           ti.quantity AS quantity_dispensed,
           t.requestor_name AS dispensed_by,
           t.date AS dispensed_date,
-          COALESCE(pr.project, '') AS project_name,
+          COALESCE(array_to_string(pr.project, ', '), '') AS project_name,
           COALESCE(pr.department::text, t.department::text, '') AS functional_group
         FROM transaction_items ti
         JOIN transactions t ON t.id = ti.transaction_id

@@ -250,8 +250,8 @@ task and work through each phase sequentially, marking `[~]` while in progress a
 #### Inventory UX
 - [x] Sort lots by receipt date descending in expanded view
 - [x] Show only 3 lots per product in expanded view with "View all lots" link
-- [x] Add "View Details" action to all roles (Admin dropdown, PM/Chief dropdown, Staff button)
-- [x] Create product detail page (`/products/[id]`) — read-only, all lots, Print Audit/Edit/New Transaction buttons
+- [x] Add "View Details" action (Admin dropdown; restricted to Admin-only in Session 20)
+- [x] Create product detail page (`/products/[id]`) — all lots, Print Audit/Edit/New Transaction buttons (Admin-only access since Session 20)
 
 #### Multi-project requests
 - [x] Migration 017: Convert `product_requests.project` from TEXT to TEXT[] array
@@ -271,6 +271,51 @@ task and work through each phase sequentially, marking `[~]` while in progress a
 #### Seed & config
 - [x] Updated seed.ts with real HULLC projects (17), storage locations (14), manufacturers (61)
 - [x] DEV_GUIDE.md: updated product ID format to HULLC-XXXX
+
+#### Pending
+- [ ] Run migrations 013-017 on remote Neon database + seed
+- [ ] Test bulk import with real HULLC data on deployed app
+
+### Session 20 — Pagination, Manufacturer Alternate Names, UX Refinements (2026-03-13)
+
+#### System-wide pagination (75 items/page)
+- [x] Created shared `PaginationControls` component + `paginate()` helper (`src/components/pagination-controls.tsx`)
+- [x] Added pagination to: Transactions, Requests, Config Users, Config Functional Groups, Config Projects, Config Manufacturers, Config Storage Locations
+- [x] Added pagination to standalone pages: Workflow History, Historical Import
+- [x] Replaced inline inventory pagination with shared component (DRY)
+- [x] All paginated tables reset to page 1 when filters change
+
+#### Manufacturer alternate names
+- [x] Updated `PRODUCT_SELECT_SQL` to JOIN manufacturers table and select `alternate_names` via `MAX()` aggregate
+- [x] Added `manufacturerAlternateName` to `ProductSchema` (Zod) and `ProductRow` type
+- [x] Display alternate name in inventory table (desktop + mobile), product detail page header + info card
+- [x] Added dedicated "Alternate Name" column to Config Manufacturers table
+- [x] Added "Manufacturer Alternate Name" column to inventory Excel export
+
+#### Product detail page redesign
+- [x] Redesigned to match reference app: back arrow, flask icon, stat cards (Total Stock, Lots, Reorder At, Cost/Unit), two-column layout (Product Info + Storage & Status)
+- [x] Cards use shadow-based elevation (no hard borders), top accent on stat cards
+- [x] Restricted product detail page to Admin only (was all roles)
+- [x] Removed View Details links from non-Admin roles in inventory table
+- [x] "View all lots" link in expanded rows now Admin-only
+
+#### Legacy fulfillments phased out (Option A)
+- [x] Legacy Fulfillments section now read-only history (removed Cancel + Dispense buttons)
+- [x] Added Request ID column (linked to request detail) and Dispensed Dates column
+- [x] Changed quantity display from confusing `dispensed/requested` ratio to `X units`
+- [x] Section hidden entirely when no legacy fulfillments exist
+
+#### Export fixes
+- [x] Inventory export now uses `filteredProducts` instead of `products` (respects search/location/inventory filters)
+- [x] Transaction export now uses `filteredTransactions` instead of `transactions` (respects date range/department filters)
+- [x] Metrics pages already exported filtered data (no change needed)
+
+#### Bug fixes
+- [x] Fixed lots not sorted by receipt date DESC — changed SQL `ORDER BY l.created_at` → `ORDER BY l.receipt_date DESC`
+- [x] Fixed workflow history blank page — added error state with retry button (table has 0 rows until requests are processed; remote DB needs migration 017)
+- [x] Fixed `GROUP BY` error on products API — used `MAX(m.alternate_names)` aggregate for manufacturer join
+- [x] Fixed metrics/disbursed 500 error — `pr.project` is TEXT[] after migration 017, used `array_to_string()` for COALESCE
+- [x] Removed unused "Needed" column from inventory table (header, desktop cells, mobile cards)
 
 #### Pending
 - [ ] Run migrations 013-017 on remote Neon database + seed

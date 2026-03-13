@@ -31,14 +31,16 @@ A full-stack inventory management system built for the **Hu Lab at NIAID/NIH (HU
 - Storage location management (managed dropdown, prevents deletion of in-use locations)
 - Excel import/export with multi-sheet selector for .xlsx files
 - Bulk import with persistent placeholder counters for missing data (PRODUCT-#-Missing, LOT-#-Missing, etc.)
-- Inventory pagination (75 products per page)
-- Product detail page (read-only, all roles) with Print Audit, Edit, and New Transaction actions
+- Pagination (75 items per page) across all tables: inventory, transactions, requests, config tables, workflow history, historical records
+- Product detail page (Admin only) with stat cards, two-column layout, Print Audit, Edit, and New Transaction actions
 - Expanded lots sorted by receipt date (newest first), limited to 3 in inventory view
+- Manufacturer alternate name displayed throughout system (inventory table, product detail, Excel export)
 
 ### Dispensing & Transactions
 - Record dispensing transactions against specific lots with atomic quantity decrement
 - Full transaction reversal (restores lot quantities)
 - Transaction history with date range and functional group filtering
+- Excel export respects active filters (exports filtered view, not full dataset)
 
 ### Request & Approval Workflow
 - Multi-line-item requests (each date/quantity pair fulfilled independently)
@@ -49,6 +51,7 @@ A full-stack inventory management system built for the **Hu Lab at NIAID/NIH (HU
 - Admin can approve any pending request across all groups (OOO Director coverage)
 - Request status machine: Pending Approval → Approved → In Progress → Completed (or Rejected at any stage)
 - Workflow history audit trail: tracks all status changes with timestamps, actors, and comments
+- Legacy fulfillments displayed as read-only history (phased out in favor of line-item fulfillment flow)
 
 ### User Management & Roles
 - Email + password authentication (bcrypt)
@@ -136,7 +139,7 @@ src/
 │   │   └── dashboard/page.tsx        # Charts dashboard (recharts)
 │   ├── products/
 │   │   ├── new/page.tsx              # Add Product (full page)
-│   │   ├── [id]/page.tsx             # Product detail (read-only, all roles)
+│   │   ├── [id]/page.tsx             # Product detail (Admin only, stat cards + two-column layout)
 │   │   └── [id]/edit/page.tsx        # Edit Product (full page)
 │   ├── requests/
 │   │   ├── new/page.tsx              # New Request (multi-line-item, multi-project)
@@ -146,7 +149,8 @@ src/
 │   ├── layout.tsx
 │   └── page.tsx
 ├── components/
-│   ├── inventory-page.tsx            # Main SPA client component (~3150 lines)
+│   ├── inventory-page.tsx            # Main SPA client component (~3100 lines)
+│   ├── pagination-controls.tsx      # Shared pagination component (75 items/page)
 │   ├── sidebar.tsx                   # Dark teal sidebar with role-aware nav
 │   ├── material-audit-report.tsx     # Print audit report (createPortal)
 │   ├── departmental-page.tsx         # (legacy, localStorage — out of scope)
@@ -433,6 +437,7 @@ All active development happens on `production`. `master` is kept as a reference 
 | 17 | 2026-03-12 | Planning session: import redesign, HULLC-XXXX product IDs, historical data approach (no code) |
 | 18 | 2026-03-13 | Import redesign: HULLC-XXXX IDs, bulk import with persistent placeholders, historical data page, dashboard clickable cards, inventory pagination |
 | 19 | 2026-03-13 | Post-demo fixes: metrics dashboard bug fix, product detail page, workflow history audit trail, multi-project requests, timezone fixes, lots sorting |
+| 20 | 2026-03-13 | System-wide pagination (75/page), manufacturer alternate names, product detail redesign, legacy fulfillments read-only, export filters, view details Admin-only |
 
 For detailed task-by-task history, see `docs/TASKS.md`.
 
