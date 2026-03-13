@@ -18,6 +18,7 @@ interface UserRow {
   functional_group_id: string | null;
   functional_group_name: string | null;
   is_active: boolean;
+  is_system: boolean;
   created_at: Date;
   updated_at: Date;
 }
@@ -32,6 +33,7 @@ function rowToUser(row: UserRow) {
     functionalGroupId: row.functional_group_id ?? undefined,
     functionalGroupName: row.functional_group_name ?? undefined,
     isActive: row.is_active,
+    isSystem: row.is_system,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -77,6 +79,26 @@ export async function PUT(request: Request, { params }: RouteContext) {
   }
 
   const { fullName, email, role, functionalGroupId, department } = parsed.data;
+
+  // Block protected fields on system admin
+  const { rows: sysCheck } = await query<{ is_system: boolean }>(
+    'SELECT is_system FROM users WHERE id = $1',
+    [id]
+  );
+  if (sysCheck.length > 0 && sysCheck[0].is_system) {
+    if (role !== undefined && role !== 'Admin') {
+      return NextResponse.json(
+        { error: 'The System Administrator role cannot be changed.' },
+        { status: 403 }
+      );
+    }
+    if (email !== undefined) {
+      return NextResponse.json(
+        { error: 'The System Administrator email cannot be changed.' },
+        { status: 403 }
+      );
+    }
+  }
 
   // Enforce one Director per functional group when changing role/group
   if (role === 'Director' && functionalGroupId) {

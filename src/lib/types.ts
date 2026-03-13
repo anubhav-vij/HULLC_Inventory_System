@@ -221,6 +221,7 @@ export type SystemUser = {
   functionalGroupId?: string;
   functionalGroupName?: string;
   isActive: boolean;
+  isSystem?: boolean;
 };
 
 export type User = {

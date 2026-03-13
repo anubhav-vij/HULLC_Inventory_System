@@ -24,6 +24,7 @@ interface UserRow {
   functional_group_id: string | null;
   functional_group_name: string | null;
   is_active: boolean;
+  is_system: boolean;
   created_at: Date;
   updated_at: Date;
 }
@@ -38,6 +39,7 @@ function rowToUser(row: UserRow) {
     functionalGroupId: row.functional_group_id ?? undefined,
     functionalGroupName: row.functional_group_name ?? undefined,
     isActive: row.is_active,
+    isSystem: row.is_system,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };

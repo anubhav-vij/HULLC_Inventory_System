@@ -56,6 +56,7 @@ A full-stack inventory management system built for the **Hu Lab at NIAID/NIH (HU
 ### User Management & Roles
 - Email + password authentication (bcrypt)
 - 5 roles: **Admin**, **ProjectManager**, **Chief**, **Director**, **Staff**
+- Protected System Administrator account (`admin@hullc.nih.gov`) — cannot be deactivated, role/email cannot be changed
 - Role-based access: `canEdit` (Admin only for mutations), `hasFullView` (Admin/PM/Chief for read-only visibility)
 - Functional group management (7 default groups, one Director per group enforced)
 - User activate/deactivate (soft delete)
@@ -159,7 +160,7 @@ src/
 │   ├── db/
 │   │   ├── index.ts                  # pg Pool singleton, query(), withTransaction()
 │   │   ├── schema.sql                # Full PostgreSQL schema
-│   │   ├── migrations/               # 17 numbered SQL migration files
+│   │   ├── migrations/               # 18 numbered SQL migration files
 │   │   ├── migrate.ts                # Migration runner
 │   │   ├── seed.ts                   # Idempotent seed (groups, projects, admin user)
 │   │   ├── product-queries.ts        # Shared SQL, row mappers, coerceLotDates
@@ -279,6 +280,7 @@ npx tsx --env-file=.env.local src/lib/db/migrate.ts
 | 015 | Expanded lot_files MIME type CHECK (3→6 types) |
 | 016 | Historical records table for legacy data import |
 | 017 | Multi-project support (TEXT→TEXT[]) + request_status_history table |
+| 018 | System user flag (`is_system` boolean) for protected super admin |
 
 **Important:** The migration runner splits SQL on `;` — do NOT use PL/pgSQL `DO $$` blocks (semicolons inside break the splitter). Use plain SQL with CTEs and window functions instead.
 
@@ -437,7 +439,7 @@ All active development happens on `production`. `master` is kept as a reference 
 | 17 | 2026-03-12 | Planning session: import redesign, HULLC-XXXX product IDs, historical data approach (no code) |
 | 18 | 2026-03-13 | Import redesign: HULLC-XXXX IDs, bulk import with persistent placeholders, historical data page, dashboard clickable cards, inventory pagination |
 | 19 | 2026-03-13 | Post-demo fixes: metrics dashboard bug fix, product detail page, workflow history audit trail, multi-project requests, timezone fixes, lots sorting |
-| 20 | 2026-03-13 | System-wide pagination (75/page), manufacturer alternate names, product detail redesign, legacy fulfillments read-only, export filters, view details Admin-only |
+| 20 | 2026-03-13 | System-wide pagination (75/page), manufacturer alternate names, product detail redesign, legacy fulfillments read-only, export filters, view details Admin-only, protected system admin |
 
 For detailed task-by-task history, see `docs/TASKS.md`.
 

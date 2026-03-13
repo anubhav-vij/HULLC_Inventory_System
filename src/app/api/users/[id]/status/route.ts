@@ -36,6 +36,18 @@ export async function PUT(request: Request, { params }: RouteContext) {
   }
 
   try {
+    // Block deactivation of the protected system admin
+    const { rows: sysCheck } = await query<{ is_system: boolean }>(
+      'SELECT is_system FROM users WHERE id = $1',
+      [id]
+    );
+    if (sysCheck.length > 0 && sysCheck[0].is_system && !parsed.data.isActive) {
+      return NextResponse.json(
+        { error: 'The System Administrator account cannot be deactivated.' },
+        { status: 403 }
+      );
+    }
+
     const { rows, rowCount } = await query<{ id: string; is_active: boolean }>(
       'UPDATE users SET is_active = $1 WHERE id = $2 RETURNING id, is_active',
       [parsed.data.isActive, id]

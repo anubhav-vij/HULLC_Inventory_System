@@ -273,7 +273,7 @@ task and work through each phase sequentially, marking `[~]` while in progress a
 - [x] DEV_GUIDE.md: updated product ID format to HULLC-XXXX
 
 #### Pending
-- [ ] Run migrations 013-017 on remote Neon database + seed
+- [ ] Run migrations 013-018 on remote Neon database + seed
 - [ ] Test bulk import with real HULLC data on deployed app
 
 ### Session 20 — Pagination, Manufacturer Alternate Names, UX Refinements (2026-03-13)
@@ -310,6 +310,13 @@ task and work through each phase sequentially, marking `[~]` while in progress a
 - [x] Transaction export now uses `filteredTransactions` instead of `transactions` (respects date range/department filters)
 - [x] Metrics pages already exported filtered data (no change needed)
 
+#### Protected System Administrator
+- [x] Migration 018: `is_system BOOLEAN DEFAULT FALSE` on users table, set TRUE on admin@hullc.nih.gov
+- [x] API guard: PUT /api/users/[id] blocks role and email changes on system users (403)
+- [x] API guard: PUT /api/users/[id]/status blocks deactivation of system users (403)
+- [x] Users API GET returns `isSystem` flag; `SystemUser` type updated
+- [x] Frontend: system user row shows "System Admin" label instead of Edit/Deactivate buttons
+
 #### Bug fixes
 - [x] Fixed lots not sorted by receipt date DESC — changed SQL `ORDER BY l.created_at` → `ORDER BY l.receipt_date DESC`
 - [x] Fixed workflow history blank page — added error state with retry button (table has 0 rows until requests are processed; remote DB needs migration 017)
@@ -318,7 +325,7 @@ task and work through each phase sequentially, marking `[~]` while in progress a
 - [x] Removed unused "Needed" column from inventory table (header, desktop cells, mobile cards)
 
 #### Pending
-- [ ] Run migrations 013-017 on remote Neon database + seed
+- [ ] Run migrations 013-018 on remote Neon database + seed
 - [ ] Test bulk import with real HULLC data on deployed app
 
 ---

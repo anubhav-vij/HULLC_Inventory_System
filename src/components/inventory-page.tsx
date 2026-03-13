@@ -2670,6 +2670,9 @@ export default function InventoryPage() {
                                                                 </Badge>
                                                             </TableCell>
                                                             {canEdit && <TableCell className="text-right">
+                                                                {u.isSystem ? (
+                                                                    <span className="text-xs" style={{ color: '#64748b' }}>System Admin</span>
+                                                                ) : (
                                                                 <div className="flex justify-end gap-1">
                                                                     <Tooltip>
                                                                         <TooltipTrigger asChild>
@@ -2688,6 +2691,7 @@ export default function InventoryPage() {
                                                                         <TooltipContent>{u.isActive ? 'Deactivate user' : 'Activate user'}</TooltipContent>
                                                                     </Tooltip>
                                                                 </div>
+                                                                )}
                                                             </TableCell>}
                                                         </TableRow>
                                                     ))}
