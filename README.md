@@ -30,6 +30,8 @@ A full-stack inventory management system built for the **Hu Lab at NIAID/NIH (HU
 - SOM (Scientific Operations Manager) approval flag per product
 - Storage location management (managed dropdown, prevents deletion of in-use locations)
 - Excel import/export with multi-sheet selector for .xlsx files
+- Bulk import with persistent placeholder counters for missing data (PRODUCT-#-Missing, LOT-#-Missing, etc.)
+- Inventory pagination (75 products per page)
 
 ### Dispensing & Transactions
 - Record dispensing transactions against specific lots with atomic quantity decrement
@@ -51,6 +53,13 @@ A full-stack inventory management system built for the **Hu Lab at NIAID/NIH (HU
 - Functional group management (7 default groups, one Director per group enforced)
 - User activate/deactivate (soft delete)
 - Admin override approval: Admins can approve requests on behalf of OOO Directors
+
+### Historical Data Import
+- Dedicated Admin page for importing legacy In/Out records from Excel
+- Separate `historical_records` table (not mixed into live inventory)
+- Type (In/Out) and date range filters
+- Historical data automatically included in Received/Disbursed metrics via UNION ALL
+- Separate placeholder counter namespace (LOT-#-Missing-Historical)
 
 ### Metrics & Reporting
 - Inventory Received report with date range filtering and Excel export
@@ -97,7 +106,7 @@ src/
 │   ├── api/                          # Next.js Route Handlers (REST API)
 │   │   ├── auth/login/               # POST — email+password login
 │   │   ├── health/                   # GET — DB connectivity check
-│   │   ├── products/                 # CRUD + lot management
+│   │   ├── products/                 # CRUD + lot management + bulk-import
 │   │   ├── transactions/             # Dispense recording + reversal
 │   │   ├── requests/                 # Multi-line-item requests + approval workflow
 │   │   │   └── [id]/
@@ -113,7 +122,10 @@ src/
 │   │   ├── storage-locations/        # Storage location management
 │   │   ├── vendors/                  # (deprecated — renamed to manufacturers)
 │   │   ├── projects/                 # Project management
+│   │   ├── historical-records/        # Legacy data import (Admin)
 │   │   └── metrics/                  # received, disbursed, dashboard APIs
+│   ├── historical-import/
+│   │   └── page.tsx                  # Historical data import (Admin)
 │   ├── metrics/
 │   │   ├── received/page.tsx         # Inventory Received report
 │   │   ├── disbursed/page.tsx        # Inventory Disbursed report
@@ -136,7 +148,7 @@ src/
 │   ├── db/
 │   │   ├── index.ts                  # pg Pool singleton, query(), withTransaction()
 │   │   ├── schema.sql                # Full PostgreSQL schema
-│   │   ├── migrations/               # 15 numbered SQL migration files
+│   │   ├── migrations/               # 16 numbered SQL migration files
 │   │   ├── migrate.ts                # Migration runner
 │   │   ├── seed.ts                   # Idempotent seed (groups, projects, admin user)
 │   │   ├── product-queries.ts        # Shared SQL, row mappers, coerceLotDates
@@ -148,8 +160,8 @@ src/
 ```
 
 ### Key database facts
-- **13 tables:** users, functional_groups, products, lots, lot_files, product_requests, request_line_items, fulfillments, transactions, transaction_items, projects, manufacturers, storage_locations (+ supporting tables: request_id_sequences, schema_migrations)
-- Product IDs: `TEXT` format `P001`, `P002` (not UUIDs). All other PKs: UUID via `gen_random_uuid()`
+- **14 tables:** users, functional_groups, products, lots, lot_files, product_requests, request_line_items, fulfillments, transactions, transaction_items, projects, manufacturers, storage_locations, historical_records (+ supporting tables: request_id_sequences, schema_migrations)
+- Product IDs: `TEXT` format `HULLC-XXXX` (e.g. `HULLC-0001`; legacy `P001` still supported). All other PKs: UUID via `gen_random_uuid()`
 - All tables have `created_by`/`updated_by` audit fields referencing `users.id`
 - All multi-step writes use `withTransaction()` for atomicity
 - Cascade deletes: deleting a product deletes its lots and lot_files
@@ -193,7 +205,7 @@ DATABASE_SSL=false
 # Apply base schema
 psql -U postgres -d hullc_dev -f src/lib/db/schema.sql
 
-# Run all migrations (001-015)
+# Run all migrations (001-016)
 npx tsx --env-file=.env.local src/lib/db/migrate.ts
 
 # Seed functional groups, projects, and admin user
@@ -254,6 +266,7 @@ npx tsx --env-file=.env.local src/lib/db/migrate.ts
 | 013 | Case-insensitive email unique index |
 | 014 | Missing indexes (fulfillment_id, is_active columns) |
 | 015 | Expanded lot_files MIME type CHECK (3→6 types) |
+| 016 | Historical records table for legacy data import |
 
 **Important:** The migration runner splits SQL on `;` — do NOT use PL/pgSQL `DO $$` blocks (semicolons inside break the splitter). Use plain SQL with CTEs and window functions instead.
 
@@ -275,6 +288,7 @@ All routes return JSON. Error responses include an `error` string field. Validat
 | `POST` | `/api/products` | Create product + initial lots (Admin) |
 | `GET` | `/api/products/:id` | Single product with lots |
 | `PUT` | `/api/products/:id` | Update product + sync lots (Admin) |
+| `POST` | `/api/products/bulk-import` | Bulk import from Excel with placeholder counters (Admin) |
 | `DELETE` | `/api/products/:id` | Delete product — 409 if referenced (Admin) |
 
 ### Transactions
@@ -320,6 +334,13 @@ All routes return JSON. Error responses include an `error` string field. Validat
 | `PUT` | `/api/storage-locations/:id` | Update location (409 if in use) |
 | `GET/POST` | `/api/projects` | List / create projects |
 | `PUT` | `/api/projects/:id` | Update project |
+
+### Historical Records
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/historical-records` | List all (Admin) |
+| `POST` | `/api/historical-records` | Bulk import legacy In/Out records (Admin) |
+| `DELETE` | `/api/historical-records` | Clear all records (Admin) |
 
 ### Metrics
 | Method | Path | Description |
@@ -396,6 +417,8 @@ All active development happens on `production`. `master` is kept as a reference 
 | 14 | 2026-03-11 | Audit reports, charts dashboard, mobile responsive, AWS Amplify deploy |
 | 15 | 2026-03-12 | Codebase review & hardening: security guards, bug fixes, DRY refactors, frontend quality |
 | 16 | 2026-03-12 | Role access overhaul: Dashboard Admin-only, PM/Chief restricted to Inventory+Transactions+Metrics, Admin override approvals for OOO Directors |
+| 17 | 2026-03-12 | Planning session: import redesign, HULLC-XXXX product IDs, historical data approach (no code) |
+| 18 | 2026-03-13 | Import redesign: HULLC-XXXX IDs, bulk import with persistent placeholders, historical data page, dashboard clickable cards, inventory pagination |
 
 For detailed task-by-task history, see `docs/TASKS.md`.
 

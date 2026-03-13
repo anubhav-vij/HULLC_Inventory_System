@@ -189,7 +189,55 @@ each phase sequentially, marking `[~]` while in progress and `[x]` when complete
 
 #### Pending
 - [ ] Investigate and fix Metrics Dashboard "Failed to load metrics data" error
-- [ ] Run migrations 013-015 on remote Neon database
+- [ ] Run migrations 013-016 on remote Neon database
+
+### Session 17 — Import Redesign Planning (2026-03-12)
+- [x] Decided product ID format change: P### → HULLC-XXXX (auto-generated, backward compatible)
+- [x] Designed persistent placeholder counter system for missing mandatory fields
+- [x] Chose Approach A for historical data: separate `historical_records` table
+- [x] Finalized 7 implementation steps for Session 18
+- [x] Resolved all outstanding questions (columns, counters, namespaces, UI layout)
+
+### Session 18 — Import Redesign Implementation (2026-03-13)
+
+#### Product ID format change
+- [x] Updated `generateNextProductId()` to produce HULLC-XXXX format with P### backward compatibility
+- [x] Split FOR UPDATE + aggregate into two queries (pg doesn't allow combined)
+
+#### Bulk import API
+- [x] Created `POST /api/products/bulk-import` — dedicated endpoint with server-side placeholder logic
+- [x] Persistent global counters: PRODUCT-#-Missing, MFR-#-Missing, PART-#-Missing, LOT-#-Missing, LOC-#-Missing
+- [x] Counters queried from DB at start of each import (survives re-imports)
+- [x] In-memory product ID counter within transaction (avoids duplicate key violations)
+- [x] Sentinel date 1900-01-01 for missing receipt dates
+
+#### Historical data import
+- [x] Migration 016: `historical_records` table (type In/Out, event_date, product info, lot_number)
+- [x] `GET/POST/DELETE /api/historical-records` with Admin auth guards
+- [x] POST bulk import with LOT-#-Missing-Historical counter namespace
+- [x] Built `/historical-import` page: import dialog, records table, type + date range filters
+- [x] Clear All Records with AlertDialog confirmation
+
+#### Metrics integration
+- [x] `/api/metrics/received` UNION ALL with historical_records WHERE type='In'
+- [x] `/api/metrics/disbursed` UNION ALL with historical_records WHERE type='Out'
+
+#### Inventory UX improvements
+- [x] Demo product (DPBS by Thermo Fisher) shown when inventory is empty, auto-disappears
+- [x] Dashboard cards clickable: "Transactions Today" → filtered txn view, "Added This Week" → filtered inventory
+- [x] "Low Stock Alert" card → filtered inventory (products at/below reorder threshold)
+- [x] New "Missing Data" card (orange) → filtered inventory (placeholder patterns + sentinel dates)
+- [x] Filter banner with "Clear Filter" button
+- [x] Inventory pagination: 75 products/page, numbered page controls with ellipsis
+
+#### Database cleanup & seeding
+- [x] Cleaned all test data from DB
+- [x] Seeded real config: 17 projects, 14 storage locations, 61 manufacturers
+- [x] Ran all pending migrations (013-016) on local DB
+
+#### Pending
+- [ ] Run migrations 013-016 on remote Neon database
+- [ ] Test bulk import with real HULLC data on deployed app
 
 ---
 
