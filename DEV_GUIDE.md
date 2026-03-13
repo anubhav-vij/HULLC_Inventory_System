@@ -1,6 +1,6 @@
-# CLAUDE.md
+# Developer Guide
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Reference for commands, architecture, and conventions used in this repository.
 
 ## Commands
 
@@ -88,6 +88,3 @@ Still uses localStorage (not yet migrated to the API). This component is out of 
 
 ## Environment
 Requires `.env.local` with `DATABASE_URL` (PostgreSQL connection string). SSL is auto-enabled in production; set `DATABASE_SSL=false` to disable.
-
-## Bash tool limitation (Windows)
-Heredocs with single quotes or backticks fail silently. For multi-line file writes: write a Python helper to a new temp subdirectory (`src/lib/db/tmp/helper.py`), run it with `python3 "C:\full\windows\path\helper.py"` (Windows paths), then `rm -rf` the tmp dir. The Write and Edit tools work normally for most edits.

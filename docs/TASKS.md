@@ -2,9 +2,8 @@
 
 A complete record of every feature built, every phase completed, and every task remaining.
 Built for NIH/NIAID laboratory inventory management at HULLC.
-This file serves as the single source of truth for project progress and is used by Claude Code
-to resume work automatically across sessions — start from the first `[ ]` task and work through
-each phase sequentially, marking `[~]` while in progress and `[x]` when complete.
+This file serves as the single source of truth for project progress. Start from the first `[ ]`
+task and work through each phase sequentially, marking `[~]` while in progress and `[x]` when complete.
 
 ---
 
