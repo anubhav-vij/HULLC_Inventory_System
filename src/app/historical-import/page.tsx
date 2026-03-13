@@ -85,7 +85,7 @@ export default function HistoricalImportPage() {
     setIsLoading(true);
     try {
       const res = await fetch("/api/historical-records", {
-        headers: { "x-user-role": user.role, "x-user-id": user.id },
+        headers: { "x-user-role": user.role, "x-user-id": user.id ?? "" },
       });
       if (!res.ok) throw new Error("Failed to fetch");
       setRecords(await res.json());

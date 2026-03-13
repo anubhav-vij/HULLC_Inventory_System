@@ -73,7 +73,7 @@ Authorization is role-checked via the `x-user-role` request header (set by the c
 Single source of truth for all domain types. Key things:
 - `z.string().optional()` does **not** accept `null` — use `undefined` or omit the field
 - `z.date()` expects `Date` objects — use `coerceLotDates()` before `safeParse()` on request bodies
-- Product IDs are `TEXT` in format `P001`, `P002` — not UUIDs
+- Product IDs are `TEXT` in format `HULLC-0001`, `HULLC-0002` (legacy `P001` format also supported) — not UUIDs
 - All other PKs are UUIDs via `gen_random_uuid()`
 
 ### Key data model facts

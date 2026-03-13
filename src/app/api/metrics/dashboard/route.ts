@@ -36,10 +36,10 @@ export async function GET(request: Request) {
 
     // 3. Requests by functional group
     const reqByGroupQuery = dateFilter
-      ? `SELECT COALESCE(pr.requestor_department, 'Unknown') AS group_name, COUNT(*)::int AS count
+      ? `SELECT COALESCE(pr.department, 'Unknown') AS group_name, COUNT(*)::int AS count
          FROM product_requests pr WHERE pr.date >= $1::date AND pr.date <= $2::date
          GROUP BY group_name ORDER BY count DESC`
-      : `SELECT COALESCE(pr.requestor_department, 'Unknown') AS group_name, COUNT(*)::int AS count
+      : `SELECT COALESCE(pr.department, 'Unknown') AS group_name, COUNT(*)::int AS count
          FROM product_requests pr
          GROUP BY group_name ORDER BY count DESC`;
 
