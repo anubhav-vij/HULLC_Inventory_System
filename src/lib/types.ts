@@ -153,7 +153,7 @@ export const ProductRequestSchema = z.object({
   requestorName: z.string(),
   requestorEmail: z.string(),
   department: z.string(),
-  project: z.string().nullable().optional(),
+  project: z.union([z.string(), z.array(z.string())]).nullable().optional(),
   justification: z.string(),
   sopRead: z.boolean(),
   status: ProductRequestStatusSchema,

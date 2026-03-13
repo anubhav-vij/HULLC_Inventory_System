@@ -36,7 +36,7 @@ export interface RequestRow {
   requestor_name: string;
   requestor_email: string;
   department: string;
-  project: string | null;
+  project: string[] | null;
   justification: string;
   sop_read: boolean;
   status: string;

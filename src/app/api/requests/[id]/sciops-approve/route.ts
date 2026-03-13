@@ -94,6 +94,14 @@ export async function PUT(request: Request, { params }: RouteContext) {
         [userId, id]
       );
 
+      // Log status change
+      const sciopsName = (await client.query<{full_name: string}>('SELECT full_name FROM users WHERE id = $1', [userId])).rows[0]?.full_name ?? 'Unknown';
+      await client.query(
+        `INSERT INTO request_status_history (request_id, from_status, to_status, changed_by, changed_by_name, comments)
+         VALUES ($1, 'Pending SciOps Approval', 'Approved', $2, $3, $4)`,
+        [id, userId, sciopsName, comments ?? 'SciOps Director approved']
+      );
+
       const { rows: full } = await client.query(
         `SELECT pr.*, ${LINE_ITEMS_SUBQUERY}
          FROM product_requests pr

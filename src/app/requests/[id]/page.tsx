@@ -241,6 +241,9 @@ function RequestDetailContent() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [fulfillingLineItemId, setFulfillingLineItemId] = useState<string | null>(null);
+  const [statusHistory, setStatusHistory] = useState<Array<{
+    id: string; fromStatus: string | null; toStatus: string; changedByName: string | null; comments: string | null; createdAt: string;
+  }>>([]);
 
   // Director action state
   const [directorComments, setDirectorComments] = useState("");
@@ -267,6 +270,12 @@ function RequestDetailContent() {
   useEffect(() => {
     if (!user || !id) return;
     fetchRequest();
+    if (user.role === 'Admin') {
+      fetch(`/api/workflow-history?requestId=${id}`, { headers: { 'x-user-role': user.role } })
+        .then(r => r.ok ? r.json() : [])
+        .then(data => setStatusHistory(data))
+        .catch(() => {});
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, id]);
 
@@ -507,7 +516,7 @@ function RequestDetailContent() {
                 Project
               </p>
               <p className="text-sm" style={{ color: '#0f172a' }}>
-                {request.project ?? '\u2014'}
+                {Array.isArray(request.project) ? request.project.join(', ') : (request.project ?? '\u2014')}
               </p>
             </div>
             <div>
@@ -801,6 +810,62 @@ function RequestDetailContent() {
               </span>
               . You will be notified when the status changes.
             </p>
+          </div>
+        )}
+
+        {/* Workflow History (Admin only) */}
+        {user.role === "Admin" && statusHistory.length > 0 && (
+          <div
+            className="overflow-hidden"
+            style={{
+              backgroundColor: "#f8fafc",
+              border: "1px solid #e2e8f0",
+              borderRadius: "12px",
+            }}
+          >
+            <div
+              className="px-6 py-3"
+              style={{ backgroundColor: "#1e3a5f", borderBottom: "1px solid #1e3a5f" }}
+            >
+              <h3 className="text-sm font-semibold" style={{ color: "#ffffff" }}>
+                Workflow History
+              </h3>
+            </div>
+            <div className="p-4">
+              <div className="relative pl-6">
+                {statusHistory.map((entry, idx) => (
+                  <div key={entry.id} className="relative pb-4 last:pb-0">
+                    {idx < statusHistory.length - 1 && (
+                      <div className="absolute left-[-16px] top-3 bottom-0 w-px" style={{ backgroundColor: "#cbd5e1" }} />
+                    )}
+                    <div className="absolute left-[-20px] top-1.5 w-2 h-2 rounded-full" style={{ backgroundColor: "#1e40af" }} />
+                    <div className="flex items-start gap-3">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span
+                            className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium"
+                            style={{ backgroundColor: "#dbeafe", color: "#1e40af" }}
+                          >
+                            {entry.toStatus}
+                          </span>
+                          <span className="text-xs" style={{ color: "#64748b" }}>
+                            by {entry.changedByName ?? "System"}
+                          </span>
+                          <span className="text-xs" style={{ color: "#94a3b8" }}>
+                            {format(new Date(entry.createdAt), "MMM d, yyyy h:mm a")}
+                          </span>
+                        </div>
+                        {entry.comments && (
+                          <p className="text-xs mt-1" style={{ color: "#475569" }}>
+                            {entry.comments}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         )}
       </div>

@@ -76,6 +76,15 @@ export async function PUT(request: Request, { params }: RouteContext) {
         [rejectionNote, userId || null, rejectionStage, directorNote, id]
       );
 
+      // Log status change
+      const rejectorName = (await client.query<{full_name: string}>('SELECT full_name FROM users WHERE id = $1', [userId])).rows[0]?.full_name ?? 'Unknown';
+      const stageLabel = rejectionStage === 'sciops' ? 'SciOps Director' : (rejectionStage === 'director' ? 'Director' : 'Admin');
+      await client.query(
+        `INSERT INTO request_status_history (request_id, from_status, to_status, changed_by, changed_by_name, comments)
+         VALUES ($1, $2, 'Rejected', $3, $4, $5)`,
+        [id, req.status, userId || null, rejectorName, `Rejected by ${stageLabel}: ${rejectionNote}`]
+      );
+
       const { rows: full } = await client.query<RequestRow>(
         `SELECT pr.*, ${LINE_ITEMS_SUBQUERY}
          FROM product_requests pr

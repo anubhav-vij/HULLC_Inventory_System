@@ -188,6 +188,14 @@ export async function POST(request: Request) {
         [requestId, userId]
       );
 
+      // Log status change
+      const adminName = (await client.query<{full_name: string}>('SELECT full_name FROM users WHERE id = $1', [userId])).rows[0]?.full_name ?? 'Admin';
+      await client.query(
+        `INSERT INTO request_status_history (request_id, from_status, to_status, changed_by, changed_by_name, comments)
+         VALUES ($1, $2, 'In Progress', $3, $4, 'Fulfillment started')`,
+        [requestId, req.status, userId, adminName]
+      );
+
       // Return the newly created fulfillment
       const { rows } = await client.query<FulfillmentRow>(
         `${FULFILLMENT_SELECT_SQL} WHERE f.id = $1 GROUP BY f.id`,

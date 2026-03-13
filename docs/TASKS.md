@@ -155,7 +155,7 @@ task and work through each phase sequentially, marking `[~]` while in progress a
 - [x] Added `LotFileSchema` type validation with ALLOWED_FILE_TYPES constant in types.ts
 
 #### Pending deployment actions
-- [ ] Run migrations 013-015 on remote Neon database (case-insensitive email index, missing indexes, expanded MIME types)
+- [~] Run migrations 013-017 on remote Neon database (tracked in Session 19 pending)
 
 #### Code quality — frontend improvements
 - [x] Centralized auth headers in inventory-page.tsx: `authHeaders()` and `requestHeaders()` replace 13+ inconsistent inline patterns
@@ -187,8 +187,8 @@ task and work through each phase sequentially, marking `[~]` while in progress a
 - [x] Reject API already allowed Admin — no change needed
 
 #### Pending
-- [ ] Investigate and fix Metrics Dashboard "Failed to load metrics data" error
-- [ ] Run migrations 013-016 on remote Neon database
+- [x] Investigate and fix Metrics Dashboard "Failed to load metrics data" error (fixed Session 19)
+- [ ] Run migrations 013-017 on remote Neon database
 
 ### Session 17 — Import Redesign Planning (2026-03-12)
 - [x] Decided product ID format change: P### → HULLC-XXXX (auto-generated, backward compatible)
@@ -235,7 +235,45 @@ task and work through each phase sequentially, marking `[~]` while in progress a
 - [x] Ran all pending migrations (013-016) on local DB
 
 #### Pending
-- [ ] Run migrations 013-016 on remote Neon database
+- [ ] Run migrations 013-017 on remote Neon database
+- [ ] Test bulk import with real HULLC data on deployed app
+
+### Session 19 — Post-Demo Fixes & Workflow History (2026-03-13)
+
+#### Bug fixes
+- [x] Fix Metrics Dashboard "Failed to load metrics data" — `pr.requestor_department` → `pr.department`
+- [x] Fix dashboard "Transactions Today" card — timezone bug in date filtering (`new Date('YYYY-MM-DD')` parses as UTC, not local)
+- [x] Fix request date filtering (same timezone bug in `filteredRequests`)
+- [x] Fix server-side date validation rejecting today's date — `new Date()` UTC vs local mismatch
+- [x] Fix TypeScript error in historical-import page (`user.id` nullability)
+
+#### Inventory UX
+- [x] Sort lots by receipt date descending in expanded view
+- [x] Show only 3 lots per product in expanded view with "View all lots" link
+- [x] Add "View Details" action to all roles (Admin dropdown, PM/Chief dropdown, Staff button)
+- [x] Create product detail page (`/products/[id]`) — read-only, all lots, Print Audit/Edit/New Transaction buttons
+
+#### Multi-project requests
+- [x] Migration 017: Convert `product_requests.project` from TEXT to TEXT[] array
+- [x] Request form: multi-select project picker with checkboxes + badge pills
+- [x] API: Accept string or string[] for project field
+- [x] Display: comma-separated projects in all request tables, detail pages, and approvals
+
+#### Workflow history (Admin only)
+- [x] Migration 017: Create `request_status_history` table with indexes
+- [x] Log status changes in 5 API routes: request creation, approve, reject, sciops-approve, fulfillments
+- [x] Each log entry includes: from_status, to_status, changed_by, changed_by_name, comments
+- [x] API: `GET /api/workflow-history` with optional `requestId` filter
+- [x] Workflow History page (`/workflow-history`) — searchable table with status transitions and timeline
+- [x] Request detail page: timeline section showing status history (Admin only)
+- [x] Sidebar: "Workflow History" nav item (Admin only)
+
+#### Seed & config
+- [x] Updated seed.ts with real HULLC projects (17), storage locations (14), manufacturers (61)
+- [x] DEV_GUIDE.md: updated product ID format to HULLC-XXXX
+
+#### Pending
+- [ ] Run migrations 013-017 on remote Neon database + seed
 - [ ] Test bulk import with real HULLC data on deployed app
 
 ---

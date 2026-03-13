@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
-import { ChevronsUpDown, MoreHorizontal, Package, Pencil, PlusCircle, Warehouse, ArrowRightLeft, CloudUpload, Loader2, AlertTriangle, Download, Trash2, CheckCircle2, XCircle, Hourglass, FileText, Search, LogOut, Users, Building2, UserCog, ShieldAlert, ChevronRight, Printer, Menu } from 'lucide-react';
+import { ChevronsUpDown, MoreHorizontal, Package, Pencil, PlusCircle, Warehouse, ArrowRightLeft, CloudUpload, Loader2, AlertTriangle, Download, Trash2, CheckCircle2, XCircle, Hourglass, FileText, Search, LogOut, Users, Building2, UserCog, ShieldAlert, ChevronRight, Printer, Menu, Eye } from 'lucide-react';
 import { ProductForm } from './product-form';
 import { TransactionForm } from './transaction-form';
 import { RequestForm } from './request-form';
@@ -254,13 +254,11 @@ export default function InventoryPage() {
     const filteredTransactions = useMemo(() => {
         let result = transactions;
         if (txDateFrom) {
-            const from = new Date(txDateFrom);
-            from.setHours(0, 0, 0, 0);
+            const from = new Date(txDateFrom + 'T00:00:00');
             result = result.filter(t => new Date(t.date) >= from);
         }
         if (txDateTo) {
-            const to = new Date(txDateTo);
-            to.setHours(23, 59, 59, 999);
+            const to = new Date(txDateTo + 'T23:59:59.999');
             result = result.filter(t => new Date(t.date) <= to);
         }
         if (txDeptFilter) {
@@ -275,13 +273,11 @@ export default function InventoryPage() {
             result = result.filter(r => r.status === reqStatusFilter);
         }
         if (reqDateFrom) {
-            const from = new Date(reqDateFrom);
-            from.setHours(0, 0, 0, 0);
+            const from = new Date(reqDateFrom + 'T00:00:00');
             result = result.filter(r => new Date(r.date) >= from);
         }
         if (reqDateTo) {
-            const to = new Date(reqDateTo);
-            to.setHours(23, 59, 59, 999);
+            const to = new Date(reqDateTo + 'T23:59:59.999');
             result = result.filter(r => new Date(r.date) <= to);
         }
         return result;
@@ -1594,6 +1590,7 @@ export default function InventoryPage() {
                 if (view === 'metrics-received') { router.push('/metrics/received'); return; }
                 if (view === 'metrics-disbursed') { router.push('/metrics/disbursed'); return; }
                 if (view === 'historical-import') { router.push('/historical-import'); return; }
+                if (view === 'workflow-history') { router.push('/workflow-history'); return; }
                 if (view !== 'inventory') setInventoryFilter('all');
                 setActiveView(view);
             }} user={user} onLogout={handleLogout} mobileOpen={sidebarOpen} onMobileClose={() => setSidebarOpen(false)} />
@@ -1969,6 +1966,7 @@ export default function InventoryPage() {
                                                                             <DropdownMenu>
                                                                                 <DropdownMenuTrigger asChild><Button variant="ghost" className="h-8 w-8 p-0"><span className="sr-only">Open menu</span><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
                                                                                 <DropdownMenuContent align="end">
+                                                                                    <DropdownMenuItem onClick={() => router.push(`/products/${product.id}`)}><Eye className="mr-2 h-4 w-4" /> View Details</DropdownMenuItem>
                                                                                     <DropdownMenuItem onClick={() => handleEdit(product)}><Pencil className="mr-2 h-4 w-4" /> Edit</DropdownMenuItem>
                                                                                     <DropdownMenuItem onClick={() => handleNewTransaction(product)}><ArrowRightLeft className="mr-2 h-4 w-4" /> New Transaction</DropdownMenuItem>
                                                                                     <DropdownMenuItem onClick={() => setAuditProduct(product)}><Printer className="mr-2 h-4 w-4" /> Print Audit</DropdownMenuItem>
@@ -1979,15 +1977,24 @@ export default function InventoryPage() {
                                                                         </TableCell>
                                                                     ) : hasFullView ? (
                                                                         <TableCell className="text-right">
-                                                                            <Button variant="ghost" size="sm" onClick={() => setAuditProduct(product)} title="Print Audit Report">
-                                                                                <Printer className="h-4 w-4" />
-                                                                            </Button>
+                                                                            <DropdownMenu>
+                                                                                <DropdownMenuTrigger asChild><Button variant="ghost" className="h-8 w-8 p-0"><span className="sr-only">Open menu</span><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
+                                                                                <DropdownMenuContent align="end">
+                                                                                    <DropdownMenuItem onClick={() => router.push(`/products/${product.id}`)}><Eye className="mr-2 h-4 w-4" /> View Details</DropdownMenuItem>
+                                                                                    <DropdownMenuItem onClick={() => setAuditProduct(product)}><Printer className="mr-2 h-4 w-4" /> Print Audit</DropdownMenuItem>
+                                                                                </DropdownMenuContent>
+                                                                            </DropdownMenu>
                                                                         </TableCell>
                                                                     ) : (
                                                                         <TableCell className="text-right">
-                                                                            <Button size="sm" onClick={() => handleRequestProduct(product)}>
-                                                                                Request Item
-                                                                            </Button>
+                                                                            <div className="flex items-center gap-1 justify-end">
+                                                                                <Button variant="ghost" size="sm" onClick={() => router.push(`/products/${product.id}`)} title="View Details">
+                                                                                    <Eye className="h-4 w-4" />
+                                                                                </Button>
+                                                                                <Button size="sm" onClick={() => handleRequestProduct(product)}>
+                                                                                    Request Item
+                                                                                </Button>
+                                                                            </div>
                                                                         </TableCell>
                                                                     )}
                                                                 </TableRow>
@@ -2009,7 +2016,7 @@ export default function InventoryPage() {
                                                                                         </TableRow>
                                                                                     </TableHeader>
                                                                                     <TableBody>
-                                                                                        {product.lots.map(lot => (
+                                                                                        {[...product.lots].sort((a, b) => new Date(b.receiptDate).getTime() - new Date(a.receiptDate).getTime()).slice(0, 3).map(lot => (
                                                                                             <TableRow key={lot.id}>
                                                                                                 <TableCell>{lot.lotNumber}</TableCell>
                                                                                                 <TableCell>{lot.quantity}</TableCell>
@@ -2031,6 +2038,14 @@ export default function InventoryPage() {
                                                                                         ))}
                                                                                     </TableBody>
                                                                                 </Table>
+                                                                                {product.lots.length > 3 && (
+                                                                                    <p className="text-xs text-muted-foreground mt-2 ml-2">
+                                                                                        Showing 3 of {product.lots.length} lots.{' '}
+                                                                                        <Button variant="link" size="sm" className="p-0 h-auto text-xs" onClick={() => router.push(`/products/${product.id}`)}>
+                                                                                            View all lots
+                                                                                        </Button>
+                                                                                    </p>
+                                                                                )}
                                                                             </div>
                                                                         </TableCell>
                                                                     </TableRow>
@@ -2204,7 +2219,7 @@ export default function InventoryPage() {
                                                                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-2">
                                                                                     <div>
                                                                                         <h4 className="font-semibold text-xs mb-1">Project</h4>
-                                                                                        <p className="text-sm">{req.project ?? '—'}</p>
+                                                                                        <p className="text-sm">{Array.isArray(req.project) ? req.project.join(', ') : (req.project ?? '—')}</p>
                                                                                     </div>
                                                                                     <div>
                                                                                         <h4 className="font-semibold text-xs mb-1">Justification</h4>
@@ -2343,7 +2358,7 @@ export default function InventoryPage() {
                                                                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-2">
                                                                                     <div>
                                                                                         <h4 className="font-semibold text-xs mb-1">Project</h4>
-                                                                                        <p className="text-sm">{req.project ?? '—'}</p>
+                                                                                        <p className="text-sm">{Array.isArray(req.project) ? req.project.join(', ') : (req.project ?? '—')}</p>
                                                                                     </div>
                                                                                     <div>
                                                                                         <h4 className="font-semibold text-xs mb-1">Justification</h4>

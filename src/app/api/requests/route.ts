@@ -19,7 +19,7 @@ const CreateRequestSchema = z.object({
   requestorName: z.string().min(1),
   requestorEmail: z.string().email(),
   department: z.string().min(1),
-  project: z.string().optional(),
+  project: z.union([z.string(), z.array(z.string())]).optional(),
   justification: z.string().min(1),
   sopRead: z.boolean(),
   lineItems: z.array(LineItemInputSchema).min(1),
@@ -151,7 +151,8 @@ export async function POST(request: Request) {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   for (const li of lineItems) {
-    const d = new Date(li.requestedDate);
+    const [y, m, day] = li.requestedDate.split('-').map(Number);
+    const d = new Date(y, m - 1, day);
     if (d < today) {
       return NextResponse.json(
         { error: 'All requested dates must be today or in the future.' },
@@ -180,7 +181,7 @@ export async function POST(request: Request) {
             department, project, justification, sop_read, status, created_by, updated_by)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'Pending Approval', $10, $10)`,
         [requestId, productId, productName, requestorName, requestorEmail,
-         department, project ?? null, justification, sopRead, userId]
+         department, Array.isArray(project) ? project : (project ? [project] : null), justification, sopRead, userId]
       );
 
       // Insert line items
@@ -206,6 +207,14 @@ export async function POST(request: Request) {
       await client.query(
         `UPDATE product_requests SET request_number = $1, request_id = $2 WHERE id = $3`,
         [lastNumber, hullcRequestId, requestId]
+      );
+
+      // Log initial status
+      const userName = (await client.query<{full_name: string}>('SELECT full_name FROM users WHERE id = $1', [userId])).rows[0]?.full_name ?? 'System';
+      await client.query(
+        `INSERT INTO request_status_history (request_id, from_status, to_status, changed_by, changed_by_name, comments)
+         VALUES ($1, NULL, 'Pending Approval', $2, $3, 'Request submitted')`,
+        [requestId, userId, userName]
       );
 
       // Fetch the created request with line items

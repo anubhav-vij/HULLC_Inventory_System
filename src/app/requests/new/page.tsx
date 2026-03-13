@@ -9,8 +9,9 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Loader2, PlusCircle, Trash2, ChevronRight } from 'lucide-react';
+
+import { Loader2, PlusCircle, Trash2, ChevronRight, ChevronsUpDown } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useToast } from '@/hooks/use-toast';
 import { v4 as uuidv4 } from 'uuid';
 import type { Product, User } from '@/lib/types';
@@ -37,7 +38,7 @@ function NewRequestForm() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
-  const [project, setProject] = useState('');
+  const [selectedProjects, setSelectedProjects] = useState<string[]>([]);
   const [justification, setJustification] = useState('');
   const [sopRead, setSopRead] = useState(false);
   const [lineItemErrors, setLineItemErrors] = useState<Record<string, string>>({});
@@ -118,8 +119,8 @@ function NewRequestForm() {
 
     const errors: Record<string, string> = {};
 
-    if (!project) {
-      errors.project = 'Please select a project.';
+    if (selectedProjects.length === 0) {
+      errors.project = 'Please select at least one project.';
     }
 
     if (!justification.trim()) {
@@ -165,7 +166,7 @@ function NewRequestForm() {
           requestorName: user.fullName ?? user.email ?? '',
           requestorEmail: user.email ?? '',
           department: user.functionalGroupName ?? user.department ?? '',
-          project: project.trim() || undefined,
+          project: selectedProjects.length > 0 ? selectedProjects : undefined,
           justification: justification.trim(),
           sopRead,
           lineItems: lineItems.map(li => ({
@@ -270,17 +271,55 @@ function NewRequestForm() {
               </div>
               <div style={{ backgroundColor: '#f8fafc', padding: 20, borderRadius: '0 0 12px 12px' }} className="flex flex-col gap-4">
                 <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="project" style={{ color: '#475569', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>Project<span style={{ color: '#ef4444' }}> *</span></Label>
-                  <Select value={project} onValueChange={(v) => { setProject(v); setFormErrors(prev => { const next = { ...prev }; delete next.project; return next; }); }}>
-                    <SelectTrigger id="project" style={{ backgroundColor: '#fff', border: '1px solid #cbd5e1', borderRadius: 8 }}>
-                      <SelectValue placeholder="Select a project..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {projects.map(p => (
-                        <SelectItem key={p.id} value={p.name}>{p.name}</SelectItem>
+                  <Label htmlFor="project" style={{ color: '#475569', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.05em', fontWeight: 600 }}>Project(s)<span style={{ color: '#ef4444' }}> *</span></Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        role="combobox"
+                        className="w-full justify-between font-normal"
+                        style={{ backgroundColor: '#fff', border: '1px solid #cbd5e1', borderRadius: 8, minHeight: 40 }}
+                        onClick={() => setFormErrors(prev => { const next = { ...prev }; delete next.project; return next; })}
+                      >
+                        {selectedProjects.length === 0
+                          ? <span style={{ color: '#94a3b8' }}>Select projects...</span>
+                          : <span className="truncate">{selectedProjects.join(', ')}</span>
+                        }
+                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[400px] p-0" align="start">
+                      <div className="max-h-[300px] overflow-y-auto p-2">
+                        {projects.map(p => (
+                          <label
+                            key={p.id}
+                            className="flex items-center gap-2 px-2 py-1.5 rounded cursor-pointer hover:bg-slate-100"
+                          >
+                            <Checkbox
+                              checked={selectedProjects.includes(p.name)}
+                              onCheckedChange={(checked) => {
+                                setSelectedProjects(prev =>
+                                  checked ? [...prev, p.name] : prev.filter(n => n !== p.name)
+                                );
+                                setFormErrors(prev => { const next = { ...prev }; delete next.project; return next; });
+                              }}
+                            />
+                            <span className="text-sm">{p.name}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                  {selectedProjects.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {selectedProjects.map(name => (
+                        <span key={name} className="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium" style={{ backgroundColor: '#eff6ff', color: '#1e40af', border: '1px solid #bfdbfe' }}>
+                          {name}
+                          <button type="button" onClick={() => setSelectedProjects(prev => prev.filter(n => n !== name))} className="ml-0.5 hover:text-red-500">&times;</button>
+                        </span>
                       ))}
-                    </SelectContent>
-                  </Select>
+                    </div>
+                  )}
                   {formErrors.project && <p className="text-xs text-destructive mt-0.5">{formErrors.project}</p>}
                 </div>
                 <div className="flex flex-col gap-1.5">

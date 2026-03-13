@@ -40,6 +40,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: "approvals", label: "Approvals", icon: CheckSquare, roles: ["Admin", "Director"] },
   { id: "transactions", label: "Transactions", icon: ArrowLeftRight, roles: ["Admin", "ProjectManager", "Chief"] },
   { id: "fulfillments", label: "Fulfillments", icon: Truck, roles: ["Admin"] },
+  { id: "workflow-history", label: "Workflow History", icon: History, roles: ["Admin"] },
   {
     id: "configuration",
     label: "Configuration",
