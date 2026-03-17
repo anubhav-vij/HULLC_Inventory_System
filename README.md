@@ -450,6 +450,7 @@ All active development happens on `production`. `master` is kept as a reference 
 | 19 | 2026-03-13 | Post-demo fixes: metrics dashboard bug fix, product detail page, workflow history audit trail, multi-project requests, timezone fixes, lots sorting |
 | 20 | 2026-03-13 | System-wide pagination (75/page), manufacturer alternate names, product detail redesign, legacy fulfillments read-only, export filters, view details Admin-only, protected system admin |
 | 21 | 2026-03-13 | Phase 7: Stock reservation, system admin name edit fix, Admin SciOps approval override |
+| 22 | 2026-03-17 | Ran migrations 013-019 on remote Neon production DB — deployed app now supports all Session 18-21 features |
 
 For detailed task-by-task history, see `docs/TASKS.md`.
 

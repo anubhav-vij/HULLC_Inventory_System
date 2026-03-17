@@ -155,7 +155,7 @@ task and work through each phase sequentially, marking `[~]` while in progress a
 - [x] Added `LotFileSchema` type validation with ALLOWED_FILE_TYPES constant in types.ts
 
 #### Pending deployment actions
-- [~] Run migrations 013-017 on remote Neon database (tracked in Session 19 pending)
+- [x] Run migrations 013-019 on remote Neon database (completed Session 22)
 
 #### Code quality — frontend improvements
 - [x] Centralized auth headers in inventory-page.tsx: `authHeaders()` and `requestHeaders()` replace 13+ inconsistent inline patterns
@@ -235,7 +235,7 @@ task and work through each phase sequentially, marking `[~]` while in progress a
 - [x] Ran all pending migrations (013-016) on local DB
 
 #### Pending
-- [ ] Run migrations 013-017 on remote Neon database
+- [x] Run migrations 013-019 on remote Neon database (completed Session 22)
 - [ ] Test bulk import with real HULLC data on deployed app
 
 ### Session 19 — Post-Demo Fixes & Workflow History (2026-03-13)
@@ -273,7 +273,7 @@ task and work through each phase sequentially, marking `[~]` while in progress a
 - [x] DEV_GUIDE.md: updated product ID format to HULLC-XXXX
 
 #### Pending
-- [ ] Run migrations 013-018 on remote Neon database + seed
+- [x] Run migrations 013-019 on remote Neon database (completed Session 22)
 - [ ] Test bulk import with real HULLC data on deployed app
 
 ### Session 20 — Pagination, Manufacturer Alternate Names, UX Refinements (2026-03-13)
@@ -325,8 +325,15 @@ task and work through each phase sequentially, marking `[~]` while in progress a
 - [x] Removed unused "Needed" column from inventory table (header, desktop cells, mobile cards)
 
 #### Pending
-- [ ] Run migrations 013-018 on remote Neon database + seed
+- [x] Run migrations 013-019 on remote Neon database (completed Session 22)
 - [ ] Test bulk import with real HULLC data on deployed app
+
+### Session 22 — Remote Database Migration (2026-03-17)
+- [x] Ran migrations 013-019 on remote Neon production database (7 new migrations)
+- [x] Verified all 19 migrations applied: schema_migrations table confirms 001-019
+- [x] Verified admin@hullc.nih.gov has `is_system = TRUE` (set by migration 018)
+- [x] Verified `reserved_quantity` column exists on products table (migration 019)
+- [x] Deployed app now supports all Session 18-21 features: multi-project requests, workflow history, historical data import, system admin protection, stock reservation
 
 ---
 
@@ -685,6 +692,3 @@ task and work through each phase sequentially, marking `[~]` while in progress a
 - [ ] Confirm NIH Blue hex in print reports (`#002F87` vs `#003087`) — verify with NIH branding guidelines
 
 ---
-
-
-````"*
